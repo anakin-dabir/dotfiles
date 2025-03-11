@@ -66,6 +66,12 @@ case "$class" in
 	Warp-cloudflare-gui)
 		result "state=floating sticky=on rectangle=240x400+1605+55"
 		;;
+	Io.ente.auth)
+		result "state=floating focus=on center-on rectangle=300x300+0+0"
+		;;
+	gnome-calculator)
+		result "state=floating focus=on rectangle=400x600+1505+55"
+		;;
 esac
 
 case "$instance" in

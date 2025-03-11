@@ -22,7 +22,7 @@ super + {_,shift + }q
 	OpenApps --{terminal,floating}
 
 # App launcher
-super + @space
+super + space
 	OpenApps --menu
 
 # Theme Selector
@@ -201,7 +201,11 @@ super + shift {Left,Down,Up,Right}
 
 # Move floating window
 alt + shift {Left,Down,Up,Right}
-	bspc node -v {-20 0,0 20,0 -20,20 0}
+	bspc node -v {-60 0,0 60,0 -60,60 0}
 
+alt + w
+	OpenApps --monitor
 
+alt + q
+	~/.config/bspwm/src/Kill.sh
 

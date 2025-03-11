@@ -42,8 +42,8 @@ term_font_size="10"
 term_font_name="JetBrainsMono Nerd Font"
 
 # Picom options
-P_FADE="false"			# Fade true|false
-P_SHADOWS="true"		# Shadows true|false
+P_FADE="true"			# Fade true|false
+P_SHADOWS="false"		# Shadows true|false
 SHADOW_C="#000000"		# Shadow color
 P_CORNER_R="2"			# Corner radius (0 = disabled)
 P_BLUR="false"			# Blur true|false
