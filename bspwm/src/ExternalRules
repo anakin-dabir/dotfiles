@@ -46,7 +46,7 @@ case "$class" in
         result "state=floating focus=on center=on"
         ;;
     TelegramDesktop)
-        result "desktop=^6 follow=on"
+        result "desktop=^5 follow=on"
         ;;
     pavucontrol)
         result "state=floating center=on"
@@ -72,6 +72,8 @@ case "$class" in
 	gnome-calculator)
 		result "state=floating focus=on rectangle=400x600+1505+55"
 		;;
+	terminal64.exe)
+		result "desktop^4 follow=on"
 esac
 
 case "$instance" in
