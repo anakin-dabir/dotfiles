@@ -30,7 +30,9 @@ window {
 
     /* properties for all widgets */
     enabled:                     true;
-    border-radius:               6px;
+    border-radius:               0px;
+    border:						 1px solid;
+    border-color:				 @selected;
     cursor:                      "default";
     background-color:            @background;
 }

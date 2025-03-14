@@ -158,8 +158,8 @@ super + d
 # ----- Focus/Swap Nodes ----- #
 
 # Rotate desktop
-super + Tab
-	bspc node @/ --rotate {90,-90}
+# super + Tab
+# bspc node @/ --rotate {90,-90}
 
 # Switch workspace
 super + {Left,Right}
@@ -174,7 +174,9 @@ super + ctrl + {Left,Right}
 	bspc node -d {prev,next} '--follow'
 
 # Cycle focus through nodes.
-ctrl + Tab
+#ctrl + Tab
+
+super + Tab
 	bspc node -f next.local.!hidden.window
 
 # Swap Nodes

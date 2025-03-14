@@ -16,9 +16,11 @@ window {
     width:                       50%;
     x-offset:                    0px;
     y-offset:                    0px;
-    
+
     background-color:            @background;
-    //border-radius: 				 6px;
+    border-radius: 				 0px;
+    border:                      2px solid;
+    border-color:				 @selected;
 }
 
 mainbox {
@@ -75,7 +77,7 @@ listview {
     reverse:                     false;
     fixed-height:                true;
     fixed-columns:               true;
-    
+
     spacing:                     15px;
     border-color:                @selected;
     background-color:            transparent;
