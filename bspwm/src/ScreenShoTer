@@ -127,7 +127,7 @@ countdown() {
 run_cmd() {
     case $1 in
         --now)
-            sleep 0.5 && take_screenshot "full" false ;;
+            sleep 0.2 && take_screenshot "full" false ;;
         --sel)
             take_screenshot "select" false ;;
         --in3)

@@ -13,6 +13,7 @@
 # Set environment variables
 export PATH="$HOME/.config/bspwm/src:$PATH"
 export XDG_CURRENT_DESKTOP='bspwm'
+# XDG_CURRENT_DESKTOP=GNOME mongodb-compass
 ## Fix java applications
 export _JAVA_AWT_WM_NONREPARENTING=1
 
@@ -74,4 +75,13 @@ pidof -q clipcatd || { clipcatd & }
 # Launch polkit
 pidof -q polkit-gnome-authentication-agent-1 || { /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 & }
 
+# Launch gestures
 libinput-gestures-setup start
+
+# Start gnome-keyring-daemon once
+# Start gnome-keyring-daemon and capture its output
+if [ -z "$GNOME_KEYRING_CONTROL" ]; then
+  eval "$(/usr/bin/gnome-keyring-daemon --start 2>/dev/null)"
+  # Export variables explicitly (optional but safe)
+  export SSH_AUTH_SOCK GNOME_KEYRING_CONTROL
+fi
