@@ -39,7 +39,7 @@ FOCUSED_BC="#bb9af7"	# Focused border color
 
 # Terminal font & size
 term_font_size="10"
-term_font_name="0xProto Nerd Font"
+term_font_name="JetBrainsMono Nerd Font"
 
 # Picom options
 P_FADE="true"			# Fade true|false
@@ -55,7 +55,7 @@ dunst_offset='(20, 60)'
 dunst_origin='bottom-right'
 dunst_transparency='0'
 dunst_corner_radius='1'
-dunst_font='0xProto Nerd Font Medium 9'
+dunst_font='JetBrainsMono Nerd Font Medium 9'
 dunst_border='1'
 dunst_frame_color="$blueb"
 dunst_icon_theme="TokyoNight-SE"
@@ -73,7 +73,7 @@ jg_sel_fg="$fg"
 jg_sep="$blackb"
 
 # Rofi menu font and colors
-rofi_font="0xProto Nerd Font Bold 9"
+rofi_font="JetBrainsMono Nerd Font Bold 9"
 rofi_background="$bg"
 rofi_bg_alt="$accent_color"
 rofi_background_alt="${bg}E0"

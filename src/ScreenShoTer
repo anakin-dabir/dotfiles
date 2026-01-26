@@ -37,6 +37,7 @@ filename="$dir/Shot-${timestamp}.png"
 [ -d "$dir" ] || mkdir -p "$dir"
 
 # Rofi options
+s_mobile="📱"
 s_full=""
 s_select=""
 s_in3="󰔝"
@@ -75,7 +76,7 @@ rofi_cmd() {
 }
 
 run_rofi() {
-    echo -e "$s_full\n$s_select\n$s_in3\n$s_all" | rofi_cmd
+    echo -e "$s_mobile\n$s_full\n$s_select\n$s_in3\n$s_all" | rofi_cmd
 }
 
 show_notification() {
@@ -103,6 +104,9 @@ take_screenshot() {
                 [[ -n "$geometry" ]] && cmd="$cmd -g $geometry"
             fi
             ;;
+        "mobile")
+            cmd="$cmd -g 467x1015+725+57"
+            ;;
         "select")
             cmd="$cmd -s -o -b 2"
             ;;
@@ -126,6 +130,8 @@ countdown() {
 
 run_cmd() {
     case $1 in
+		--mobile)
+            sleep 0.2 && take_screenshot "mobile" false ;;
         --now)
             sleep 0.2 && take_screenshot "full" false ;;
         --sel)
@@ -139,6 +145,8 @@ run_cmd() {
 
 select_option="$(run_rofi)"
 case ${select_option} in
+	"$s_mobile")
+        run_cmd --mobile ;;
     "$s_full")
         run_cmd --now ;;
     "$s_select")

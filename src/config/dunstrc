@@ -35,7 +35,7 @@ frame_color = "#7aa2f7"
 sort = no
 idle_threshold = 0
 
-font = 0xProto Nerd Font Medium 9
+font = JetBrainsMono Nerd Font Medium 9
 line_height = 0
 
 markup = full
