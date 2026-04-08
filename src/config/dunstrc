@@ -11,7 +11,7 @@ follow = mouse
 
 width = (300, 400)
 #height = (0, 200)
-origin = bottom-right
+origin = top-right
 offset = (20, 60)
 scale = 0
 
@@ -19,7 +19,7 @@ notification_limit = 20
 indicate_hidden = yes
 
 transparency = 0
-corner_radius = 1
+corner_radius = 0
 
 gap_size = 4
 separator_height = 1
@@ -29,17 +29,17 @@ padding = 15
 horizontal_padding = 15
 text_icon_padding = 0
 
-frame_width = 1
-frame_color = "#7aa2f7"
+frame_width = 2
+frame_color = "#bd93f9"
 
 sort = no
 idle_threshold = 0
 
-font = JetBrainsMono Nerd Font Medium 9
+font = JetBrainsMono NF Medium 9
 line_height = 0
 
 markup = full
-format = "<span size='xx-large' font_desc='Cantarell 9' weight='bold' foreground='#7aa2f7'>%s</span>\n%b"
+format = "<span size='xx-large' font_desc='Cantarell 9' weight='bold' foreground='#bd93f9'>%s</span>\n%b"
 alignment = center
 vertical_alignment = center
 
@@ -52,7 +52,7 @@ hide_duplicate_count = true
 show_indicators = yes
 
 enable_recursive_icon_lookup = true
-icon_theme = "TokyoNight-SE, Adwaita"
+icon_theme = "Dracula, Adwaita"
 icon_position = left
 min_icon_size = 60
 max_icon_size = 90
@@ -74,7 +74,7 @@ mouse_right_click = close_all
 
 progress_bar = true
 progress_bar_height = 10
-progress_bar_frame_width = 1
+progress_bar_frame_width = 2
 progress_bar_min_width = 125
 progress_bar_max_width = 250
 progress_bar_corner_radius = 5
@@ -84,15 +84,15 @@ class = Dunst
 
 [urgency_low]
 timeout = 3
-background = "#1a1b26"
-foreground = "#9ece6a"
+background = "#282a36"
+foreground = "#50fa7b"
 
 [urgency_normal]
 timeout = 5
-background = "#1a1b26"
-foreground = "#c0caf5"
+background = "#282a36"
+foreground = "#f8f8f2"
 
 [urgency_critical]
 timeout = 0
-background = "#1a1b26"
-foreground = "#f7768e"
+background = "#282a36"
+foreground = "#ff5555"

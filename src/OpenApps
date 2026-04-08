@@ -110,6 +110,9 @@ case "$1" in
 	--monitor)
 		/home/cdc/.config/bspwm/src/Monitor.sh
 		;;
+	--xephyr-sandbox)
+		/home/cdc/.config/bspwm/src/sandbox-menu
+		;;
 	*)
 		echo "Invalid Option"
 		;;

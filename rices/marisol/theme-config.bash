@@ -34,20 +34,20 @@ TOP_PADDING="44"
 BOTTOM_PADDING="1"
 LEFT_PADDING="1"
 RIGHT_PADDING="1"
-NORMAL_BC="#ff79c6"		# Normal border color
-FOCUSED_BC="#bd93f9"	# Focused border color
+NORMAL_BC="#77767B"		# Normal border color
+FOCUSED_BC="#F8E45C"	# Focused border color
 
 # Terminal font & size
 term_font_size="10"
 term_font_name="JetBrainsMono Nerd Font"
 
 # Picom options
-P_FADE="true"			# Fade true|false
+P_FADE="false"			# Fade true|false
 P_SHADOWS="false"		# Shadows true|false
 SHADOW_C="#000000"		# Shadow color
-P_CORNER_R="0"			# Corner radius (0 = disabled)
+P_CORNER_R="10"			# Corner radius (0 = disabled)
 P_BLUR="false"			# Blur true|false
-P_ANIMATIONS="@"		# (@ = enable) (# = disable)
+P_ANIMATIONS="#"		# (@ = enable) (# = disable)
 P_TERM_OPACITY="1.0"	# Terminal transparency. Range: 0.1 - 1.0 (1.0 = disabled)
 
 # Dunst

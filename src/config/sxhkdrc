@@ -25,6 +25,9 @@ super + {_,shift + }q
 super + space
 	OpenApps --menu
 
+ctrl + super + space
+	OpenApps --xephyr-sandbox
+
 # Theme Selector
 alt + @space
 	RiceSelector

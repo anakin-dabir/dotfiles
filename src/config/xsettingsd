@@ -1,6 +1,6 @@
-Net/ThemeName "TokyoNight-zk"
-Net/IconThemeName "Glassy"
-Gtk/CursorThemeName "Qogirr"
+Net/ThemeName "Dracula-zk"
+Net/IconThemeName "Dracula"
+Gtk/CursorThemeName "Qogirr-Dark"
 Gtk/DecorationLayout ":"
 Xft/Hinting 1
 Xft/HintStyle "hintfull"
