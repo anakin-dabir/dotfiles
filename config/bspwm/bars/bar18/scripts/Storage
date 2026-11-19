@@ -1,0 +1,17 @@
+#!/bin/bash
+# Disk usage info (root filesystem) for eww bar
+MOUNT=/
+case "$1" in
+    --percent)
+        df --output=pcent "$MOUNT" | tail -1 | tr -d ' %'
+        ;;
+    --used)
+        df -h "$MOUNT" | awk 'NR==2 {print $3}'
+        ;;
+    --tooltip)
+        used=$(df -h "$MOUNT" | awk 'NR==2 {print $3}')
+        total=$(df -h "$MOUNT" | awk 'NR==2 {print $2}')
+        pct=$(df --output=pcent "$MOUNT" | tail -1 | tr -d ' %')
+        echo "Disk: ${used} / ${total} (${pct}%)"
+        ;;
+esac

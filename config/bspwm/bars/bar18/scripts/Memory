@@ -1,0 +1,17 @@
+#!/bin/bash
+# RAM usage info for eww bar
+case "$1" in
+    --percent)
+        free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}'
+        ;;
+    --used)
+        # short form, e.g. "5.4G" — strip the "i" from "5.4Gi"
+        free -h | awk '/^Mem:/ {sub(/i$/,"",$3); print $3}'
+        ;;
+    --tooltip)
+        used=$(free -h | awk '/^Mem:/ {sub(/i$/,"",$3); print $3}')
+        total=$(free -h | awk '/^Mem:/ {sub(/i$/,"",$2); print $2}')
+        pct=$(free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}')
+        echo "RAM: ${used} / ${total} (${pct}%)"
+        ;;
+esac

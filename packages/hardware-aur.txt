@@ -1,0 +1,3 @@
+hp-omen-wmi-dkms
+omen-hub
+victus-control-bin

@@ -1,0 +1,6 @@
+# Daily work layout — 4 tabs, SW-couriers stack, auto-starting dev servers.
+# Launch: kitty --session ~/.config/kitty/work.session  (or super+shift+w / Xephyr startup)
+#
+# Each tab runs its command then `exec zsh`, so Ctrl+C stops the server but the
+# tab stays open for reuse. To make a tab NOT auto-run, replace the whole
+# `launch ... zsh -c '...'` line with just:  launch --cwd=<folder>

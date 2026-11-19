@@ -1,0 +1,38 @@
+#!/bin/bash
+# Full system update (repo + AUR) followed by the post-update cleanup.
+
+bold() { printf '\n\033[1;34m:: %s\033[0m\n' "$1"; }
+
+bold "Updating repo + AUR packages"
+yay -Syu || exit 1
+
+before=$(df --output=avail -B1 / | tail -1)
+
+bold "Removing orphaned packages"
+yay -Yc
+
+bold "Cleaning package caches"
+sudo paccache -rk1
+sudo paccache -ruk0
+rm -rf "$HOME/.cache/yay/"*
+
+# Stale GPU caches after mesa/nvidia bumps make Electron apps sluggish.
+bold "Clearing Electron GPU caches"
+for d in "$HOME/.config"/*/; do
+    rm -rf "${d}GPUCache" "${d}DawnGraphiteCache" "${d}DawnWebGPUCache"
+done
+
+after=$(df --output=avail -B1 / | tail -1)
+bold "Free space: $(numfmt --to=iec "$before") -> $(numfmt --to=iec "$after")"
+
+pacnew=$(find /etc -name '*.pacnew' 2>/dev/null)
+if [ -n "$pacnew" ]; then
+    bold "Config files to review (merge with: sudo pacdiff)"
+    echo "$pacnew"
+fi
+
+if [ ! -d "/usr/lib/modules/$(uname -r)" ]; then
+    bold "Kernel was updated — reboot to load it"
+fi
+
+Updates --sync-polybar >/dev/null 2>&1

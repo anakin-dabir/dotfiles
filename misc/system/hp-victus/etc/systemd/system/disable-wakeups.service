@@ -1,0 +1,10 @@
+[Unit]
+Description=Disable spurious ACPI wakeup sources
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/disable-wakeups.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+! Colors generated for the cupertino theme.
+st.alpha:   1.0
+
+*background: #1C1C1E
+*foreground: #F5F5F7
+
+! Black + DarkGrey
+*color0:  #48484A
+*color8:  #98989D
+
+! DarkRed + Red
+*color1:  #FF453A
+*color9:  #FF375F
+
+! DarkGreen + Green
+*color2:  #30D158
+*color10: #30D158
+
+! DarkYellow + Yellow
+*color3:  #FF9F0A
+*color11: #FF9F0A
+
+! DarkBlue + Blue
+*color4:  #0A84FF
+*color12: #0A84FF
+
+! DarkMagenta + Magenta
+*color5:  #BF5AF2
+*color13: #BF5AF2
+
+! DarkCyan + Cyan
+*color6:  #0A84FF
+*color14: #0A84FF
+
+! LightGrey + White
+*color7:  #F5F5F7
+*color15: #FFFFFF

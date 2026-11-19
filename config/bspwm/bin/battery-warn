@@ -1,0 +1,23 @@
+#!/bin/bash
+# Notify when battery is low. Invoked by battery-warn.timer.
+
+BAT=/sys/class/power_supply/BAT0
+CAP=$(cat "$BAT/capacity" 2>/dev/null) || exit 0
+STATUS=$(cat "$BAT/status" 2>/dev/null) || exit 0
+
+# Only warn while discharging (not charging / full / unknown)
+[ "$STATUS" = "Discharging" ] || exit 0
+
+# Find a user session DBus so notify-send reaches dunst when invoked by systemd
+export DISPLAY=${DISPLAY:-:0}
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+
+notify() {
+    local urgency=$1 title=$2 body=$3
+    notify-send -a battery-warn -u "$urgency" -i battery-caution -r 991337 "$title" "$body"
+}
+
+if   [ "$CAP" -le 2 ];  then notify critical "Battery CRITICAL (${CAP}%)" "Plug in NOW — system will die soon."
+elif [ "$CAP" -le 5 ];  then notify critical "Battery very low (${CAP}%)" "Plug in immediately."
+elif [ "$CAP" -le 15 ]; then notify normal   "Battery low (${CAP}%)"      "Consider plugging in."
+fi

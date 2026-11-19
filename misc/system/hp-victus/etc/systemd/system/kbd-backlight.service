@@ -1,0 +1,10 @@
+[Unit]
+Description=HP keyboard: fix RGB perms + restore saved color at boot
+After=multi-user.target
+ConditionPathIsDirectory=/sys/devices/platform/hp-wmi/rgb_zones
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'Z=/sys/devices/platform/hp-wmi/rgb_zones; chgrp wheel $Z/zone*; chmod 664 $Z/zone*; C=$(cat /etc/kbd-backlight.conf 2>/dev/null); for z in $Z/zone*; do echo "$C" > "$z"; done'
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,97 @@
+#!/bin/bash
+# Toggle a fast, smooth EASED "breathing rainbow" glow on the keyboard.
+#   no args -> toggle on/off      --loop -> internal cycling loop
+#
+# No sudo: RGB zone files are group-writable (wheel) via the udev rule, so the
+# loop writes them directly for a high, even framerate. Preview-only (never
+# changes the saved color). Bound to super+alt+g.
+
+CONF=/etc/kbd-backlight.conf
+PIDFILE=/tmp/kbd-rainbow.pid
+ZONES=(/sys/devices/platform/hp-wmi/rgb_zones/zone0*)
+
+# --- Tunables ---
+# Per-color fade time = STEPS * DELAY (~2s). Full loop = STEPS * (#colors) * DELAY.
+# To slow the drift without more CPU, raise DELAY. To fade smoother, raise STEPS.
+DELAY=0.04     # seconds per frame. bigger = slower & lighter on CPU
+HOLD=15        # frames to STAY on each color before fading (dwell). HOLD*DELAY = seconds held
+STEPS=55       # cross-fade frames between colors: higher = smoother/slower fade.
+               # Colors are visited in a contrasting order, so each fade morphs
+               # between very different colors (distinct changes, not a drift).
+LEVEL=0        # 0 = raw vivid colors (no white-washing). Raise toward 150 only
+               # if you want even brightness at the cost of pastel-ness.
+
+# Palette comes from the SHARED source of truth used by the picker too.
+COLORFILE="$HOME/.config/bspwm/kbd-colors.conf"
+mapfile -t PALETTE < <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$COLORFILE" | awk '{print $1}')
+
+# Reorder so CONSECUTIVE colors contrast strongly (big hue jumps) instead of
+# the subtle neighbor-drift of a hue-sorted list. Uses a large stride that's
+# coprime with the count, so every color is still visited exactly once.
+gcd() { local a=$1 b=$2 t; while [ "$b" -ne 0 ]; do t=$b; b=$((a%b)); a=$t; done; echo "$a"; }
+_n=${#PALETTE[@]}
+if [ "$_n" -gt 4 ]; then
+    _stride=$(( _n * 2 / 5 )); [ "$_stride" -lt 2 ] && _stride=2
+    while [ "$(gcd "$_stride" "$_n")" -ne 1 ]; do _stride=$((_stride + 1)); done
+    _out=()
+    for ((i = 0; i < _n; i++)); do _out+=("${PALETTE[(i*_stride)%_n]}"); done
+    PALETTE=("${_out[@]}")
+fi
+
+gen_frames() {
+    # Cross-fade (RGB lerp) between consecutive palette colors, looping, with
+    # optional constant-luminance normalization so brightness stays even.
+    awk -v pal="${PALETTE[*]}" -v steps="$STEPS" -v hold="$HOLD" -v lt="$LEVEL" 'BEGIN{
+        m = split(pal, C, " ")
+        for (i = 1; i <= m; i++) {
+            j = (i % m) + 1                    # next color (wraps to start)
+            r1=strtonum("0x" substr(C[i],1,2)); g1=strtonum("0x" substr(C[i],3,2)); b1=strtonum("0x" substr(C[i],5,2))
+            r2=strtonum("0x" substr(C[j],1,2)); g2=strtonum("0x" substr(C[j],3,2)); b2=strtonum("0x" substr(C[j],5,2))
+            # total frames for this color = hold (stay) + steps (fade to next)
+            for (s = 0; s < hold + steps; s++) {
+                t = (s < hold) ? 0 : (s - hold) / steps      # dwell, then fade
+                R = r1 + (r2-r1)*t; G = g1 + (g2-g1)*t; B = b1 + (b2-b1)*t
+                if (lt > 0) {
+                    L = 0.299*R + 0.587*G + 0.114*B
+                    if (L > lt)      { sc = lt / L; R*=sc; G*=sc; B*=sc }
+                    else if (L < lt) { k = (lt-L)/(255-L); R=R+(255-R)*k; G=G+(255-G)*k; B=B+(255-B)*k }
+                }
+                printf "%02X%02X%02X\n", int(R+0.5), int(G+0.5), int(B+0.5)
+            }
+        }
+    }'
+}
+
+if [ "$1" = "--loop" ]; then
+    echo $$ > "$PIDFILE"
+    # Built-in sub-second sleep with NO per-frame process spawn: hold a fifo
+    # open read/write and use `read -t` as a precise, jitter-free timer.
+    FIFO=$(mktemp -u); mkfifo "$FIFO"; exec {sfd}<>"$FIFO"; rm -f "$FIFO"
+    trap 'rm -f "$PIDFILE"' EXIT
+
+    mapfile -t FR < <(gen_frames)
+    n=${#FR[@]}; [ "$n" -eq 0 ] && exit 1
+    # Single-zone hardware: all zones drive the same light, so write only ONE
+    # zone per frame. This cuts the (CPU-expensive) EC/ACPI firmware calls ~4x.
+    zone="${ZONES[0]}"
+    idx=0
+    while true; do
+        printf '%s' "${FR[idx]}" > "$zone" 2>/dev/null
+        idx=$(( (idx + 1) % n ))
+        read -t "$DELAY" -u "$sfd" _ 2>/dev/null   # in-process sleep
+    done
+    exit 0
+fi
+
+# --- Toggle ---
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
+    kill "$(cat "$PIDFILE")" 2>/dev/null
+    rm -f "$PIDFILE"
+    sleep 0.1
+    saved=$(cat "$CONF" 2>/dev/null)
+    [[ "$saved" =~ ^[0-9A-Fa-f]{6}$ ]] && "$HOME/.config/bspwm/bin/set-kbd-color" "$saved"
+    notify-send -a kbd-rainbow -i preferences-desktop-theme "Keyboard" "Glow OFF"
+else
+    setsid -f "$0" --loop >/dev/null 2>&1
+    notify-send -a kbd-rainbow -i preferences-desktop-theme "Keyboard" "Breathing glow ON 🌈"
+fi

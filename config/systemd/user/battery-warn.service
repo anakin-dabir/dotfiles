@@ -1,0 +1,6 @@
+[Unit]
+Description=Battery low notification (one-shot)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/bspwm/bin/battery-warn

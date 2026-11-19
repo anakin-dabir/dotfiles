@@ -1,0 +1,17 @@
+#!/bin/bash
+# Auto-mount the iPhone's photo/media AFC share (DCIM, Books, Music, etc.)
+# GVFS's own afc volume monitor only auto-mounts the "Documents" (house-arrest)
+# share; the plain media share has to be requested explicitly via gio mount.
+# Triggered by udev on USB connect — see /etc/udev/rules.d/99-iphone-automount.rules
+
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+for i in $(seq 1 10); do
+    UDID=$(idevice_id -l 2>/dev/null | head -1)
+    [ -n "$UDID" ] && break
+    sleep 1
+done
+
+[ -z "$UDID" ] && exit 0
+
+gio mount "afc://$UDID/" 2>/dev/null

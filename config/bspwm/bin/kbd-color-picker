@@ -1,0 +1,63 @@
+#!/bin/bash
+# fzf keyboard backlight picker with LIVE PREVIEW.
+#   - moving the cursor previews the color (temporary)
+#   - Enter commits permanently, Esc / window-close restores the original
+# Colors come from the shared palette: ~/.config/bspwm/kbd-colors.conf
+# Runs inside a floating terminal (launched via sxhkd).
+
+SETTER="$HOME/.config/bspwm/bin/set-kbd-color"
+PREVIEW_HELPER="$HOME/.config/bspwm/bin/kbd-preview"
+COLORFILE="$HOME/.config/bspwm/kbd-colors.conf"
+CONF=/etc/kbd-backlight.conf
+
+# Original color, to restore if the user cancels
+ORIG=$(cat "$CONF" 2>/dev/null)
+[[ "$ORIG" =~ ^[0-9A-Fa-f]{6}$ ]] || ORIG="FFFFFF"
+
+# Build the fzf list from the shared palette, rendering "# --- Group ---"
+# comment lines as visual separators. Header lines have no hex, so previewing/
+# selecting one is a harmless no-op.
+build_list() {
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^#+[[:space:]]*-+[[:space:]]*(.*[^-[:space:]])[[:space:]]*-+[[:space:]]*$ ]]; then
+            printf '  ─── %s ───\n' "${BASH_REMATCH[1]}"        # group header
+            continue
+        fi
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue              # other comments
+        [[ -z "${line// }" ]] && continue                       # blank
+        read -r hex name <<< "$line"
+        printf '   %-16s #%s\n' "$name" "$hex"                   # color row
+    done < "$COLORFILE"
+    printf '   %-16s #%s\n' "Off" "000000"
+    printf '   %s\n' "Custom hex…"
+}
+
+# Restore original on ANY exit unless a color was committed
+COMMITTED=0
+restore() { [ "$COMMITTED" -eq 0 ] && "$SETTER" "$ORIG" >/dev/null 2>&1; }
+trap restore EXIT INT TERM HUP
+
+choice=$(build_list | fzf \
+    --prompt="kbd color> " \
+    --header="up/down preview - Enter apply - Esc cancel (now: #$ORIG)" \
+    --height=100% --layout=reverse --info=inline --cycle \
+    --bind "focus:execute-silent($PREVIEW_HELPER {})" \
+    --bind 'start:pos(2)' \
+    --bind 'enter:transform:case {} in *───*) ;; *) echo accept;; esac' \
+    --bind 'down:down+transform:case {} in *───*) echo down;; esac' \
+    --bind 'up:up+transform:case {} in *───*) echo up;; esac')
+
+[ -z "$choice" ] && exit 0
+
+if [[ "$choice" == "Custom hex…"* ]]; then
+    read -rp "Enter hex (RRGGBB): " hex
+else
+    hex=$(printf '%s' "$choice" | grep -oE '[0-9A-Fa-f]{6}' | head -1)
+fi
+hex="${hex#\#}"; hex="${hex^^}"
+
+if [[ "$hex" =~ ^[0-9A-F]{6}$ ]]; then
+    "$SETTER" "$hex"
+    COMMITTED=1
+    notify-send -a kbd-color -i preferences-desktop-theme "Keyboard color set" "#$hex"
+fi

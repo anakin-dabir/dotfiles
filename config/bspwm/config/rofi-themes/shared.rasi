@@ -1,0 +1,35 @@
+* {
+    font: "Adwaita Sans 11";
+    background: #1C1C1EF2;
+    bg-alt: #2C2C2E;
+    background-alt: #1C1C1EE6;
+    foreground: #F5F5F7;
+    selected: #007AFFF0;
+    active: #34C759;
+    urgent: #FF3B30;
+}
+
+/* ── cupertino: macOS-style geometry ───────────────────────── */
+window {
+    border-radius: 12px;
+    border:        1px;
+    border-color:  @bg-alt;
+    padding:       0px;
+}
+mainbox  { padding: 8px; spacing: 6px; }
+inputbar {
+    background-color: @bg-alt;
+    border-radius:    9px;
+    padding:          9px 12px;
+    spacing:          8px;
+}
+entry    { placeholder-color: @foreground; }
+listview { spacing: 2px; padding: 2px 0px; }
+element  { border-radius: 8px; padding: 8px 12px; spacing: 10px; }
+element selected {
+    background-color: @selected;
+    text-color:       #FFFFFF;
+}
+element-icon { size: 22px; }
+button   { border-radius: 8px; padding: 6px; }
+message  { border-radius: 9px; padding: 8px; }

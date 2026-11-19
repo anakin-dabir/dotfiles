@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""
+JARVIS — local voice assistant.
+  mic → whisper.cpp (STT) → ollama qwen2.5-coder (brain) → piper (TTS) → speakers
+
+Everything runs locally. No cloud, no API keys.
+
+Usage:  jarvis            (press ENTER to talk, ENTER again to stop; Ctrl+C quits)
+        jarvis --text     (text-only mode, no mic/speaker — for testing)
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+# ── Config ────────────────────────────────────────────────────────────────
+HOME = os.path.expanduser("~")
+JARVIS_DIR = f"{HOME}/.local/share/jarvis"
+WHISPER_MODEL = f"{JARVIS_DIR}/models/ggml-base.en.bin"
+PIPER_VOICE = f"{JARVIS_DIR}/voices/en_US-amy-medium.onnx"
+
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+MODEL = "qwen2.5-coder:7b"
+
+SYSTEM_PROMPT = (
+    "You are JARVIS, a concise local voice assistant. "
+    "Answer in 1-3 short sentences — your replies are spoken aloud, so keep them "
+    "brief and natural. No markdown, no code blocks, no bullet lists unless asked."
+)
+
+history = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+
+def find_bin(*names):
+    """Return the first binary found from names, else None."""
+    for n in names:
+        p = shutil.which(n)
+        if p:
+            return p
+    return None
+
+
+WHISPER_BIN = find_bin("whisper-cli", "whisper-cpp", "main")
+PIPER_BIN = find_bin("piper", "piper-tts")
+
+
+def record(path):
+    """Record mic audio until the user presses ENTER."""
+    print("\n🎤 Recording… press ENTER to stop", flush=True)
+    proc = subprocess.Popen(
+        ["arecord", "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", path],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        input()
+    finally:
+        proc.terminate()
+        proc.wait()
+
+
+def transcribe(path):
+    """Run whisper.cpp on the wav, return the recognized text."""
+    if not WHISPER_BIN:
+        return ""
+    out = subprocess.run(
+        [WHISPER_BIN, "-m", WHISPER_MODEL, "-f", path, "-nt", "-np", "--no-timestamps"],
+        capture_output=True, text=True,
+    )
+    return " ".join(out.stdout.split()).strip()
+
+
+def ask(prompt):
+    """Send prompt (with history) to ollama, return the reply."""
+    history.append({"role": "user", "content": prompt})
+    body = json.dumps(
+        {"model": MODEL, "messages": history, "stream": False}
+    ).encode()
+    req = urllib.request.Request(
+        OLLAMA_URL, data=body, headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        reply = json.load(r)["message"]["content"].strip()
+    history.append({"role": "assistant", "content": reply})
+    # keep context small: system + last 8 turns
+    if len(history) > 17:
+        del history[1:3]
+    return reply
+
+
+def speak(text):
+    """Speak text via piper → aplay. Falls back to printing if piper is missing."""
+    if not PIPER_BIN or not os.path.exists(PIPER_VOICE):
+        return
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        wav = f.name
+    try:
+        subprocess.run(
+            [PIPER_BIN, "--model", PIPER_VOICE, "--output_file", wav],
+            input=text, text=True, capture_output=True,
+        )
+        subprocess.run(["aplay", "-q", wav], stderr=subprocess.DEVNULL)
+    finally:
+        os.unlink(wav)
+
+
+def preflight(text_mode):
+    """Verify deps are present; print what's missing."""
+    problems = []
+    if not text_mode:
+        if not WHISPER_BIN:
+            problems.append("whisper.cpp not found  →  sudo pacman -S whisper.cpp")
+        elif not os.path.exists(WHISPER_MODEL):
+            problems.append(f"whisper model missing  →  see setup below\n    {WHISPER_MODEL}")
+        if not PIPER_BIN:
+            problems.append("piper not found  →  paru -S piper-tts-git")
+        elif not os.path.exists(PIPER_VOICE):
+            problems.append(f"piper voice missing  →  see setup below\n    {PIPER_VOICE}")
+    try:
+        urllib.request.urlopen("http://127.0.0.1:11434", timeout=3)
+    except Exception:
+        problems.append("ollama not reachable  →  sudo systemctl start ollama")
+    if problems:
+        print("⚠  Setup incomplete:\n")
+        for p in problems:
+            print("  •", p)
+        print(
+            "\nModel downloads:\n"
+            f"  mkdir -p {JARVIS_DIR}/models {JARVIS_DIR}/voices\n"
+            f"  curl -L -o {WHISPER_MODEL} \\\n"
+            "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin\n"
+            f"  curl -L -o {PIPER_VOICE} \\\n"
+            "    https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx\n"
+            f"  curl -L -o {PIPER_VOICE}.json \\\n"
+            "    https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json\n"
+        )
+        return False
+    return True
+
+
+def main():
+    text_mode = "--text" in sys.argv
+    if not preflight(text_mode):
+        sys.exit(1)
+
+    print(f"🤖 JARVIS ready  ({MODEL}{', text mode' if text_mode else ''})")
+    print("   Ctrl+C to quit\n")
+
+    while True:
+        try:
+            if text_mode:
+                said = input("You: ").strip()
+            else:
+                input("Press ENTER to talk… ")
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                    wav = f.name
+                try:
+                    record(wav)
+                    print("… transcribing", flush=True)
+                    said = transcribe(wav)
+                finally:
+                    os.unlink(wav)
+                print(f"You: {said or '(nothing heard)'}")
+
+            if not said:
+                continue
+            if said.lower().strip(" .!?") in ("quit", "exit", "goodbye", "bye"):
+                speak("Goodbye.")
+                break
+
+            reply = ask(said)
+            print(f"JARVIS: {reply}\n")
+            if not text_mode:
+                speak(reply)
+
+        except (KeyboardInterrupt, EOFError):
+            print("\n👋 bye")
+            break
+        except Exception as e:
+            print(f"⚠  {e}\n")
+
+
+if __name__ == "__main__":
+    main()

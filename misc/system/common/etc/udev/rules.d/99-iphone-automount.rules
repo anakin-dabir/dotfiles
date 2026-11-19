@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ENV{DEVTYPE}=="usb_device", ACTION=="add", RUN+="/usr/bin/systemd-run --uid=@USER@ --gid=@USER@ --setenv=XDG_RUNTIME_DIR=/run/user/@UID@ --setenv=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/@UID@/bus /home/@USER@/.config/bspwm/bin/iphone-automount"

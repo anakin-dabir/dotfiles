@@ -1,0 +1,17 @@
+beekeeper-studio-bin
+brave-beta-bin
+brave-nightly-bin
+cursor-bin
+cutwire-drift-bin
+ente-auth-bin
+gtk-engine-murrine
+gtk2
+mongodb-tools-bin
+mongodb70-bin
+mongosh-bin
+photoqt-bin
+redisinsight-bin
+visual-studio-code-insiders-bin
+whitesur-cursor-theme-git
+whitesur-gtk-theme
+whitesur-icon-theme

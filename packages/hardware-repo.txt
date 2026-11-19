@@ -1,0 +1,7 @@
+envycontrol
+intel-ucode
+libva-nvidia-driver
+nvidia-open-dkms
+nvidia-prime
+nvidia-settings
+r8168-dkms

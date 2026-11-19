@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# 1. Get command from user via rofi
+# Using -dmenu so you can type whatever you want
+CMD=$(rofi -dmenu -p "NVIDIA Run (Host):")
+
+# Exit if user hits escape/cancels
+[ -z "$CMD" ] && exit 0
+
+# 2. Extract the binary name (first word) to check if it exists
+BINARY=$(echo "$CMD" | awk '{print $1}')
+
+# 3. Check if the app is installed
+if ! command -v "$BINARY" >/dev/null 2>&1; then
+    notify-send -u critical "Error" "Command '$BINARY' not found on system."
+    exit 1
+fi
+
+# 4. Launch on NVIDIA card with prime-run
+# Use nohup and & so the script doesn't hang or close the app
+prime-run $CMD >/dev/null 2>&1 &
+
+notify-send "NVIDIA Power" "Launching $BINARY on RTX 5060"

@@ -1,0 +1,24 @@
+# Claude Code session data
+.claude/
+
+# Shell history and caches
+config/zsh/zhistory*
+config/zsh/zcompdump*
+
+# Runtime state
+config/mpd/log
+config/mpd/mpd.db
+config/mpd/mpdstate
+config/mpd/socket
+config/ncmpcpp/error.log
+config/ncmpcpp/lyrics/
+config/geany/session.conf
+config/gtk-3.0/bookmarks
+
+# Service enable links are absolute paths; install.sh enables the units instead
+config/systemd/user/*.wants/
+
+# Editor/app leftovers
+*.bak
+*.atomic-write-*
+.goutputstream-*
