@@ -69,6 +69,10 @@ super + alt + b
 super + alt + c
     OpenApps --clipboard
 
+# Notification center (history, Do Not Disturb)
+super + alt + i
+    NotifyCenter
+
 # Screenshot
 Print
 	OpenApps --screenshot

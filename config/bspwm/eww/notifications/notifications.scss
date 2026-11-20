@@ -1,0 +1,192 @@
+// Notification center panel (colors come from the current rice, see colors.scss)
+
+$nc-font: "Adwaita Sans", "Inter", "Noto Sans", "JetBrainsMono NF", sans-serif;
+$nc-icons: "Material Design Icons Desktop";
+
+.nc-closer {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.nc-panel {
+  font-family: $nc-font;
+  color: $fg;
+  background-color: rgba($bg, 0.97);
+  border: 1px solid rgba($fg, 0.10);
+  border-radius: 16px;
+  padding: 14px;
+  margin: 2px;
+}
+
+.nc-panel label {
+  font-family: $nc-font;
+  color: $fg;
+}
+
+// ----- header ----- //
+
+.nc-header {
+  padding: 2px 4px 12px 4px;
+}
+
+.nc-title {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.nc-sub {
+  font-size: 11px;
+  color: rgba($fg, 0.55);
+  margin-top: 2px;
+}
+
+.nc-pill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background-color: rgba($fg, 0.07);
+  font-size: 11px;
+}
+
+.nc-pill:hover {
+  background-color: rgba($fg, 0.14);
+}
+
+.nc-pill label {
+  font-size: 11px;
+}
+
+.nc-pill .nc-pill-icon {
+  font-family: $nc-icons;
+  font-size: 13px;
+}
+
+.nc-pill-on {
+  background-color: $blue;
+}
+
+.nc-pill-on:hover {
+  background-color: rgba($blue, 0.85);
+}
+
+.nc-pill-on label {
+  color: #ffffff;
+}
+
+.nc-pill-danger {
+  background-color: $red;
+}
+
+.nc-pill-danger label {
+  color: #ffffff;
+}
+
+// ----- list ----- //
+
+.nc-day {
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba($fg, 0.5);
+  margin: 6px 6px 6px 6px;
+}
+
+.nc-card {
+  background-color: rgba($fg, 0.05);
+  border: 1px solid rgba($fg, 0.04);
+  border-radius: 12px;
+  padding: 11px 12px;
+}
+
+.nc-card:hover {
+  background-color: rgba($fg, 0.10);
+}
+
+.nc-unread {
+  background-color: rgba($blue, 0.12);
+  border-color: rgba($blue, 0.25);
+}
+
+.nc-unread:hover {
+  background-color: rgba($blue, 0.18);
+}
+
+.nc-critical {
+  border-color: rgba($red, 0.6);
+}
+
+.nc-icon {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 9px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin-top: 1px;
+}
+
+.nc-glyph {
+  font-family: $nc-icons;
+  font-size: 18px;
+  background-color: rgba($fg, 0.08);
+}
+
+.nc-panel .nc-glyph {
+  font-family: $nc-icons;
+}
+
+.nc-dot {
+  min-width: 7px;
+  min-height: 7px;
+  border-radius: 999px;
+  background-color: $blue;
+}
+
+.nc-app {
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba($fg, 0.65);
+}
+
+.nc-time {
+  font-size: 11px;
+  color: rgba($fg, 0.45);
+}
+
+.nc-dismiss {
+  font-family: $nc-icons;
+  font-size: 13px;
+  padding: 0 2px;
+  color: rgba($fg, 0.35);
+  border-radius: 999px;
+}
+
+.nc-dismiss:hover {
+  color: $fg;
+  background-color: rgba($fg, 0.12);
+}
+
+.nc-summary {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.nc-body {
+  font-size: 12px;
+  color: rgba($fg, 0.75);
+}
+
+// ----- empty state ----- //
+
+.nc-empty {
+  padding: 34px 0 30px 0;
+}
+
+.nc-empty-icon {
+  font-family: $nc-icons;
+  font-size: 40px;
+  color: rgba($fg, 0.25);
+}
+
+.nc-empty-text {
+  font-size: 12px;
+  color: rgba($fg, 0.5);
+  margin-top: 8px;
+}

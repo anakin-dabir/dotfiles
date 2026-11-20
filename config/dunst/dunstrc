@@ -73,3 +73,8 @@ class = Dunst
 [bluetooth_pairing]
 appname = "blueman"
 timeout = 0
+
+# Save every notification for the notification center (NotifyCenter, super + alt + i)
+[log_all]
+summary = "*"
+script = ~/.config/bspwm/bin/NotifyLog

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Called by dunst for every notification (rule [log_all] in dunstrc).
+# Appends it to a JSON-lines log that survives restarts, for NotifyCenter.
+
+LOG="${XDG_STATE_HOME:-$HOME/.local/state}/notifications/log.jsonl"
+ICONS="${XDG_CACHE_HOME:-$HOME/.cache}/notifications/icons"
+KEEP=500
+
+# Skip transient popups: volume/brightness sliders, screenshot countdowns,
+# and NotifyCenter's own messages.
+[[ -n "$DUNST_PROGRESS" && "$DUNST_PROGRESS" != "-1" ]] && exit 0
+[[ "$DUNST_STACK_TAG" == cvolum || "$DUNST_STACK_TAG" == notifycenter ]] && exit 0
+[[ "$DUNST_SUMMARY" == "Taking shot in"* ]] && exit 0
+[[ "$DUNST_APP_NAME" == NotifyCenter ]] && exit 0
+
+mkdir -p "$(dirname "$LOG")" "$ICONS"
+
+# Apps like browsers pass icons from temporary folders that vanish later;
+# keep a copy so the history still shows them.
+icon="$DUNST_ICON_PATH"
+if [[ -f "$icon" && "$icon" == /tmp/* ]]; then
+    copy="$ICONS/$(md5sum < "$icon" | cut -c1-16).${icon##*.}"
+    [ -f "$copy" ] || cp "$icon" "$copy"
+    icon="$copy"
+fi
+
+jq -nc \
+    --arg key "$(date +%s%N)" \
+    --arg time "$(date +%s)" \
+    --arg app "$DUNST_APP_NAME" \
+    --arg desktop "$DUNST_DESKTOP_ENTRY" \
+    --arg summary "$DUNST_SUMMARY" \
+    --arg body "$DUNST_BODY" \
+    --arg urgency "$DUNST_URGENCY" \
+    --arg icon "$icon" \
+    --arg urls "$DUNST_URLS" \
+    '{key: $key, time: ($time|tonumber), app: $app, desktop: $desktop, summary: $summary,
+      body: $body, urgency: $urgency, icon: $icon, urls: $urls}' \
+    >> "$LOG"
+
+# Keep the log (and the icon copies) from growing forever
+if [ "$(wc -l < "$LOG")" -gt $((KEEP + 50)) ]; then
+    tail -n "$KEEP" "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+    find "$ICONS" -type f -mtime +30 -delete 2>/dev/null
+fi
+
+# Refresh the bell on the bar (and the panel, if it's open)
+"$HOME/.config/bspwm/bin/NotifyCenter" --refresh >/dev/null 2>&1 &
+exit 0

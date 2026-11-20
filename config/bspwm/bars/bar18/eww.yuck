@@ -16,6 +16,8 @@
 (defpoll NETSTAT :interval "15s" `scripts/Network --stat`)
 
 ;; Updates vars
+;; Notification bell (pushed by NotifyCenter on every change)
+(defpoll notif_bell :interval "60s" :initial "󰂜" `~/.config/bspwm/bin/NotifyCenter --bar`)
 (defpoll UPDATES :interval "15m" `cat $HOME/.cache/Updates.txt 2>/dev/null`)
 
 ;; Battery vars
@@ -87,6 +89,15 @@
          :class "sysstat-group"
       (label :text "󰋊" :class "sysstat-icon")
       (label :text storage_used :class "sysstat-text"))))
+
+;; Notification bell ;;
+(defwidget notifbell []
+	(eventbox :cursor "pointer"
+	(button	:class "notif-bell"
+			:tooltip "Notifications (right-click: Do Not Disturb)"
+			:onclick "~/.config/bspwm/bin/NotifyCenter &"
+			:onrightclick "~/.config/bspwm/bin/NotifyCenter --dnd &"
+		notif_bell)))
 
 ;; control center ;;
 (defwidget notifycenter []
@@ -222,6 +233,7 @@
 	(box :orientation "v"
 		 :space-evenly false
 		 :class "control"
+(notifbell)
 (notifycenter)
 (volum)
 (wifi)

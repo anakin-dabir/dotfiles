@@ -22,3 +22,4 @@ config/systemd/user/*.wants/
 *.bak
 *.atomic-write-*
 .goutputstream-*
+config/bspwm/bars/*/workspaces.yuck

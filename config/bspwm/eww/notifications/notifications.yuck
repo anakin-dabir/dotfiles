@@ -1,0 +1,83 @@
+;; Notification center panel. Opened/filled by bin/NotifyCenter.
+
+(defvar nc_items "[]")       ;; newest first, see push_data in NotifyCenter
+(defvar nc_total 0)
+(defvar nc_sub "")
+(defvar nc_dnd false)
+(defvar nc_confirm false)    ;; "Clear" was clicked once, waiting for the second click
+(defvar nc_height 0)
+
+(defwidget nc-card [n]
+  (box :orientation "v" :space-evenly false
+    (label :class "nc-day" :halign "start" :visible {n.header != ""} :text {n.header})
+    ;; Outer eventbox only gives the card its hover look; the click areas
+    ;; ("open" and the × button) sit side by side so one click never fires both.
+    (eventbox
+      (box :class "nc-card ${n.unread ? 'nc-unread' : ''} ${n.urgency == 'CRITICAL' ? 'nc-critical' : ''}"
+           :space-evenly false
+           :spacing 4
+        (eventbox :cursor "pointer" :hexpand true
+                  :onclick "~/.config/bspwm/bin/NotifyCenter --open '${n.key}' &"
+                  :tooltip "Open"
+          (box :space-evenly false :spacing 12
+            (box :class "nc-icon" :valign "start" :visible {n.icon != ""}
+                 :style "background-image: url('${n.icon}');")
+            (label :class "nc-icon nc-glyph" :valign "start" :visible {n.icon == ""} :text "󰂜")
+            (box :orientation "v" :space-evenly false :hexpand true :spacing 3
+              (box :space-evenly false :spacing 6
+                (box :class "nc-dot" :valign "center" :visible {n.unread})
+                (label :class "nc-app" :halign "start" :hexpand true :xalign 0
+                       :limit-width 28 :text {n.app})
+                (label :class "nc-time" :text {n.ago}))
+              (label :class "nc-summary" :halign "start" :xalign 0 :wrap true
+                     :limit-width 140 :text {n.summary})
+              (label :class "nc-body" :halign "start" :xalign 0 :wrap true
+                     :visible {n.body != ""} :limit-width 180 :text {n.body}
+                     :tooltip {n.body}))))
+        (eventbox :cursor "pointer" :valign "start"
+          (button :class "nc-dismiss" :tooltip "Dismiss"
+                  :onclick "~/.config/bspwm/bin/NotifyCenter --delete '${n.key}' &" "󰅖"))))))
+
+(defwidget nc-panel []
+  (box :class "nc-panel" :orientation "v" :space-evenly false :width 400
+    (box :class "nc-header" :space-evenly false :spacing 8
+      (box :orientation "v" :space-evenly false :hexpand true
+        (label :class "nc-title" :halign "start" :text "Notifications")
+        (label :class "nc-sub" :halign "start" :text nc_sub))
+      (eventbox :cursor "pointer"
+        (button :class "nc-pill ${nc_dnd ? 'nc-pill-on' : ''}"
+                :tooltip {nc_dnd ? "Do Not Disturb is on: popups are held back" : "Hold back popups"}
+                :onclick "~/.config/bspwm/bin/NotifyCenter --dnd &"
+          (box :space-evenly false :spacing 6
+            (label :class "nc-pill-icon" :text {nc_dnd ? "󰂛" : "󰖔"})
+            (label :text "Do Not Disturb"))))
+      (eventbox :cursor "pointer" :visible {nc_total > 0}
+        (button :class "nc-pill ${nc_confirm ? 'nc-pill-danger' : ''}"
+                :tooltip "Delete all notifications"
+                :onclick {nc_confirm ? "~/.config/bspwm/bin/NotifyCenter --clear &" : "${EWW_CMD} update nc_confirm=true"}
+          (label :text {nc_confirm ? "Sure?" : "Clear"}))))
+    (revealer :reveal {nc_total == 0} :transition "none"
+      (box :class "nc-empty" :orientation "v" :space-evenly false
+        (label :class "nc-empty-icon" :text "󰂜")
+        (label :class "nc-empty-text" :text "No notifications")))
+    (scroll :class "nc-scroll" :vscroll true :hscroll false
+            :visible {nc_total > 0} :height nc_height
+      (box :class "nc-list" :orientation "v" :space-evenly false :spacing 8
+        (for n in nc_items
+          (nc-card :n n))))))
+
+(defwindow notifcenter
+  :geometry (geometry :x "0px" :y "0px" :width "400px" :anchor "top left")
+  :stacking "fg"
+  :wm-ignore true
+  (nc-panel))
+
+;; Invisible full-screen layer under the panel: clicking anywhere else closes it
+(defwindow nc-closer
+  :geometry (geometry :x "0px" :y "0px" :width "100%" :height "100%" :anchor "top left")
+  :stacking "fg"
+  :wm-ignore true
+  (eventbox :onclick "~/.config/bspwm/bin/NotifyCenter --close &"
+            :onrightclick "~/.config/bspwm/bin/NotifyCenter --close &"
+            :onmiddleclick "~/.config/bspwm/bin/NotifyCenter --close &"
+    (box :class "nc-closer")))

@@ -91,6 +91,7 @@ changes too. Commit them or ignore them; they're regenerated every time.
 | `super + w` / `e` / `r` | Browser / VS Code / file manager |
 | `super + alt + w` | Wallpaper picker |
 | `super + alt + n` / `b` / `c` | Wi-Fi / Bluetooth / clipboard menus |
+| `super + alt + i` | Notification center panel (or click the bell on any bar; right-click it for Do Not Disturb). Click a notification to jump to its app |
 | `Print` / `shift + Print` | Screenshot menu / Flameshot |
 | `super + alt + p` | Power menu |
 | `super + alt + j` / `g` | Keyboard backlight color / rainbow |
