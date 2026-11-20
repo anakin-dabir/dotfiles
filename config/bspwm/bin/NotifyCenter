@@ -17,7 +17,7 @@ EWW=(eww -c "$BSPDIR/eww")
 
 PANEL_W=400   # panel width in px (keep in sync with notifications.yuck)
 GAP=8         # space between bar and panel
-SHOWN=100     # newest notifications listed in the panel
+SHOWN=500     # notifications listed in the panel (scrollable); NotifyLog keeps 500
 
 BELL=$'\U000F009C'      # nf-md-bell_outline
 BELL_DOT=$'\U000F0178'  # nf-md-bell_badge_outline
@@ -33,7 +33,9 @@ fi
 is_paused()  { [ "$(dunstctl is-paused 2>/dev/null)" = true ]; }
 seen_time()  { cat "$SEEN" 2>/dev/null || echo 0; }
 mark_seen()  { date +%s > "$SEEN"; }
-panel_open() { "${EWW[@]}" active-windows 2>/dev/null | grep -q 'notifcenter'; }
+# Ask X, not eww: a panel drawn by a stray eww process still counts as open.
+panel_windows() { xdotool search --name '^Eww - (notifcenter|nc-closer)$' 2>/dev/null; }
+panel_open()    { [ -n "$(panel_windows)" ]; }
 
 unread_count() {
     jq -s --argjson seen "$(seen_time)" '[.[] | select(.time > $seen)] | length' "$LOG" 2>/dev/null || echo 0
@@ -58,10 +60,30 @@ refresh_bars() {
     fi
 }
 
+# Start eww if needed and wait until it answers. Never run `eww open` before
+# that: with no daemon answering, `eww open` starts a private copy of eww that
+# the real one can't close (that's how the panel got stuck before).
 ensure_daemon() {
-    "${EWW[@]}" ping >/dev/null 2>&1 && return
-    "${EWW[@]}" daemon >/dev/null 2>&1
-    for _ in $(seq 20); do "${EWW[@]}" ping >/dev/null 2>&1 && return; sleep 0.1; done
+    "${EWW[@]}" ping >/dev/null 2>&1 && return 0
+    pgrep -f "eww -c $BSPDIR/eww daemon" >/dev/null ||
+        setsid "${EWW[@]}" daemon >/dev/null 2>&1 < /dev/null 9>&-
+    for _ in $(seq 50); do "${EWW[@]}" ping >/dev/null 2>&1 && return 0; sleep 0.1; done
+    return 1
+}
+
+# Close the panel when you switch desktop or focus another window, in case
+# the click-outside layer misses a click.
+start_watcher() {
+    stop_watcher
+    ( bspc subscribe desktop_focus node_focus | head -n 1 >/dev/null
+      rm -f "$DIR/watcher.pid"   # so --close doesn't stop this very process
+      "$0" --close ) >/dev/null 2>&1 9>&- &   # 9>&-: don't hold the lock
+    echo $! > "$DIR/watcher.pid"
+}
+stop_watcher() {
+    local pid; pid=$(cat "$DIR/watcher.pid" 2>/dev/null) || return
+    rm -f "$DIR/watcher.pid"
+    pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
 }
 
 # Fill the panel's variables from the log.
@@ -166,7 +188,7 @@ place_panel() {
 }
 
 open_panel() {
-    ensure_daemon
+    ensure_daemon || { notify-send -a NotifyCenter -u low "Notifications" "eww isn't responding"; return 1; }
     local placement mon pos anchor maxh
     placement=$(place_panel)
     maxh=${placement##*|}; placement=${placement%|*}
@@ -178,12 +200,25 @@ open_panel() {
     "${EWW[@]}" update nc_confirm=false >/dev/null 2>&1
     "${EWW[@]}" open nc-closer --screen "$mon" >/dev/null 2>&1
     "${EWW[@]}" open notifcenter --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+    start_watcher
     mark_seen
     refresh_bars
 }
 
 close_panel() {
-    "${EWW[@]}" close notifcenter nc-closer >/dev/null 2>&1
+    stop_watcher
+    timeout 2 "${EWW[@]}" close notifcenter nc-closer >/dev/null 2>&1
+    # Still on screen? It belongs to a stuck eww: kill whatever draws it,
+    # then make sure the normal eww is running again.
+    if panel_open; then
+        local w pid
+        for w in $(panel_windows); do
+            pid=$(xdotool getwindowpid "$w" 2>/dev/null) && kill "$pid" 2>/dev/null
+        done
+        pkill -f "eww -c $BSPDIR/eww open (notifcenter|nc-closer)" 2>/dev/null
+        sleep 0.3
+        ensure_daemon
+    fi
     mark_seen
     refresh_bars
 }
@@ -258,6 +293,11 @@ toggle_dnd() {
     panel_open && "${EWW[@]}" update nc_dnd="$(is_paused && echo true || echo false)" >/dev/null 2>&1
     refresh_bars
 }
+
+# One action at a time (double clicks on the bell, key repeat)
+case "$1" in --bar|--refresh) ;; *)
+    exec 9> "$DIR/.lock"; flock -w 3 9 || exit 1 ;;
+esac
 
 case "$1" in
     --bar)     bell ;;
