@@ -244,6 +244,8 @@ delete_entry() {
 }
 
 clear_all() {
+    # Keep the previous history, in case "Clear" was clicked by mistake
+    [ -s "$LOG" ] && cp "$LOG" "$LOG.before-clear"
     : > "$LOG"
     dunstctl history-clear 2>/dev/null
     "${EWW[@]}" update nc_confirm=false >/dev/null 2>&1

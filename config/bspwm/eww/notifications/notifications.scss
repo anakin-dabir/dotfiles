@@ -1,6 +1,15 @@
-// Notification center panel (colors come from the current rice, see colors.scss)
+// Notification center panel. Colors and shape come from the current rice:
+// config/modules/06-eww.sh writes them into colors.scss, matching the rice's
+// dunst popups (corner radius, border, font). These defaults only apply
+// until a rice has been applied once.
 
-$nc-font: "Adwaita Sans", "Inter", "Noto Sans", "JetBrainsMono NF", sans-serif;
+$nc-radius: 16px !default;
+$nc-card-radius: 12px !default;
+$nc-pill-radius: 999px !default;
+$nc-border: 1px solid rgba($fg, 0.10) !default;
+$nc-theme-font: "Adwaita Sans" !default;
+
+$nc-font: $nc-theme-font, "Adwaita Sans", "Noto Sans", "JetBrainsMono NF", sans-serif;
 $nc-icons: "Material Design Icons Desktop";
 
 .nc-closer {
@@ -11,8 +20,8 @@ $nc-icons: "Material Design Icons Desktop";
   font-family: $nc-font;
   color: $fg;
   background-color: rgba($bg, 0.97);
-  border: 1px solid rgba($fg, 0.10);
-  border-radius: 16px;
+  border: $nc-border;
+  border-radius: $nc-radius;
   padding: 14px;
   margin: 2px;
 }
@@ -41,7 +50,7 @@ $nc-icons: "Material Design Icons Desktop";
 
 .nc-pill {
   padding: 5px 11px;
-  border-radius: 999px;
+  border-radius: $nc-pill-radius;
   background-color: rgba($fg, 0.07);
   font-size: 11px;
 }
@@ -91,7 +100,7 @@ $nc-icons: "Material Design Icons Desktop";
 .nc-card {
   background-color: rgba($fg, 0.05);
   border: 1px solid rgba($fg, 0.04);
-  border-radius: 12px;
+  border-radius: $nc-card-radius;
   padding: 11px 12px;
 }
 
@@ -115,7 +124,7 @@ $nc-icons: "Material Design Icons Desktop";
 .nc-icon {
   min-width: 34px;
   min-height: 34px;
-  border-radius: 9px;
+  border-radius: $nc-card-radius * 0.75;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -155,7 +164,7 @@ $nc-icons: "Material Design Icons Desktop";
   font-size: 13px;
   padding: 0 2px;
   color: rgba($fg, 0.35);
-  border-radius: 999px;
+  border-radius: $nc-pill-radius;
 }
 
 .nc-dismiss:hover {
