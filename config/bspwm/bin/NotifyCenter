@@ -60,16 +60,8 @@ refresh_bars() {
     fi
 }
 
-# Start eww if needed and wait until it answers. Never run `eww open` before
-# that: with no daemon answering, `eww open` starts a private copy of eww that
-# the real one can't close (that's how the panel got stuck before).
-ensure_daemon() {
-    "${EWW[@]}" ping >/dev/null 2>&1 && return 0
-    pgrep -f "eww -c $BSPDIR/eww daemon" >/dev/null ||
-        setsid "${EWW[@]}" daemon >/dev/null 2>&1 < /dev/null 9>&-
-    for _ in $(seq 50); do "${EWW[@]}" ping >/dev/null 2>&1 && return 0; sleep 0.1; done
-    return 1
-}
+# One healthy eww, no duplicates (see bin/EwwDaemon)
+ensure_daemon() { "$BSPDIR/bin/EwwDaemon" 9>&-; }
 
 # Close the panel when you switch desktop or focus another window, in case
 # the click-outside layer misses a click.
@@ -200,6 +192,13 @@ open_panel() {
     "${EWW[@]}" update nc_confirm=false >/dev/null 2>&1
     "${EWW[@]}" open nc-closer --screen "$mon" >/dev/null 2>&1
     "${EWW[@]}" open notifcenter --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+    # If eww started a duplicate copy while opening, start over with one clean eww
+    if ! ensure_daemon || [ "$(panel_windows | wc -l)" -ne 2 ]; then
+        "$BSPDIR/bin/EwwDaemon" --restart 9>&-
+        push_data "$(seen_time)" "$maxh"
+        "${EWW[@]}" open nc-closer --screen "$mon" >/dev/null 2>&1
+        "${EWW[@]}" open notifcenter --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+    fi
     start_watcher
     mark_seen
     refresh_bars
@@ -208,16 +207,9 @@ open_panel() {
 close_panel() {
     stop_watcher
     timeout 2 "${EWW[@]}" close notifcenter nc-closer >/dev/null 2>&1
-    # Still on screen? It belongs to a stuck eww: kill whatever draws it,
-    # then make sure the normal eww is running again.
+    # Still on screen? A stuck or duplicate eww is drawing it: restart eww.
     if panel_open; then
-        local w pid
-        for w in $(panel_windows); do
-            pid=$(xdotool getwindowpid "$w" 2>/dev/null) && kill "$pid" 2>/dev/null
-        done
-        pkill -f "eww -c $BSPDIR/eww open (notifcenter|nc-closer)" 2>/dev/null
-        sleep 0.3
-        ensure_daemon
+        "$BSPDIR/bin/EwwDaemon" --restart 9>&-
     fi
     mark_seen
     refresh_bars

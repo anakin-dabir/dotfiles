@@ -87,13 +87,13 @@ case "$1" in
 		Help
 		;;
 	--usercard)
-		eww -c "$WIDGET_DIR" open --toggle launchermenu
+		EwwDaemon && eww -c "$WIDGET_DIR" open --toggle launchermenu
 		;;
 	--player)
-		eww -c "$WIDGET_DIR" open --toggle music
+		EwwDaemon && eww -c "$WIDGET_DIR" open --toggle music
 		;;
 	--calendar)
-		eww -c "$WIDGET_DIR" open --toogle date
+		EwwDaemon && eww -c "$WIDGET_DIR" open --toggle date
 		;;
 	--code)
 		code dash/

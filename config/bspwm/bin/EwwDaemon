@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Keep exactly one eww running for the shared widgets (launcher, music
+# player, notification center) and make sure it answers.
+#
+#   EwwDaemon            start eww if needed; restart it if it's stuck or duplicated
+#   EwwDaemon --restart  always restart it
+#
+# Why: if an `eww open` can't reach the running eww, eww quietly starts a
+# second copy. The copies then fight over the same socket, and windows
+# end up on screen that nothing can close. Run this before opening eww
+# windows. The eww bars (bar02, bar18) use their own config and aren't touched.
+
+CFG="$HOME/.config/bspwm/eww"
+EWW=(eww -c "$CFG")
+PATTERN="^eww -c $CFG( |$)"
+
+procs() { pgrep -f "$PATTERN"; }
+
+# eww processes that have been around for 2s or more (skips eww commands
+# that are running right now and will exit on their own)
+lasting() {
+    local p
+    for p in $(procs); do
+        [ "$(ps -o etimes= -p "$p" 2>/dev/null)" -ge 2 ] 2>/dev/null && echo "$p"
+    done
+}
+
+healthy() {
+    [ "$(lasting | wc -l)" -le 1 ] && timeout 2 "${EWW[@]}" ping >/dev/null 2>&1
+}
+
+restart() {
+    pkill -f "$PATTERN"
+    for _ in $(seq 20); do procs >/dev/null || break; sleep 0.1; done
+    pkill -9 -f "$PATTERN"
+    # 8>&- 9>&- : don't hand our lock (or NotifyCenter's) to the daemon
+    setsid "${EWW[@]}" daemon >/dev/null 2>&1 < /dev/null 8>&- 9>&-
+    for _ in $(seq 50); do
+        timeout 1 "${EWW[@]}" ping >/dev/null 2>&1 && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+exec 8> "${XDG_RUNTIME_DIR:-/tmp}/eww-daemon.lock"
+flock -w 10 8 || exit 1
+
+case "$1" in
+    --restart) restart ;;
+    *)         healthy || restart ;;
+esac
