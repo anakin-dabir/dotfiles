@@ -1,5 +1,9 @@
-// Bar dropdowns. Same look as the notification panel: colors and shape come
-// from the current rice (colors.scss, written by config/modules/06-eww.sh).
+// Bar dropdowns. Colors, accent, corners, border and font all come from the
+// current rice (colors.scss, written by config/modules/06-eww.sh), so every
+// theme gets dropdowns in its own style.
+//
+// Spacing system: panel padding 16 · 12 between blocks · cards padding 12 ·
+// list items 8/10 · round buttons 34.
 
 $bp-icons: "Material Design Icons Desktop";
 
@@ -27,57 +31,66 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-head-icon {
   font-family: $bp-icons;
   font-size: 22px;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 42px;
+  min-height: 42px;
   border-radius: $nc-card-radius;
-  background-color: rgba($blue, 0.16);
-  color: $blue;
+  background-color: rgba($nc-accent, 0.18);
+  color: $nc-accent;
 }
 
-.bp-title {
+.bp-panel .bp-title {
   font-size: 15px;
   font-weight: bold;
 }
 
-.bp-sub {
+.bp-panel .bp-sub {
   font-size: 11px;
   color: rgba($fg, 0.6);
   margin-top: 2px;
 }
 
-.bp-panel .bp-sub {
-  color: rgba($fg, 0.6);
-}
-
-.bp-big {
+.bp-panel .bp-big {
   font-size: 22px;
   font-weight: bold;
 }
 
-.bp-section {
-  font-size: 11px;
-  font-weight: bold;
-  margin-top: 2px;
+// ----- cards ----- //
+
+.bp-card {
+  background-color: rgba($fg, 0.05);
+  border-radius: $nc-card-radius;
+  padding: 12px;
+}
+
+.bp-list {
+  padding: 6px;
+}
+
+.bp-list-head {
+  padding: 6px 6px 4px 6px;
 }
 
 .bp-panel .bp-section {
+  font-size: 11px;
+  font-weight: bold;
   color: rgba($fg, 0.5);
 }
 
 .bp-panel .bp-dim {
   font-size: 11px;
-  color: rgba($fg, 0.5);
+  color: rgba($fg, 0.55);
 }
 
-.bp-clock {
-  font-size: 34px;
-  font-weight: bold;
+.bp-sep {
+  min-height: 1px;
+  background-color: rgba($fg, 0.08);
+  margin: 0 6px 0 52px;
 }
 
-// ----- rows, stats, cards ----- //
+// ----- rows and stats ----- //
 
-.bp-row-name,
-.bp-row-value {
+.bp-panel .bp-row-name,
+.bp-panel .bp-row-value {
   font-size: 12px;
 }
 
@@ -85,7 +98,7 @@ $bp-icons: "Material Design Icons Desktop";
   color: rgba($fg, 0.7);
 }
 
-.bp-stat-value {
+.bp-panel .bp-stat-value {
   font-size: 13px;
   font-weight: bold;
 }
@@ -93,13 +106,6 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-stat-label {
   font-size: 10px;
   color: rgba($fg, 0.5);
-  margin-top: 2px;
-}
-
-.bp-card {
-  background-color: rgba($fg, 0.05);
-  border-radius: $nc-card-radius;
-  padding: 11px 12px;
 }
 
 // ----- meters and graphs ----- //
@@ -119,12 +125,12 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-thin progress {
   min-height: 7px;
   border-radius: $nc-pill-radius;
-  background-color: $blue;
+  background-color: $nc-accent;
 }
 
 .bp-thin progress {
   min-height: 4px;
-  background-color: rgba($blue, 0.7);
+  background-color: rgba($nc-accent, 0.7);
 }
 
 .bp-warm progress {
@@ -139,20 +145,14 @@ $bp-icons: "Material Design Icons Desktop";
   background-color: $green;
 }
 
-.bp-graph-box {
-  background-color: rgba($fg, 0.04);
-  border-radius: $nc-card-radius;
-  padding: 6px 4px 2px 4px;
-}
-
 .bp-graph {
-  color: $blue;
-  background-color: rgba($blue, 0.10);
+  color: $nc-accent;
+  background-color: rgba($nc-accent, 0.10);
 }
 
 .bp-core trough {
   min-width: 6px;
-  min-height: 34px;
+  min-height: 30px;
   border-radius: $nc-pill-radius;
   background-color: rgba($fg, 0.08);
 }
@@ -160,103 +160,168 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-core progress {
   min-width: 6px;
   border-radius: $nc-pill-radius;
-  background-color: $blue;
+  background-color: $nc-accent;
 }
 
 .bp-core.bp-hot progress {
   background-color: $red;
 }
 
-// ----- buttons, tiles, choices ----- //
+// ----- buttons ----- //
 
 .bp-button {
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: $nc-card-radius;
   background-color: rgba($fg, 0.07);
 }
 
 .bp-button:hover {
-  background-color: rgba($fg, 0.14);
+  background-color: rgba($fg, 0.13);
 }
 
-.bp-button label {
+.bp-panel .bp-btn-text {
   font-size: 12px;
 }
 
-.bp-panel .bp-btn-icon,
-.bp-panel .bp-tile-icon,
-.bp-panel .bp-choice-icon,
-.bp-panel .bp-choice-check {
+.bp-panel .bp-btn-icon {
   font-family: $bp-icons;
-  font-size: 16px;
+  font-size: 15px;
 }
 
-.bp-tile {
-  padding: 10px 12px;
-  border-radius: $nc-card-radius;
-  background-color: rgba($fg, 0.07);
-}
-
-.bp-tile:hover {
-  background-color: rgba($fg, 0.14);
-}
-
-.bp-tile-on {
-  background-color: $blue;
-}
-
-.bp-tile-on:hover {
-  background-color: rgba($blue, 0.85);
-}
-
-.bp-tile-on label {
-  color: #ffffff;
-}
-
-.bp-tile-title {
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.bp-tile-sub {
-  font-size: 10px;
-}
-
-.bp-choice {
-  padding: 7px 10px;
-  border-radius: $nc-card-radius;
-}
-
-.bp-choice:hover {
-  background-color: rgba($fg, 0.08);
-}
-
-.bp-choice-name {
-  font-size: 12px;
-}
-
-.bp-choice-on .bp-choice-name {
-  font-weight: bold;
-}
-
-.bp-panel .bp-choice-check {
-  color: $blue;
-}
-
-// ----- sliders ----- //
-
-.bp-panel .bp-slider-icon {
+// Round icon button (slider icons, back, Wi-Fi/Bluetooth switches)
+.bp-panel .bp-round {
   font-family: $bp-icons;
-  font-size: 18px;
+  font-size: 17px;
   min-width: 34px;
   min-height: 34px;
   border-radius: $nc-pill-radius;
   background-color: rgba($fg, 0.08);
+  color: $fg;
 }
 
-.bp-slider-icon:hover {
+.bp-panel .bp-round:hover {
   background-color: rgba($fg, 0.16);
 }
+
+.bp-panel .bp-round-on {
+  background-color: $nc-accent;
+  color: $nc-on-accent;
+}
+
+.bp-panel .bp-round-on:hover {
+  background-color: rgba($nc-accent, 0.85);
+}
+
+.bp-panel .bp-mini {
+  font-family: $bp-icons;
+  font-size: 15px;
+  padding: 0 4px;
+  border-radius: $nc-pill-radius;
+  color: rgba($fg, 0.6);
+}
+
+.bp-panel .bp-mini:hover {
+  color: $fg;
+  background-color: rgba($fg, 0.10);
+}
+
+// ----- drill-in rows and lists ----- //
+
+.bp-nav {
+  padding: 6px;
+}
+
+.bp-nav-open {
+  border-radius: $nc-card-radius;
+  padding: 2px 4px;
+}
+
+.bp-panel .bp-nav-title {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.bp-panel .bp-nav-sub {
+  font-size: 11px;
+  color: rgba($fg, 0.6);
+}
+
+.bp-panel .bp-chev {
+  font-family: $bp-icons;
+  font-size: 18px;
+  color: rgba($fg, 0.4);
+}
+
+.bp-nav-open:hover .bp-chev {
+  color: $fg;
+}
+
+.bp-item {
+  padding: 8px 10px;
+  border-radius: $nc-card-radius;
+}
+
+.bp-item:hover {
+  background-color: rgba($fg, 0.08);
+}
+
+.bp-panel .bp-item-icon {
+  font-family: $bp-icons;
+  font-size: 17px;
+  min-width: 22px;
+}
+
+.bp-panel .bp-item-name {
+  font-size: 12px;
+}
+
+.bp-panel .bp-item-on .bp-item-name {
+  font-weight: bold;
+}
+
+.bp-panel .bp-item-on .bp-item-icon {
+  color: $nc-accent;
+}
+
+.bp-panel .bp-item-sub {
+  font-size: 10px;
+  color: rgba($fg, 0.55);
+}
+
+.bp-panel .bp-item-lock {
+  font-family: $bp-icons;
+  font-size: 13px;
+  color: rgba($fg, 0.45);
+}
+
+.bp-panel .bp-check {
+  font-family: $bp-icons;
+  font-size: 16px;
+  color: $nc-accent;
+}
+
+// On/off switch in list headers
+.bp-switch {
+  min-width: 44px;
+  min-height: 24px;
+  padding: 3px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.18);
+}
+
+.bp-switch-on {
+  background-color: $nc-accent;
+}
+
+.bp-switch-knob {
+  min-width: 18px;
+  min-height: 18px;
+  border-radius: $nc-pill-radius;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+// ----- sliders ----- //
 
 .bp-slider trough {
   min-height: 8px;
@@ -266,12 +331,12 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-slider highlight {
   border-radius: $nc-pill-radius;
-  background-color: $blue;
+  background-color: $nc-accent;
 }
 
 .bp-slider slider {
-  min-width: 16px;
-  min-height: 16px;
+  min-width: 18px;
+  min-height: 18px;
   margin: -5px 0;
   border-radius: $nc-pill-radius;
   background-color: #ffffff;
@@ -285,19 +350,23 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 // ----- calendar ----- //
+// (class bp-month, not bp-calendar: eww gives each window a class with its
+// own name, so .bp-calendar would also style the whole calendar window)
 
 .bp-month {
   font-family: $nc-font;
-  font-size: 12px;
+  font-size: 13px;
   color: $fg;
-  padding: 4px;
-  border-radius: $nc-card-radius;
-  background-color: rgba($fg, 0.04);
+  background-color: transparent;
+  padding: 2px 4px;
+  -GtkCalendar-vertical-separation: 10;
+  -GtkCalendar-horizontal-separation: 8;
+  -GtkCalendar-inner-border: 4;
 }
 
 .bp-month:selected {
-  background-color: $blue;
-  color: #ffffff;
+  background-color: $nc-accent;
+  color: $nc-on-accent;
   border-radius: $nc-pill-radius;
 }
 
@@ -306,7 +375,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-month.button {
-  color: rgba($fg, 0.7);
+  color: rgba($fg, 0.6);
 }
 
 .bp-month.button:hover {

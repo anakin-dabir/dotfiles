@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Buttons and sliders in the bar dropdowns (eww/barpanels) call this.
+# Every action updates the dropdown right away instead of waiting for its poll.
+#
+#   vol-set N | vol-mute | mic-set N | mic-mute | sink NAME
+#   bright N
+#   wifi-toggle | bt-toggle | view main|wifi|bt | wifi-scan
+#   wifi-connect N (position in the list) | bt-connect MAC
+#   run COMMAND...          close the dropdown, then run COMMAND
+
+BIN="$HOME/.config/bspwm/bin"
+EWW=(eww -c "$HOME/.config/bspwm/eww")
+upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }
+push() { local p; for p in "$@"; do "$BIN/BarPanelData" "$p" --push; done; }
+
+# Change one field of a dropdown's data at once (sliders: the number next to
+# the slider follows while you drag, without re-reading the whole system)
+patch() { # var jq-filter
+    local cur; cur=$("${EWW[@]}" get "$1" 2>/dev/null) || return
+    upd "$1=$(jq -c "$2" <<< "$cur")"
+}
+int() { printf '%.0f' "$1" 2>/dev/null || echo 0; }
+
+case "$1" in
+    vol-set)  v=$(int "$2"); pamixer --set-volume "$v" --unmute
+              patch bp_sound ".vol = $v | .muted = false" ;;
+    vol-mute) pamixer -t; push sound ;;
+    mic-set)  v=$(int "$2"); pamixer --default-source --set-volume "$v" --unmute
+              patch bp_sound ".mic_vol = $v | .mic_muted = false" ;;
+    mic-mute) pamixer --default-source -t; push sound ;;
+    sink)     pactl set-default-sink "$2"; push sound ;;
+
+    bright)   v=$(int "$2"); (( v < 1 )) && v=1
+              brightnessctl -q set "$v%"; patch bp_battery ".bright = $v" ;;
+
+    wifi-toggle)
+        if [ "$(nmcli radio wifi)" = enabled ]; then nmcli radio wifi off; else nmcli radio wifi on; fi
+        push network; sleep 3; push network wifi ;;
+    bt-toggle)
+        if bluetoothctl show | grep -q 'Powered: yes'; then bluetoothctl power off; else bluetoothctl power on; fi
+        sleep 0.5; push network bt ;;
+
+    view)
+        upd bp_view="$2"
+        "$BIN/BarPanel" --refit
+        case "$2" in
+            wifi) push wifi; exec "$0" wifi-scan ;;
+            bt)   push bt ;;
+        esac ;;
+    wifi-scan)
+        upd bp_scanning=true
+        "$BIN/BarPanelData" wifi --rescan --push
+        upd bp_scanning=false ;;
+
+    wifi-connect) # $2 = position in the dropdown's list (names can contain quotes)
+        info=$("${EWW[@]}" get bp_wifi | jq -c --argjson i "$2" '.networks[$i]')
+        ssid=$(jq -r .ssid <<< "$info")
+        [ -z "$ssid" ] || [ "$ssid" = null ] && exit 1
+        [ "$(jq -r .active <<< "$info")" = true ] && exit 0
+        if [ "$(jq -r .known <<< "$info")" = true ]; then
+            upd bp_connecting="$ssid"
+            out=$(nmcli con up id "$ssid" 2>&1)
+        elif [ "$(jq -r .secure <<< "$info")" = true ]; then
+            pass=$(rofi -dmenu -password -p "Password" -mesg "Wi-Fi network \"$ssid\"" \
+                   -theme "$HOME/.config/bspwm/config/rofi-themes/NetManagerDM.rasi" \
+                   -theme-str 'listview { enabled: false; }' < /dev/null 2>/dev/null) || exit 0
+            [ -z "$pass" ] && exit 0
+            upd bp_connecting="$ssid"
+            out=$(nmcli dev wifi connect "$ssid" password "$pass" 2>&1)
+        else
+            upd bp_connecting="$ssid"
+            out=$(nmcli dev wifi connect "$ssid" 2>&1)
+        fi
+        rc=$?
+        upd bp_connecting=""
+        [ $rc -ne 0 ] && notify-send -u normal -i network-wireless "Couldn't connect to $ssid" \
+            "$(tail -n 1 <<< "$out" | sed 's/^Error: //')"
+        push wifi network ;;
+
+    bt-connect)
+        mac=$2
+        upd bp_connecting="$mac"
+        if bluetoothctl info "$mac" | grep -q 'Connected: yes'; then
+            bluetoothctl disconnect "$mac" >/dev/null 2>&1
+        else
+            bluetoothctl power on >/dev/null 2>&1
+            timeout 15 bluetoothctl connect "$mac" >/dev/null 2>&1 ||
+                notify-send -u normal -i bluetooth "Couldn't connect" "$(bluetoothctl info "$mac" | sed -n 's/^\s*Name: //p') didn't answer. Is it nearby and turned on?"
+        fi
+        upd bp_connecting=""
+        push bt network ;;
+
+    run)
+        shift
+        "$BIN/BarPanel" --close
+        setsid "$@" >/dev/null 2>&1 < /dev/null & ;;
+
+    *) sed -n '2,11p' "$0" >&2; exit 1 ;;
+esac

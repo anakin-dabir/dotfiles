@@ -3,6 +3,7 @@
 #   BarPanel NAME       open NAME's dropdown, or close it if it's already open
 #                       NAME: cpu memory disk sound network battery calendar notifcenter
 #   BarPanel --close    close whichever dropdown is open
+#   BarPanel --refit    redraw the open dropdown at its natural size
 #
 # Only one dropdown is open at a time. Clicking anywhere outside it (or
 # switching window/desktop) closes it; clicking another bar item switches to
@@ -138,7 +139,7 @@ open() { # $1 = name
     read -r cpos csize maxh <<< "$rest"
     if [ -n "$filler" ]; then wait "$filler"; else fill "$name" "$maxh"; fi
     show() {
-        "${EWW[@]}" update bp_open="$name" >/dev/null 2>&1
+        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" >/dev/null 2>&1
         "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1
         "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
     }
@@ -150,6 +151,7 @@ open() { # $1 = name
         fill "$name" "$maxh"; show
     fi
     echo "$name" > "$STATE/open"
+    echo "$win $mon $pos $anchor" > "$STATE/placed"
     start_watcher
 }
 
@@ -157,8 +159,19 @@ open() { # $1 = name
 exec 7> "$STATE/.lock"
 flock -w 3 7 || exit 1
 
+# Redraw the open dropdown in place at its natural size (an open window
+# grows with its content but never shrinks, e.g. back from the Wi-Fi list)
+refit() {
+    local win mon pos anchor
+    read -r win mon pos anchor < "$STATE/placed" 2>/dev/null || return
+    [ -n "$(current)" ] || return
+    "${EWW[@]}" close "$win" >/dev/null 2>&1
+    "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+}
+
 case "$1" in
     --close|"") close ;;
+    --refit) refit ;;
     *)
         was=$(current)
         [ -n "$was" ] || [ -n "$(open_windows)" ] && close

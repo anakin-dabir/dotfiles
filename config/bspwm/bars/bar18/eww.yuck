@@ -58,7 +58,8 @@
 			(button :style "background-image: url('${WIFIICON}');"
 					:class "trayicon"
 					:tooltip "${NETSTAT}"
-					:onclick "OpenApps --netmanager")
+					:onclick "~/.config/bspwm/bin/BarPanel network &"
+					:onrightclick "OpenApps --netmanager")
 		)
 	)
 )
@@ -71,12 +72,13 @@
     (eventbox :cursor "pointer"
       (button :class "trayicon"
               :style "background-image: url('${battery_icon}');"
-              :tooltip "Battery: ${battery_percentage}%"))
+              :tooltip "Battery: ${battery_percentage}%"
+              :onclick "~/.config/bspwm/bin/BarPanel battery &"))
     (label :text "${battery_percentage}%" :class "sysstat-text")))
 
 ;; Memory Widget
 (defwidget memory []
-  (eventbox :cursor "pointer" :tooltip memory_tooltip
+  (eventbox :cursor "pointer" :tooltip memory_tooltip :onclick "~/.config/bspwm/bin/BarPanel memory &"
     (box :orientation "v" :halign "center" :space-evenly "false" :spacing 0
          :class "sysstat-group"
       (label :text "󰍛" :class "sysstat-icon")
@@ -84,7 +86,7 @@
 
 ;; Storage Widget
 (defwidget storage []
-  (eventbox :cursor "pointer" :tooltip storage_tooltip
+  (eventbox :cursor "pointer" :tooltip storage_tooltip :onclick "~/.config/bspwm/bin/BarPanel disk &"
     (box :orientation "v" :halign "center" :space-evenly "false" :spacing 0
          :class "sysstat-group"
       (label :text "󰋊" :class "sysstat-icon")
@@ -183,15 +185,17 @@
 	(button   :style "background-image: url('${volume_icon}');"
 			  :class "trayicon"
 			  :onrightclick "OpenApps --soundcontrol"
-			  :onclick "scripts/Volume --toggle-muted"))))
+			  :onmiddleclick "scripts/Volume --toggle-muted"
+			  :onclick "~/.config/bspwm/bin/BarPanel sound &"))))
 
 ;; Clock Widgets ;;
 (defwidget time []
+	(eventbox :cursor "pointer"
 	(box	:orientation "v"
 			:class "time"
 			:valign "end"
-	(button	:class "time-hour" "${formattime(EWW_TIME, "%H")}")
-	(button	:class "time-min" "${formattime(EWW_TIME, "%M")}")))
+	(button	:class "time-hour" :onclick "~/.config/bspwm/bin/BarPanel calendar &" "${formattime(EWW_TIME, "%H")}")
+	(button	:class "time-min" :onclick "~/.config/bspwm/bin/BarPanel calendar &" "${formattime(EWW_TIME, "%M")}"))))
 
 
 ;; Powermenu Widget — single button opens the rofi PowerMenu directly

@@ -1,25 +1,79 @@
 #!/usr/bin/env bash
 # Volume for a polybar custom/script module (tail = true).
-# Prints "<icon> 60" or "<muted icon> Muted" and again on every change.
-#   VolumeBar [icon] [muted-icon] [padding]
+# Prints the volume, and again on every change.
 # Used instead of polybar's internal/pulseaudio, whose left click is a fixed
 # "mute" that can't be changed (left click here opens the sound dropdown).
+#
+#   VolumeBar [icon] [muted-icon] [padding]
+#       simple: "<icon> 60" / "<muted-icon> Muted"
+#   VolumeBar --on TEMPLATE --off TEMPLATE [--ramp "i0|i1|i2..."]
+#       each bar's own look; in the templates:
+#         %percentage%   the volume
+#         @ramp@         the --ramp icon for the current level
+#         @bar@          a slider like polybar's <bar-volume>, from
+#                        --bar "width|fill|indicator|empty" (each part may
+#                        carry its own %{F..}/%{T..} tags)
+#         @name@         a color from the current theme (bars/colors.ini)
 
-ON=${1:-$'\U000F057E'}
-OFF=${2:-$'\U000F0581'}
-PAD=${3:-5pt}
+COLORS="$HOME/.config/bspwm/bars/colors.ini"
+ON="" OFF="" RAMP="" BAR="" MODE=simple
+if [ "$1" = --on ]; then
+    MODE=template
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --on) ON=$2; shift 2 ;; --off) OFF=$2; shift 2 ;; --ramp) RAMP=$2; shift 2 ;; --bar) BAR=$2; shift 2 ;; *) shift ;;
+        esac
+    done
+    # Put the theme's colors into the templates once
+    while IFS='=' read -r k v; do
+        k=$(echo "$k" | tr -d ' '); v=$(echo "$v" | tr -d ' ')
+        [ -n "$k" ] && [ -n "$v" ] || continue
+        ON=${ON//@$k@/$v}; OFF=${OFF//@$k@/$v}; BAR=${BAR//@$k@/$v}
+    done < <(sed -n '/^\[color\]/,/^\[/p' "$COLORS" | grep -E '^[a-z0-9-]+ *=')
+else
+    I_ON=${1:-$'\U000F057E'}; I_OFF=${2:-$'\U000F0581'}; PAD=${3:-5pt}
+fi
 
-last=""
-show() {
-    local out
-    if [ "$(pamixer --get-mute 2>/dev/null)" = true ]; then
-        out="%{O$PAD}$OFF%{O$PAD}Muted"
+render() {
+    local muted vol out
+    muted=$(pamixer --get-mute 2>/dev/null); vol=$(pamixer --get-volume 2>/dev/null || echo 0)
+    if [ "$MODE" = simple ]; then
+        [ "$muted" = true ] && out="%{O$PAD}$I_OFF%{O$PAD}Muted" || out="%{O$PAD}$I_ON%{O$PAD}$vol"
+    elif [ "$muted" = true ]; then
+        out=${OFF//%percentage%/$vol}
     else
-        out="%{O$PAD}$ON%{O$PAD}$(pamixer --get-volume 2>/dev/null)"
+        out=${ON//%percentage%/$vol}
+        if [ -n "$RAMP" ]; then
+            local icons n i
+            IFS='|' read -r -a icons <<< "$RAMP"; n=${#icons[@]}
+            i=$(( vol * n / 100 )); (( i >= n )) && i=$(( n - 1 ))   # same as polybar
+            out=${out//@ramp@/${icons[$i]}}
+        fi
+        if [ -n "$BAR" ]; then
+            local w fill ind empty f e k bar=""
+            IFS='|' read -r w fill ind empty <<< "$BAR"
+            f=$(( (w * vol + 50) / 100 )); (( f > w )) && f=$w
+            e=$(( w - f ))
+            if [ -n "$ind" ]; then (( f > 0 )) && f=$(( f - 1 )) || e=$(( e - 1 )); fi
+            for ((k = 0; k < f; k++)); do bar+=$fill; done
+            bar+=$ind
+            for ((k = 0; k < e; k++)); do bar+=$empty; done
+            out=${out//@bar@/$bar}
+        fi
     fi
-    [ "$out" != "$last" ] && echo "$out" && last=$out
+    printf '%s\n' "$out"
 }
 
+last=""
+show() { local o; o=$(render); [ "$o" != "$last" ] && echo "$o" && last=$o; }
+
 show
-pactl subscribe 2>/dev/null | grep --line-buffered -E "'change' on (sink|server)" |
-    while read -r _; do show; done
+# Listen for changes. pactl runs as a coprocess so it can be stopped with us:
+# polybar waits for its scripts to exit (theme switches wait for polybar).
+EVENTS_PID=""
+trap 'kill $EVENTS_PID 2>/dev/null; exit 0' TERM INT HUP
+coproc EVENTS { exec pactl subscribe 2>/dev/null; }
+while read -r line <&"${EVENTS[0]}"; do
+    case "$line" in *"'change' on sink"*|*"'change' on server"*) show ;; esac
+done
+kill $EVENTS_PID 2>/dev/null

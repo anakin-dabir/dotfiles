@@ -8,6 +8,8 @@ $nc-card-radius: 12px !default;
 $nc-pill-radius: 999px !default;
 $nc-border: 1px solid rgba($fg, 0.10) !default;
 $nc-theme-font: "Adwaita Sans" !default;
+$nc-accent: $blue !default;
+$nc-on-accent: #ffffff !default;
 
 $nc-font: $nc-theme-font, "Adwaita Sans", "Noto Sans", "JetBrainsMono NF", sans-serif;
 $nc-icons: "Material Design Icons Desktop";
@@ -69,15 +71,15 @@ $nc-icons: "Material Design Icons Desktop";
 }
 
 .nc-pill-on {
-  background-color: $blue;
+  background-color: $nc-accent;
 }
 
 .nc-pill-on:hover {
-  background-color: rgba($blue, 0.85);
+  background-color: rgba($nc-accent, 0.85);
 }
 
 .nc-pill-on label {
-  color: #ffffff;
+  color: $nc-on-accent;
 }
 
 .nc-pill-danger {
@@ -109,12 +111,12 @@ $nc-icons: "Material Design Icons Desktop";
 }
 
 .nc-unread {
-  background-color: rgba($blue, 0.12);
-  border-color: rgba($blue, 0.25);
+  background-color: rgba($nc-accent, 0.12);
+  border-color: rgba($nc-accent, 0.25);
 }
 
 .nc-unread:hover {
-  background-color: rgba($blue, 0.18);
+  background-color: rgba($nc-accent, 0.18);
 }
 
 .nc-critical {
@@ -145,7 +147,7 @@ $nc-icons: "Material Design Icons Desktop";
   min-width: 7px;
   min-height: 7px;
   border-radius: 999px;
-  background-color: $blue;
+  background-color: $nc-accent;
 }
 
 .nc-app {

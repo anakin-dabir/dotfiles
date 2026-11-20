@@ -170,7 +170,7 @@
 		 ))
 
 		 (eventbox :cursor "pointer"
-		 (button :onclick "${EWW_CMD} open --toggle audio_ctl"
+		 (button :onclick "~/.config/bspwm/bin/BarPanel sound &"
 				 :onrightclick "scripts/volume.sh --toggle-muted"
 				 (box :orientation "h"
 					  :spacing 3
@@ -188,7 +188,8 @@
 		 ))
 
 		 (eventbox :cursor "pointer"
-		 (button :onclick "OpenApps --netmanager"
+		 (button :onclick "~/.config/bspwm/bin/BarPanel network &"
+				 :onrightclick "OpenApps --netmanager"
 				 (box :orientation "h"
 					  :spacing 3
 					  :valign "center"
@@ -244,6 +245,7 @@
 
 ;; weather
 (defwidget clock []
+	(eventbox :cursor "pointer" :onclick "~/.config/bspwm/bin/BarPanel calendar &"
 	(box :class "mainbars"
 		 :spacing 15
 		 :space-evenly "false"
@@ -260,7 +262,7 @@
 			(label :class "weathertemp" :text "${TEMP}°C")
 		)
 	)
-)
+))
 
 
 (defwidget audio []

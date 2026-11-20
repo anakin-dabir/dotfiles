@@ -104,7 +104,8 @@ sound() {
     mvol=$(pamixer --default-source --get-volume 2>/dev/null || echo 0)
     mmuted=$(pamixer --default-source --get-mute 2>/dev/null || echo false)
     jq -nc --argjson vol "$vol" --argjson muted "$muted" --argjson mvol "$mvol" --argjson mmuted "$mmuted" \
-        --argjson sinks "${sinks:-[]}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks}'
+        --argjson sinks "${sinks:-[]}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks,
+          output: ([$sinks[] | select(.default) | .desc][0] // "No output")}'
 }
 
 network() {
@@ -167,8 +168,48 @@ battery() {
         --argjson bright "${bright:-0}" '{pct: $pct, status: $status, time: $time, health: $health, bright: $bright}'
 }
 
-[ "$2" = --fast ] && FAST=1
+# Wi-Fi networks in range. --rescan asks the card to search again (takes a
+# few seconds); without it the last results are returned at once.
+wifi() {
+    local rescan=no; [ "$RESCAN" = 1 ] && rescan=yes
+    local known; known=$(nmcli -t -f NAME,TYPE con show 2>/dev/null | sed -n 's/:802-11-wireless$//p' | jq -R . | jq -sc .)
+    nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan "$rescan" 2>/dev/null |
+        sed 's/\\:/\x01/g' |
+        awk -F: '$2 != "" { gsub("\x01", ":", $2); print $1 "\t" $2 "\t" $3 "\t" $4 }' |
+        jq -R -s -c --argjson known "${known:-[]}" '
+            split("\n") | map(select(. != "") | split("\t")
+              | {active: (.[0] == "*"), ssid: .[1], signal: (.[2] | tonumber? // 0),
+                 secure: (.[3] != "" and .[3] != "--")})
+            | group_by(.ssid) | map(max_by(.signal) + {active: (map(.active) | any)})
+            | map(. + {known: (.ssid as $s | $known | index($s) != null),
+                       bars: (if .signal >= 75 then 4 elif .signal >= 50 then 3 elif .signal >= 25 then 2 else 1 end)})
+            | sort_by([(if .active then 0 else 1 end), (if .known then 0 else 1 end), -.signal])
+            | to_entries | map(.value + {i: .key}) | {networks: .}'
+}
+
+# Paired Bluetooth devices
+bt() {
+    bluetoothctl devices Paired 2>/dev/null | while read -r _ mac name; do
+        local info; info=$(bluetoothctl info "$mac" 2>/dev/null)
+        jq -nc --arg mac "$mac" --arg name "$name" \
+            --arg icon "$(sed -n 's/^\s*Icon: //p' <<< "$info")" \
+            --argjson on "$(grep -q 'Connected: yes' <<< "$info" && echo true || echo false)" \
+            --arg battery "$(sed -n 's/^\s*Battery Percentage: .*(\([0-9]*\))/\1/p' <<< "$info")" \
+            '{mac: $mac, name: $name, icon: $icon, connected: $on, battery: $battery}'
+    done | jq -sc 'sort_by(if .connected then 0 else 1 end) | {devices: .}'
+}
+
+PUSH=0
+for a in "${@:2}"; do
+    case "$a" in --fast) FAST=1 ;; --push) PUSH=1 ;; --rescan) RESCAN=1 ;; esac
+done
 case "$1" in
-    cpu|memory|disk|sound|network|battery) "$1" ;;
-    *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery" >&2; exit 1 ;;
+    cpu|memory|disk|sound|network|battery|wifi|bt)
+        if [ "$PUSH" = 1 ]; then
+            # Send straight to the open dropdown instead of waiting for its next poll
+            eww -c "$HOME/.config/bspwm/eww" update "bp_$1=$("$1")" >/dev/null 2>&1
+        else
+            "$1"
+        fi ;;
+    *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery|wifi|bt [--push] [--fast] [--rescan]" >&2; exit 1 ;;
 esac
