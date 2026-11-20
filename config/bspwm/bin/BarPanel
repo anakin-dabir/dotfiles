@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Dropdown panels under the bar items (eww/barpanels, eww/notifications).
+#   BarPanel NAME       open NAME's dropdown, or close it if it's already open
+#                       NAME: cpu memory disk sound network battery calendar notifcenter
+#   BarPanel --close    close whichever dropdown is open
+#
+# Only one dropdown is open at a time. Clicking anywhere outside it (or
+# switching window/desktop) closes it; clicking another bar item switches to
+# that item's dropdown.
+
+BSPDIR="$HOME/.config/bspwm"
+EWW=(eww -c "$BSPDIR/eww")
+STATE="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
+GAP=8
+mkdir -p "$STATE"
+
+width_of() {
+    case "$1" in
+        notifcenter) echo 400 ;; *) echo 340 ;;
+    esac
+}
+window_of() { [ "$1" = notifcenter ] && echo notifcenter || echo "bp-$1"; }
+
+# What's on screen, asked from X (a stuck eww's windows count too)
+open_windows() { xdotool search --name '^Eww - (notifcenter|bp-(cpu|memory|disk|sound|network|battery|calendar))$' 2>/dev/null; }
+current() { cat "$STATE/open" 2>/dev/null; }
+
+ensure_eww() { "$BSPDIR/bin/EwwDaemon" 7>&-; }
+
+start_watcher() {
+    stop_watcher
+    ( bspc subscribe desktop_focus node_focus | head -n 1 >/dev/null
+      rm -f "$STATE/watcher.pid"   # so --close doesn't stop this very process
+      "$0" --close ) >/dev/null 2>&1 7>&- &
+    echo $! > "$STATE/watcher.pid"
+}
+stop_watcher() {
+    local pid; pid=$(cat "$STATE/watcher.pid" 2>/dev/null) || return
+    rm -f "$STATE/watcher.pid"
+    pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
+}
+
+# Where the dropdown goes. Prints: monitor-number panel-pos anchor closer-pos closer-size max-height
+place() { # $1 = panel width
+    local W=$1 X Y WINDOW SCREEN mon mx my mw mh
+    eval "$(xdotool getmouselocation --shell)"
+    read -r mon mx my mw mh < <(bspc query -T -m focused |
+        jq -r '"\(.name) \(.rectangle.x) \(.rectangle.y) \(.rectangle.width) \(.rectangle.height)"')
+
+    local bar="" clicked=0 class
+    class=$(xprop -id "$WINDOW" WM_CLASS 2>/dev/null)
+    if [[ "$class" == *[Pp]olybar* ]] || [ "$(xdotool getwindowname "$WINDOW" 2>/dev/null)" = "Eww - bar" ]; then
+        bar=$WINDOW; clicked=1
+    else
+        # Keyboard: use the widest bar on this monitor
+        local w g best=0 gx gw
+        for w in $(xdotool search --onlyvisible --class 'Polybar' 2>/dev/null) \
+                 $(xdotool search --onlyvisible --name '^Eww - bar$' 2>/dev/null); do
+            g=$(xdotool getwindowgeometry --shell "$w")
+            gx=$(sed -n 's/^X=//p' <<< "$g"); gw=$(sed -n 's/^WIDTH=//p' <<< "$g")
+            (( gx < mx || gx >= mx + mw )) && continue
+            (( gw > best )) && { best=$gw; bar=$w; }
+        done
+    fi
+
+    local bx=0 by=0 bw=0 bh=0
+    if [ -n "$bar" ]; then
+        local g; g=$(xdotool getwindowgeometry --shell "$bar")
+        bx=$(( $(sed -n 's/^X=//p' <<< "$g") - mx )); by=$(( $(sed -n 's/^Y=//p' <<< "$g") - my ))
+        bw=$(sed -n 's/^WIDTH=//p' <<< "$g"); bh=$(sed -n 's/^HEIGHT=//p' <<< "$g")
+    fi
+
+    # The click-outside layer covers the screen except the bar, so clicking
+    # another bar item goes to that item.
+    local x y anchor="top left" maxh cpos="0x0" csize="${mw}x${mh}"
+    if [ -n "$bar" ] && (( bw < bh )); then                      # vertical bar
+        if (( bx < mw / 2 )); then
+            x=$(( bx + bw + GAP )); cpos="$(( bx + bw ))x0"; csize="$(( mw - bx - bw ))x${mh}"
+        else
+            x=$(( bx - W - GAP )); csize="${bx}x${mh}"
+        fi
+        y=$GAP; maxh=$(( mh - 2 * GAP - 90 ))
+    else
+        if (( clicked )); then x=$(( X - mx - W / 2 )); else x=$(( mw - W - GAP )); fi
+        if [ -n "$bar" ] && (( by > mh / 2 )); then              # bottom bar
+            anchor="bottom left"; y=$(( -(mh - by + GAP) )); maxh=$(( by - 2 * GAP - 90 ))
+            csize="${mw}x${by}"
+        elif [ -n "$bar" ]; then                                 # top bar
+            y=$(( by + bh + GAP )); maxh=$(( mh - by - bh - 2 * GAP - 90 ))
+            cpos="0x$(( by + bh ))"; csize="${mw}x$(( mh - by - bh ))"
+        else
+            y=$(( GAP + 32 )); maxh=$(( mh - 2 * GAP - 122 ))
+        fi
+    fi
+    (( x < GAP )) && x=$GAP
+    (( x > mw - W - GAP )) && x=$(( mw - W - GAP ))
+    (( maxh > 640 )) && maxh=640
+
+    # eww wants the monitor's number, not its name
+    if [ "$(bspc query -M | wc -l)" -eq 1 ]; then mon=0
+    else mon=$(xrandr --listmonitors | awk -v n="$mon" '$NF == n { sub(":", "", $1); print $1 }'); fi
+    echo "$mon ${x}x${y} $anchor|$cpos $csize $maxh"
+}
+
+# Fill the dropdown before it shows, so it never opens empty
+fill() { # $1 = name, $2 = max height
+    case "$1" in
+        notifcenter) "$BSPDIR/bin/NotifyCenter" --data "$2" 7>&- ;;
+        calendar)    ;;
+        cpu)         "${EWW[@]}" update bp_cpu="$("$BSPDIR/bin/BarPanelData" cpu --fast)" ;;
+        *)           "${EWW[@]}" update "bp_$1=$("$BSPDIR/bin/BarPanelData" "$1")" ;;
+    esac >/dev/null 2>&1
+}
+
+close() {
+    local was; was=$(current)
+    stop_watcher
+    rm -f "$STATE/open"
+    local wins; wins=$("${EWW[@]}" active-windows 2>/dev/null | cut -d: -f1 | grep -E '^(notifcenter|bp-)')
+    [ -n "$wins" ] && timeout 2 "${EWW[@]}" close $wins >/dev/null 2>&1
+    timeout 2 "${EWW[@]}" update bp_open="" >/dev/null 2>&1
+    # Still on screen? A stuck or duplicate eww is drawing it: restart eww.
+    [ -n "$(open_windows)" ] && "$BSPDIR/bin/EwwDaemon" --restart 7>&-
+    [ "$was" = notifcenter ] && "$BSPDIR/bin/NotifyCenter" --closed 7>&-
+}
+
+open() { # $1 = name
+    local name=$1 win placement mon pos anchor rest cpos csize maxh
+    win=$(window_of "$name")
+    ensure_eww || { notify-send -u low "Bar menu" "eww isn't responding"; return 1; }
+    # Load the data while working out the position (the notification panel
+    # needs the position first: its height depends on the space left)
+    local filler=""
+    [ "$name" != notifcenter ] && { fill "$name" & filler=$!; }
+    placement=$(place "$(width_of "$name")")
+    rest=${placement#*|}; placement=${placement%|*}
+    read -r mon pos anchor <<< "$placement"
+    read -r cpos csize maxh <<< "$rest"
+    if [ -n "$filler" ]; then wait "$filler"; else fill "$name" "$maxh"; fi
+    show() {
+        "${EWW[@]}" update bp_open="$name" >/dev/null 2>&1
+        "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1
+        "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+    }
+    show
+    # If eww started a duplicate copy while opening, start over with one clean eww
+    # (a quick count is enough here; the full check ran just before)
+    if [ "$(pgrep -fc "^eww -c $BSPDIR/eww( |\$)")" -gt 1 ] || [ "$(open_windows | wc -l)" -ne 1 ]; then
+        "$BSPDIR/bin/EwwDaemon" --restart 7>&-
+        fill "$name" "$maxh"; show
+    fi
+    echo "$name" > "$STATE/open"
+    start_watcher
+}
+
+# One action at a time (double clicks, key repeat)
+exec 7> "$STATE/.lock"
+flock -w 3 7 || exit 1
+
+case "$1" in
+    --close|"") close ;;
+    *)
+        was=$(current)
+        [ -n "$was" ] || [ -n "$(open_windows)" ] && close
+        [ "$was" = "$1" ] || open "$1"
+        ;;
+esac

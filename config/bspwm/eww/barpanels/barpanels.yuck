@@ -1,0 +1,242 @@
+;; Dropdowns under the bar items. Opened, placed and closed by bin/BarPanel;
+;; their data comes from bin/BarPanelData, polled only while open.
+
+(defvar bp_open "")   ;; name of the open dropdown (BarPanel sets it)
+
+(defpoll bp_cpu :interval "2s" :run-while {bp_open == "cpu"}
+  :initial '{"total":0,"cores":[],"temp":"","load":"","model":"","procs":[],"threads":0}'
+  `~/.config/bspwm/bin/BarPanelData cpu`)
+(defpoll bp_memory :interval "2s" :run-while {bp_open == "memory"}
+  :initial '{"used":"","total":"","free":"","pct":0,"swap_used":"","swap_total":"","swap_pct":0,"apps":[]}'
+  `~/.config/bspwm/bin/BarPanelData memory`)
+(defpoll bp_disk :interval "30s" :run-while {bp_open == "disk"}
+  :initial '{"disks":[]}'
+  `~/.config/bspwm/bin/BarPanelData disk`)
+(defpoll bp_sound :interval "1s" :run-while {bp_open == "sound"}
+  :initial '{"vol":0,"muted":false,"mic_vol":0,"mic_muted":false,"sinks":[]}'
+  `~/.config/bspwm/bin/BarPanelData sound`)
+(defpoll bp_network :interval "2s" :run-while {bp_open == "network"}
+  :initial '{"kind":"none","name":"","signal":0,"ip":"","iface":"","down":"","up":"","down_b":0,"wifi_on":false,"bt_on":false,"bt_dev":""}'
+  `~/.config/bspwm/bin/BarPanelData network`)
+(defpoll bp_battery :interval "5s" :run-while {bp_open == "battery"}
+  :initial '{"pct":0,"status":"","time":"","health":"","bright":0}'
+  `~/.config/bspwm/bin/BarPanelData battery`)
+
+;; ---------- building blocks ----------
+
+(defwidget bp-head [icon title value ?sub]
+  (box :class "bp-head" :space-evenly false :spacing 12
+    (label :class "bp-head-icon" :valign "center" :text icon)
+    (box :orientation "v" :space-evenly false :hexpand true :valign "center"
+      (label :class "bp-title" :halign "start" :xalign 0 :limit-width 26 :text title)
+      (label :class "bp-sub" :halign "start" :xalign 0 :limit-width 38 :visible {sub != ""} :text sub))
+    (label :class "bp-big" :valign "center" :text value)))
+
+(defwidget bp-section [text]
+  (label :class "bp-section" :halign "start" :text text))
+
+(defwidget bp-meter [value]
+  (progress :class "bp-meter ${value >= 90 ? 'bp-hot' : value >= 75 ? 'bp-warm' : ''}"
+            :value value :orientation "h"))
+
+(defwidget bp-stat [label value]
+  (box :class "bp-stat" :orientation "v" :space-evenly false
+    (label :class "bp-stat-value" :text value)
+    (label :class "bp-stat-label" :text label)))
+
+(defwidget bp-row [name value]
+  (box :class "bp-row" :space-evenly false
+    (label :class "bp-row-name" :halign "start" :hexpand true :xalign 0 :limit-width 30 :text name)
+    (label :class "bp-row-value" :text value)))
+
+(defwidget bp-app [name value pct]
+  (box :class "bp-app" :orientation "v" :space-evenly false :spacing 4
+    (bp-row :name name :value value)
+    (progress :class "bp-thin" :value pct :orientation "h")))
+
+(defwidget bp-button [text onclick ?icon]
+  (eventbox :cursor "pointer"
+    (button :class "bp-button" :onclick onclick
+      (box :space-evenly false :spacing 8 :halign "center"
+        (label :class "bp-btn-icon" :visible {icon != ""} :text icon)
+        (label :text text)))))
+
+(defwidget bp-tile [icon title sub on onclick]
+  (eventbox :cursor "pointer" :hexpand true
+    (button :class "bp-tile ${on ? 'bp-tile-on' : ''}" :onclick onclick
+      (box :space-evenly false :spacing 10
+        (label :class "bp-tile-icon" :text icon)
+        (box :orientation "v" :space-evenly false
+          (label :class "bp-tile-title" :halign "start" :text title)
+          (label :class "bp-tile-sub" :halign "start" :xalign 0 :limit-width 14 :text sub))))))
+
+(defwidget bp-slider [icon value onchange onclick ?max]
+  (box :class "bp-slider-row" :space-evenly false :spacing 10
+    (eventbox :cursor "pointer"
+      (button :class "bp-slider-icon" :onclick onclick icon))
+    (scale :class "bp-slider" :hexpand true :min 0 :max {max == "" ? 101 : max}
+           :value value :onchange onchange)
+    (label :class "bp-slider-value" :text "${value}%")))
+
+;; ---------- CPU ----------
+
+(defwidget bp-cpu-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon "󰍛" :title "Processor" :sub {bp_cpu.model} :value "${bp_cpu.total}%")
+    (box :class "bp-graph-box"
+      (graph :class "bp-graph" :value {bp_cpu.total} :time-range "60s" :min 0 :max 100
+             :dynamic false :thickness 2 :line-style "round" :height 64))
+    (box :class "bp-cores" :spacing 4 :height 36
+      (for c in {bp_cpu.cores}
+        (progress :class "bp-core ${c >= 90 ? 'bp-hot' : ''}" :orientation "v" :flipped true :value c)))
+    (box :space-evenly true
+      (bp-stat :label "Temperature" :value {bp_cpu.temp == "" ? "–" : bp_cpu.temp})
+      (bp-stat :label "Load (1 / 5 / 15 min)" :value {bp_cpu.load})
+      (bp-stat :label "Threads" :value {bp_cpu.threads}))
+    (bp-section :text "Using the most CPU")
+    (box :orientation "v" :space-evenly false :spacing 7
+      (label :class "bp-dim" :halign "start" :visible {arraylength(bp_cpu.procs) == 0} :text "Measuring…")
+      (for p in {bp_cpu.procs}
+        (bp-row :name {p.name} :value "${p.pct}%")))
+    (bp-button :icon "󰍹" :text "System Monitor"
+               :onclick "~/.config/bspwm/bin/BarPanel --close; gnome-system-monitor -r &")))
+
+;; ---------- Memory ----------
+
+(defwidget bp-memory-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon "󰘚" :title "Memory" :sub "${bp_memory.used} of ${bp_memory.total} used · ${bp_memory.free} free"
+             :value "${bp_memory.pct}%")
+    (box :class "bp-graph-box"
+      (graph :class "bp-graph" :value {bp_memory.pct} :time-range "60s" :min 0 :max 100
+             :dynamic false :thickness 2 :line-style "round" :height 52))
+    (box :orientation "v" :space-evenly false :spacing 6
+      (bp-row :name "Swap" :value "${bp_memory.swap_used} of ${bp_memory.swap_total}")
+      (bp-meter :value {bp_memory.swap_pct}))
+    (bp-section :text "Apps using the most memory")
+    (box :orientation "v" :space-evenly false :spacing 10
+      (for a in {bp_memory.apps}
+        (bp-app :name {a.name} :value {a.size} :pct {a.pct})))
+    (bp-button :icon "󰍹" :text "System Monitor"
+               :onclick "~/.config/bspwm/bin/BarPanel --close; gnome-system-monitor -p &")))
+
+;; ---------- Storage ----------
+
+(defwidget bp-disk-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon "󰋊" :title "Storage"
+             :sub {arraylength(bp_disk.disks) > 0 ? "${bp_disk.disks[0].free} free on the system drive" : ""}
+             :value {arraylength(bp_disk.disks) > 0 ? "${bp_disk.disks[0].pct}%" : ""})
+    (for d in {bp_disk.disks}
+      (box :class "bp-card" :orientation "v" :space-evenly false :spacing 7
+        (bp-row :name {d.name} :value "${d.used} of ${d.size}")
+        (bp-meter :value {d.pct})
+        (label :class "bp-dim" :halign "start" :text "${d.free} free · ${d.mount}")))
+    (box :space-evenly true :spacing 8
+      (bp-button :icon "󰉋" :text "Files"
+                 :onclick "~/.config/bspwm/bin/BarPanel --close; thunar &")
+      (bp-button :icon "󰄨" :text "Analyze"
+                 :onclick "~/.config/bspwm/bin/BarPanel --close; kitty --class floating -e ncdu ~ &"))))
+
+;; ---------- Sound ----------
+
+(defwidget bp-sound-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon {bp_sound.muted ? "󰖁" : "󰕾"} :title "Sound"
+             :sub {bp_sound.muted ? "Muted" : ""} :value {bp_sound.muted ? "" : "${bp_sound.vol}%"})
+    (bp-slider :icon {bp_sound.muted ? "󰖁" : "󰕾"} :value {bp_sound.vol}
+               :onchange "pamixer --set-volume {} --unmute"
+               :onclick "pamixer -t")
+    (bp-section :text "Output")
+    (box :orientation "v" :space-evenly false :spacing 2
+      (for s in {bp_sound.sinks}
+        (eventbox :cursor "pointer"
+          (button :class "bp-choice ${s.default ? 'bp-choice-on' : ''}"
+                  :onclick "pactl set-default-sink '${s.name}'"
+            (box :space-evenly false :spacing 10
+              (label :class "bp-choice-icon"
+                     :text {s.kind == "headphones" ? "󰋋" : s.kind == "hdmi" ? "󰡁" : s.kind == "bluetooth" ? "󰂯" : "󰓃"})
+              (label :class "bp-choice-name" :halign "start" :hexpand true :xalign 0 :limit-width 34 :text {s.desc})
+              (label :class "bp-choice-check" :visible {s.default} :text "󰄬"))))))
+    (bp-section :text "Microphone")
+    (bp-slider :icon {bp_sound.mic_muted ? "󰍭" : "󰍬"} :value {bp_sound.mic_vol}
+               :onchange "pamixer --default-source --set-volume {} --unmute"
+               :onclick "pamixer --default-source -t")
+    (bp-button :icon "󰒓" :text "Sound Settings"
+               :onclick "~/.config/bspwm/bin/BarPanel --close; pavucontrol &")))
+
+;; ---------- Network ----------
+
+(defwidget bp-network-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon {bp_network.kind == "wifi" ? "󰖩" : bp_network.kind == "ethernet" ? "󰈀" : "󰭚"}
+             :title {bp_network.kind == "none" ? "Not connected" : bp_network.name}
+             :sub {bp_network.kind == "none" ? "" : "${bp_network.kind == 'wifi' ? 'Wi-Fi' : 'Ethernet'} · ${bp_network.ip}"}
+             :value {bp_network.kind == "wifi" ? "${bp_network.signal}%" : ""})
+    (box :class "bp-graph-box"
+      (graph :class "bp-graph" :value {bp_network.down_b} :time-range "60s" :min 0
+             :dynamic true :thickness 2 :line-style "round" :height 48))
+    (box :space-evenly true
+      (bp-stat :label "Download" :value {bp_network.down})
+      (bp-stat :label "Upload" :value {bp_network.up}))
+    (box :space-evenly true :spacing 8
+      (bp-tile :icon {bp_network.wifi_on ? "󰖩" : "󰖪"} :title "Wi-Fi"
+               :sub {bp_network.wifi_on ? (bp_network.kind == "wifi" ? bp_network.name : "On") : "Off"}
+               :on {bp_network.wifi_on}
+               :onclick "nmcli radio wifi ${bp_network.wifi_on ? 'off' : 'on'}")
+      (bp-tile :icon {bp_network.bt_on ? "󰂯" : "󰂲"} :title "Bluetooth"
+               :sub {bp_network.bt_on ? (bp_network.bt_dev != "" ? bp_network.bt_dev : "On") : "Off"}
+               :on {bp_network.bt_on}
+               :onclick "bluetoothctl power ${bp_network.bt_on ? 'off' : 'on'}"))
+    (box :space-evenly true :spacing 8
+      (bp-button :icon "󰖩" :text "Networks…"
+                 :onclick "~/.config/bspwm/bin/BarPanel --close; ~/.config/bspwm/bin/OpenApps --netmanager &")
+      (bp-button :icon "󰂯" :text "Devices…"
+                 :onclick "~/.config/bspwm/bin/BarPanel --close; ~/.config/bspwm/bin/OpenApps --bluetooth &"))))
+
+;; ---------- Battery ----------
+
+(defwidget bp-battery-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon {bp_battery.status == "Charging" ? "󰂄" : "󰁹"} :title "Battery"
+             :sub {bp_battery.time != "" ? bp_battery.time : bp_battery.status}
+             :value "${bp_battery.pct}%")
+    (progress :class "bp-meter ${bp_battery.pct <= 20 ? 'bp-hot' : bp_battery.status == 'Charging' ? 'bp-good' : ''}"
+              :value {bp_battery.pct} :orientation "h")
+    (box :space-evenly true
+      (bp-stat :label "Status" :value {bp_battery.status})
+      (bp-stat :label "Battery health" :value {bp_battery.health == "" ? "–" : bp_battery.health}))
+    (bp-section :text "Screen brightness")
+    (bp-slider :icon "󰃠" :value {bp_battery.bright} :max 100
+               :onchange "brightnessctl -q set {}%" :onclick "")
+    (bp-button :icon "󰐥" :text "Power Options…"
+               :onclick "~/.config/bspwm/bin/BarPanel --close; ~/.config/bspwm/bin/OpenApps --powermenu &")))
+
+;; ---------- Calendar ----------
+
+(defwidget bp-calendar-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 14
+    (bp-head :icon "󰃭" :title {formattime(EWW_TIME, "%A")}
+             :sub {formattime(EWW_TIME, "%B %-d, %Y")} :value {formattime(EWW_TIME, "%H:%M")})
+    (calendar :class "bp-month" :show-week-numbers false)))
+
+;; ---------- windows ----------
+
+(defwindow bp-cpu      :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-cpu-panel))
+(defwindow bp-memory   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-memory-panel))
+(defwindow bp-disk     :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-disk-panel))
+(defwindow bp-sound    :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-sound-panel))
+(defwindow bp-network  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-network-panel))
+(defwindow bp-battery  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-battery-panel))
+(defwindow bp-calendar :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-calendar-panel))
+
+;; Invisible layer under the open dropdown: a click on it closes the dropdown.
+;; BarPanel sizes it to everything except the bar, so bar clicks still work.
+(defwindow bp-closer
+  :geometry (geometry :x "0px" :y "0px" :width "100%" :height "100%" :anchor "top left")
+  :stacking "fg"
+  :wm-ignore true
+  (eventbox :onclick "~/.config/bspwm/bin/BarPanel --close &"
+            :onrightclick "~/.config/bspwm/bin/BarPanel --close &"
+            :onmiddleclick "~/.config/bspwm/bin/BarPanel --close &"
+    (box :class "bp-closer")))

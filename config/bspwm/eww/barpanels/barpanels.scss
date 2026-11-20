@@ -1,0 +1,318 @@
+// Bar dropdowns. Same look as the notification panel: colors and shape come
+// from the current rice (colors.scss, written by config/modules/06-eww.sh).
+
+$bp-icons: "Material Design Icons Desktop";
+
+.bp-closer {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.bp-panel {
+  font-family: $nc-font;
+  color: $fg;
+  background-color: rgba($bg, 0.97);
+  border: $nc-border;
+  border-radius: $nc-radius;
+  padding: 16px;
+  margin: 2px;
+}
+
+.bp-panel label {
+  font-family: $nc-font;
+  color: $fg;
+}
+
+// ----- header ----- //
+
+.bp-panel .bp-head-icon {
+  font-family: $bp-icons;
+  font-size: 22px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($blue, 0.16);
+  color: $blue;
+}
+
+.bp-title {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.bp-sub {
+  font-size: 11px;
+  color: rgba($fg, 0.6);
+  margin-top: 2px;
+}
+
+.bp-panel .bp-sub {
+  color: rgba($fg, 0.6);
+}
+
+.bp-big {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.bp-section {
+  font-size: 11px;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.bp-panel .bp-section {
+  color: rgba($fg, 0.5);
+}
+
+.bp-panel .bp-dim {
+  font-size: 11px;
+  color: rgba($fg, 0.5);
+}
+
+.bp-clock {
+  font-size: 34px;
+  font-weight: bold;
+}
+
+// ----- rows, stats, cards ----- //
+
+.bp-row-name,
+.bp-row-value {
+  font-size: 12px;
+}
+
+.bp-panel .bp-row-value {
+  color: rgba($fg, 0.7);
+}
+
+.bp-stat-value {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.bp-panel .bp-stat-label {
+  font-size: 10px;
+  color: rgba($fg, 0.5);
+  margin-top: 2px;
+}
+
+.bp-card {
+  background-color: rgba($fg, 0.05);
+  border-radius: $nc-card-radius;
+  padding: 11px 12px;
+}
+
+// ----- meters and graphs ----- //
+
+.bp-meter trough,
+.bp-thin trough {
+  min-height: 7px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.10);
+}
+
+.bp-thin trough {
+  min-height: 4px;
+}
+
+.bp-meter progress,
+.bp-thin progress {
+  min-height: 7px;
+  border-radius: $nc-pill-radius;
+  background-color: $blue;
+}
+
+.bp-thin progress {
+  min-height: 4px;
+  background-color: rgba($blue, 0.7);
+}
+
+.bp-warm progress {
+  background-color: $yellow;
+}
+
+.bp-hot progress {
+  background-color: $red;
+}
+
+.bp-good progress {
+  background-color: $green;
+}
+
+.bp-graph-box {
+  background-color: rgba($fg, 0.04);
+  border-radius: $nc-card-radius;
+  padding: 6px 4px 2px 4px;
+}
+
+.bp-graph {
+  color: $blue;
+  background-color: rgba($blue, 0.10);
+}
+
+.bp-core trough {
+  min-width: 6px;
+  min-height: 34px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.08);
+}
+
+.bp-core progress {
+  min-width: 6px;
+  border-radius: $nc-pill-radius;
+  background-color: $blue;
+}
+
+.bp-core.bp-hot progress {
+  background-color: $red;
+}
+
+// ----- buttons, tiles, choices ----- //
+
+.bp-button {
+  padding: 8px 12px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.07);
+}
+
+.bp-button:hover {
+  background-color: rgba($fg, 0.14);
+}
+
+.bp-button label {
+  font-size: 12px;
+}
+
+.bp-panel .bp-btn-icon,
+.bp-panel .bp-tile-icon,
+.bp-panel .bp-choice-icon,
+.bp-panel .bp-choice-check {
+  font-family: $bp-icons;
+  font-size: 16px;
+}
+
+.bp-tile {
+  padding: 10px 12px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.07);
+}
+
+.bp-tile:hover {
+  background-color: rgba($fg, 0.14);
+}
+
+.bp-tile-on {
+  background-color: $blue;
+}
+
+.bp-tile-on:hover {
+  background-color: rgba($blue, 0.85);
+}
+
+.bp-tile-on label {
+  color: #ffffff;
+}
+
+.bp-tile-title {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.bp-tile-sub {
+  font-size: 10px;
+}
+
+.bp-choice {
+  padding: 7px 10px;
+  border-radius: $nc-card-radius;
+}
+
+.bp-choice:hover {
+  background-color: rgba($fg, 0.08);
+}
+
+.bp-choice-name {
+  font-size: 12px;
+}
+
+.bp-choice-on .bp-choice-name {
+  font-weight: bold;
+}
+
+.bp-panel .bp-choice-check {
+  color: $blue;
+}
+
+// ----- sliders ----- //
+
+.bp-panel .bp-slider-icon {
+  font-family: $bp-icons;
+  font-size: 18px;
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.08);
+}
+
+.bp-slider-icon:hover {
+  background-color: rgba($fg, 0.16);
+}
+
+.bp-slider trough {
+  min-height: 8px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.10);
+}
+
+.bp-slider highlight {
+  border-radius: $nc-pill-radius;
+  background-color: $blue;
+}
+
+.bp-slider slider {
+  min-width: 16px;
+  min-height: 16px;
+  margin: -5px 0;
+  border-radius: $nc-pill-radius;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.bp-panel .bp-slider-value {
+  font-size: 11px;
+  min-width: 36px;
+  color: rgba($fg, 0.7);
+}
+
+// ----- calendar ----- //
+
+.bp-month {
+  font-family: $nc-font;
+  font-size: 12px;
+  color: $fg;
+  padding: 4px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.04);
+}
+
+.bp-month:selected {
+  background-color: $blue;
+  color: #ffffff;
+  border-radius: $nc-pill-radius;
+}
+
+.bp-month.header {
+  font-weight: bold;
+}
+
+.bp-month.button {
+  color: rgba($fg, 0.7);
+}
+
+.bp-month.button:hover {
+  color: $fg;
+}
+
+.bp-month:indeterminate {
+  color: rgba($fg, 0.3);
+}

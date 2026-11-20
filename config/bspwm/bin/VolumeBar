@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Volume for a polybar custom/script module (tail = true).
+# Prints "<icon> 60" or "<muted icon> Muted" and again on every change.
+#   VolumeBar [icon] [muted-icon] [padding]
+# Used instead of polybar's internal/pulseaudio, whose left click is a fixed
+# "mute" that can't be changed (left click here opens the sound dropdown).
+
+ON=${1:-$'\U000F057E'}
+OFF=${2:-$'\U000F0581'}
+PAD=${3:-5pt}
+
+last=""
+show() {
+    local out
+    if [ "$(pamixer --get-mute 2>/dev/null)" = true ]; then
+        out="%{O$PAD}$OFF%{O$PAD}Muted"
+    else
+        out="%{O$PAD}$ON%{O$PAD}$(pamixer --get-volume 2>/dev/null)"
+    fi
+    [ "$out" != "$last" ] && echo "$out" && last=$out
+}
+
+show
+pactl subscribe 2>/dev/null | grep --line-buffered -E "'change' on (sink|server)" |
+    while read -r _; do show; done

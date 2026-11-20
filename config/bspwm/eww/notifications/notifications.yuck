@@ -72,12 +72,5 @@
   :wm-ignore true
   (nc-panel))
 
-;; Invisible full-screen layer under the panel: clicking anywhere else closes it
-(defwindow nc-closer
-  :geometry (geometry :x "0px" :y "0px" :width "100%" :height "100%" :anchor "top left")
-  :stacking "fg"
-  :wm-ignore true
-  (eventbox :onclick "~/.config/bspwm/bin/NotifyCenter --close &"
-            :onrightclick "~/.config/bspwm/bin/NotifyCenter --close &"
-            :onmiddleclick "~/.config/bspwm/bin/NotifyCenter --close &"
-    (box :class "nc-closer")))
+;; Opened, placed and closed by bin/BarPanel (click-outside layer: bp-closer
+;; in barpanels/barpanels.yuck).

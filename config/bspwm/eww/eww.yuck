@@ -2,3 +2,4 @@
 (include "player/player.yuck")
 (include "welcome/welcome.yuck")
 (include "notifications/notifications.yuck")
+(include "barpanels/barpanels.yuck")

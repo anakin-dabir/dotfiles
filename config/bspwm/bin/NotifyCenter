@@ -8,6 +8,8 @@
 #   NotifyCenter --clear     remove all notifications
 #   NotifyCenter --close     close the panel
 #   NotifyCenter --refresh   update the bell and the open panel (NotifyLog calls this)
+# Opening, placing and closing the panel is done by bin/BarPanel, like the
+# other bar dropdowns; it calls --data (fill before showing) and --closed.
 
 DIR="${XDG_STATE_HOME:-$HOME/.local/state}/notifications"
 LOG="$DIR/log.jsonl"
@@ -15,8 +17,6 @@ SEEN="$DIR/last-seen"
 BSPDIR="$HOME/.config/bspwm"
 EWW=(eww -c "$BSPDIR/eww")
 
-PANEL_W=400   # panel width in px (keep in sync with notifications.yuck)
-GAP=8         # space between bar and panel
 SHOWN=500     # notifications listed in the panel (scrollable); NotifyLog keeps 500
 
 BELL=$'\U000F009C'      # nf-md-bell_outline
@@ -34,8 +34,7 @@ is_paused()  { [ "$(dunstctl is-paused 2>/dev/null)" = true ]; }
 seen_time()  { cat "$SEEN" 2>/dev/null || echo 0; }
 mark_seen()  { date +%s > "$SEEN"; }
 # Ask X, not eww: a panel drawn by a stray eww process still counts as open.
-panel_windows() { xdotool search --name '^Eww - (notifcenter|nc-closer)$' 2>/dev/null; }
-panel_open()    { [ -n "$(panel_windows)" ]; }
+panel_open() { [ -n "$(xdotool search --name '^Eww - notifcenter$' 2>/dev/null)" ]; }
 
 unread_count() {
     jq -s --argjson seen "$(seen_time)" '[.[] | select(.time > $seen)] | length' "$LOG" 2>/dev/null || echo 0
@@ -58,24 +57,6 @@ refresh_bars() {
     if [ -f "$BSPDIR/bars/$bar/eww.yuck" ]; then
         eww -c "$BSPDIR/bars/$bar" update notif_bell="$(bell)" >/dev/null 2>&1
     fi
-}
-
-# One healthy eww, no duplicates (see bin/EwwDaemon)
-ensure_daemon() { "$BSPDIR/bin/EwwDaemon" 9>&-; }
-
-# Close the panel when you switch desktop or focus another window, in case
-# the click-outside layer misses a click.
-start_watcher() {
-    stop_watcher
-    ( bspc subscribe desktop_focus node_focus | head -n 1 >/dev/null
-      rm -f "$DIR/watcher.pid"   # so --close doesn't stop this very process
-      "$0" --close ) >/dev/null 2>&1 9>&- &   # 9>&-: don't hold the lock
-    echo $! > "$DIR/watcher.pid"
-}
-stop_watcher() {
-    local pid; pid=$(cat "$DIR/watcher.pid" 2>/dev/null) || return
-    rm -f "$DIR/watcher.pid"
-    pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
 }
 
 # Fill the panel's variables from the log.
@@ -125,96 +106,6 @@ push_data() { # $1 = unread threshold (unix time), $2 = max list height in px
         nc_dnd="$(is_paused && echo true || echo false)" nc_height="$height" >/dev/null 2>&1
 }
 
-# Work out where the panel goes: under (or over) the bar, below the bell when
-# it was clicked, top-right of the screen when opened from the keyboard.
-place_panel() {
-    local X Y WINDOW SCREEN mon mx my mw mh
-    eval "$(xdotool getmouselocation --shell)"
-    read -r mon mx my mw mh < <(bspc query -T -m focused |
-        jq -r '"\(.name) \(.rectangle.x) \(.rectangle.y) \(.rectangle.width) \(.rectangle.height)"')
-
-    local bar="" clicked=0 class
-    class=$(xprop -id "$WINDOW" WM_CLASS 2>/dev/null)
-    if [[ "$class" == *[Pp]olybar* || "$class" == *eww* ]]; then
-        bar=$WINDOW; clicked=1
-    else
-        # Keyboard: use the widest bar on this monitor
-        local w g best=0 gx gw
-        for w in $(xdotool search --onlyvisible --class 'Polybar' 2>/dev/null) \
-                 $(xdotool search --onlyvisible --name '^Eww - bar$' 2>/dev/null); do
-            g=$(xdotool getwindowgeometry --shell "$w")
-            gx=$(sed -n 's/^X=//p' <<< "$g"); gw=$(sed -n 's/^WIDTH=//p' <<< "$g")
-            (( gx < mx || gx >= mx + mw )) && continue
-            (( gw > best )) && { best=$gw; bar=$w; }
-        done
-    fi
-
-    local x y anchor="top left" bx=0 by=0 bw=0 bh=0
-    if [ -n "$bar" ]; then
-        local g; g=$(xdotool getwindowgeometry --shell "$bar")
-        bx=$(sed -n 's/^X=//p' <<< "$g"); by=$(sed -n 's/^Y=//p' <<< "$g")
-        bw=$(sed -n 's/^WIDTH=//p' <<< "$g"); bh=$(sed -n 's/^HEIGHT=//p' <<< "$g")
-    fi
-
-    local maxh
-    if [ -n "$bar" ] && (( bw < bh )); then
-        # Vertical bar: open beside it
-        (( bx - mx < mw / 2 )) && x=$(( bx + bw + GAP - mx )) || x=$(( bx - PANEL_W - GAP - mx ))
-        y=$GAP; maxh=$(( mh - 2 * GAP - 90 ))
-    else
-        if (( clicked )); then x=$(( X - mx - PANEL_W / 2 )); else x=$(( mw - PANEL_W - GAP )); fi
-        if [ -n "$bar" ] && (( by - my > mh / 2 )); then
-            anchor="bottom left"; y=$(( -(my + mh - by + GAP) ))
-            maxh=$(( by - my - 2 * GAP - 90 ))
-        elif [ -n "$bar" ]; then
-            y=$(( by + bh - my + GAP )); maxh=$(( mh - bh - 2 * GAP - 90 ))
-        else
-            y=$(( GAP + 32 )); maxh=$(( mh - 2 * GAP - 122 ))
-        fi
-    fi
-    (( x < GAP )) && x=$GAP
-    (( x > mw - PANEL_W - GAP )) && x=$(( mw - PANEL_W - GAP ))
-    (( maxh > 640 )) && maxh=640
-
-    echo "$mon ${x}x${y} $anchor|$maxh"
-}
-
-open_panel() {
-    ensure_daemon || { notify-send -a NotifyCenter -u low "Notifications" "eww isn't responding"; return 1; }
-    local placement mon pos anchor maxh
-    placement=$(place_panel)
-    maxh=${placement##*|}; placement=${placement%|*}
-    read -r mon pos anchor <<< "$placement"
-    # eww wants the monitor's number, not its name
-    mon=$(xrandr --listmonitors | awk -v n="$mon" '$NF == n { sub(":", "", $1); print $1 }')
-
-    push_data "$(seen_time)" "$maxh"
-    "${EWW[@]}" update nc_confirm=false >/dev/null 2>&1
-    "${EWW[@]}" open nc-closer --screen "$mon" >/dev/null 2>&1
-    "${EWW[@]}" open notifcenter --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
-    # If eww started a duplicate copy while opening, start over with one clean eww
-    if ! ensure_daemon || [ "$(panel_windows | wc -l)" -ne 2 ]; then
-        "$BSPDIR/bin/EwwDaemon" --restart 9>&-
-        push_data "$(seen_time)" "$maxh"
-        "${EWW[@]}" open nc-closer --screen "$mon" >/dev/null 2>&1
-        "${EWW[@]}" open notifcenter --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
-    fi
-    start_watcher
-    mark_seen
-    refresh_bars
-}
-
-close_panel() {
-    stop_watcher
-    timeout 2 "${EWW[@]}" close notifcenter nc-closer >/dev/null 2>&1
-    # Still on screen? A stuck or duplicate eww is drawing it: restart eww.
-    if panel_open; then
-        "$BSPDIR/bin/EwwDaemon" --restart 9>&-
-    fi
-    mark_seen
-    refresh_bars
-}
-
 entry() { jq -c --arg k "$1" 'select(.key == $k)' "$LOG" | head -1; }
 
 # Find a window that belongs to the app (class/instance looks like its name).
@@ -235,7 +126,7 @@ find_window() { # $1 = app name, $2 = desktop entry
 }
 
 open_entry() {
-    close_panel
+    "$BSPDIR/bin/BarPanel" --close 9>&-
     local e app desktop wid url
     e=$(entry "$1"); [ -z "$e" ] && return
     app=$(jq -r '.app // ""' <<< "$e"); desktop=$(jq -r '.desktop // ""' <<< "$e")
@@ -286,8 +177,9 @@ toggle_dnd() {
     refresh_bars
 }
 
-# One action at a time (double clicks on the bell, key repeat)
-case "$1" in --bar|--refresh) ;; *)
+# One action at a time. Not for the calls BarPanel makes while it holds its
+# own lock (--data, --closed), nor the read-only/bar ones.
+case "$1" in --dnd|--open|--delete|--clear)
     exec 9> "$DIR/.lock"; flock -w 3 9 || exit 1 ;;
 esac
 
@@ -297,7 +189,11 @@ case "$1" in
     --open)    open_entry "$2" ;;
     --delete)  delete_entry "$2" ;;
     --clear)   clear_all ;;
-    --close)   close_panel ;;
+    --data)    push_data "$(seen_time)" "$2"
+               "${EWW[@]}" update nc_confirm=false >/dev/null 2>&1
+               mark_seen; refresh_bars ;;
+    --closed)  mark_seen; refresh_bars ;;
+    --close)   exec "$BSPDIR/bin/BarPanel" --close ;;
     --refresh) if panel_open; then push_data; mark_seen; fi; refresh_bars ;;
-    *)         if panel_open; then close_panel; else open_panel; fi ;;
+    *)         exec "$BSPDIR/bin/BarPanel" notifcenter ;;
 esac

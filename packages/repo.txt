@@ -182,3 +182,5 @@ zsh-syntax-highlighting
 gtk3
 libnotify
 xorg-xprop
+lm_sensors
+libpulse

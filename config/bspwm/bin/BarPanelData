@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Data for the bar dropdowns (eww/barpanels). Prints one JSON object.
+#   BarPanelData cpu|memory|disk|sound|network|battery
+# eww polls this every few seconds, only while that dropdown is open.
+
+RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
+mkdir -p "$RUN"
+
+human() { # bytes -> "1.2 GB"
+    awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1
+        while (b >= 1024 && i < 5) { b /= 1024; i++ }
+        printf (i <= 2 ? "%.0f %s" : "%.1f %s"), b, u[i] }'
+}
+
+# Friendlier names for common process names
+pretty() {
+    case "$1" in
+        code-insiders) echo "VS Code Insiders" ;; code) echo "VS Code" ;;
+        chrome) echo "Chrome" ;; brave) echo "Brave" ;; firefox) echo "Firefox" ;;
+        Xorg) echo "Display server (Xorg)" ;; node) echo "Node.js" ;;
+        java) echo "Java" ;; studio|studio.sh) echo "Android Studio" ;;
+        qemu-system-x86) echo "Android emulator" ;; kitty) echo "Kitty" ;;
+        *) echo "$1" ;;
+    esac
+}
+
+cpu() {
+    # Usage since the last call, from /proc/stat (total + per core)
+    local prev="$RUN/cpu.prev" now
+    now=$(grep '^cpu' /proc/stat)
+    local usage
+    usage=$(awk 'NR == FNR { for (i = 2; i <= NF; i++) t0[$1] += $i; i0[$1] = $5 + $6; next }
+                 { t = 0; for (i = 2; i <= NF; i++) t += $i; id = $5 + $6
+                   dt = t - t0[$1]; di = id - i0[$1]
+                   u = (dt > 0 && ($1 in t0)) ? 100 * (dt - di) / dt : 0
+                   printf "%d\n", u + 0.5 }' "$prev" <(echo "$now") 2>/dev/null)
+    echo "$now" > "$prev"
+    [ -z "$usage" ] && usage=$(echo "$now" | awk '{ t = 0; for (i = 2; i <= NF; i++) t += $i; printf "%d\n", 100 * (t - $5 - $6) / t }')
+
+    local total cores temp load model procs
+    total=$(head -1 <<< "$usage")
+    cores=$(tail -n +2 <<< "$usage" | jq -sc .)
+    temp=$(sensors 2>/dev/null | awk '/^Package id 0:|^Tctl:/ { gsub(/[+°C]/, "", $(NF > 4 ? 4 : 2)); print int($4 ~ /^[0-9.]+$/ ? $4 : $2); exit }')
+    load=$(cut -d' ' -f1-3 /proc/loadavg)
+    model=$(sed -n 's/^model name\s*: //p' /proc/cpuinfo | head -1 | sed 's/([^)]*)//g; s/ CPU//; s/  */ /g; s/^13th Gen //; s/^[0-9]*th Gen //')
+    # Busiest apps right now, as a share of the whole CPU (like the bar's number)
+    local n; n=$(nproc)
+    # --fast (first draw when the dropdown opens): skip the half-second app sample
+    [ "$FAST" = 1 ] && procs="[]" || procs=$(top -b -n 2 -d 0.25 -w 512 | awk -v n="$n" '
+        /^top -/ { frame++ } frame == 2 && /^ *[0-9]+ / { cpu[$12] += $9 }
+        END { for (c in cpu) if (cpu[c] / n >= 0.1) printf "%s\t%.1f\n", c, cpu[c] / n }' |
+        sort -t$'\t' -k2 -rn | head -5 |
+        while IFS=$'\t' read -r c p; do jq -nc --arg n "$(pretty "$c")" --argjson p "$p" '{name: $n, pct: $p}'; done | jq -sc .)
+    jq -nc --argjson total "${total:-0}" --argjson cores "${cores:-[]}" --arg temp "${temp:+$temp°C}" \
+        --arg load "$load" --arg model "$model" --argjson procs "${procs:-[]}" --argjson threads "$n" \
+        '{total: $total, cores: $cores, temp: $temp, load: $load, model: $model, procs: $procs, threads: $threads}'
+}
+
+memory() {
+    local t a st sf
+    read -r t a st sf < <(awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2} /^SwapTotal:/ {st=$2} /^SwapFree:/ {sf=$2}
+                              END { print t * 1024, a * 1024, st * 1024, sf * 1024 }' /proc/meminfo)
+    local used=$(( t - a )) sused=$(( st - sf ))
+    # Memory per app (all its processes added up)
+    local apps
+    apps=$(ps -eo rss=,comm= | awk '{ m[$2] += $1 } END { for (c in m) printf "%s\t%d\n", c, m[c] * 1024 }' |
+        sort -t$'\t' -k2 -rn | head -6 |
+        while IFS=$'\t' read -r c b; do
+            jq -nc --arg n "$(pretty "$c")" --arg s "$(human "$b")" --argjson p "$(( b * 100 / t ))" '{name: $n, size: $s, pct: $p}'
+        done | jq -sc .)
+    jq -nc --arg used "$(human $used)" --arg total "$(human $t)" --arg free "$(human $a)" \
+        --argjson pct "$(( used * 100 / t ))" \
+        --arg sused "$(human $sused)" --arg stotal "$(human $st)" --argjson spct "$(( st > 0 ? sused * 100 / st : 0 ))" \
+        --argjson apps "${apps:-[]}" \
+        '{used: $used, total: $total, free: $free, pct: $pct, swap_used: $sused, swap_total: $stotal, swap_pct: $spct, apps: $apps}'
+}
+
+disk() {
+    df -B1 --output=source,target,size,used,avail -x tmpfs -x devtmpfs -x efivarfs -x overlay -x squashfs 2>/dev/null |
+        tail -n +2 | sort -u -k1,1 |
+        while read -r src mnt size used avail; do
+            [ "$size" -gt 0 ] || continue
+            name=$mnt; [ "$mnt" = / ] && name="System (/)"; [ "$mnt" = /boot ] && name="Boot"
+            [[ "$mnt" == /run/media/* || "$mnt" == /media/* ]] && name="${mnt##*/}"
+            jq -nc --arg name "$name" --arg mount "$mnt" --arg used "$(human "$used")" --arg size "$(human "$size")" \
+                --arg free "$(human "$avail")" --argjson pct "$(( used * 100 / size ))" \
+                '{name: $name, mount: $mount, used: $used, size: $size, free: $free, pct: $pct}'
+        done | jq -sc 'sort_by(.mount != "/") | {disks: .}'
+}
+
+sound() {
+    local def sinks vol muted mvol mmuted
+    def=$(pactl get-default-sink 2>/dev/null)
+    # Outputs with nothing plugged in (e.g. unused HDMI ports) are left out
+    sinks=$(pactl -f json list sinks 2>/dev/null | jq -c --arg d "$def" '[.[]
+        | select((.name == $d) or (([.ports[]? | .availability] | all(. == "not available")) | not))
+        | {name, default: (.name == $d),
+        desc: (.description | sub("^Raptor Lake-P/U/H cAVS "; "") | sub(" Output \\(Stereo\\)$"; "")),
+        kind: (if (.description | test("HDMI|DisplayPort")) then "hdmi"
+               elif (.description | test("Headphone|Headset"; "i")) then "headphones"
+               elif (.name | test("bluez")) then "bluetooth" else "speaker" end)}]')
+    vol=$(pamixer --get-volume 2>/dev/null || echo 0)
+    muted=$(pamixer --get-mute 2>/dev/null || echo false)
+    mvol=$(pamixer --default-source --get-volume 2>/dev/null || echo 0)
+    mmuted=$(pamixer --default-source --get-mute 2>/dev/null || echo false)
+    jq -nc --argjson vol "$vol" --argjson muted "$muted" --argjson mvol "$mvol" --argjson mmuted "$mmuted" \
+        --argjson sinks "${sinks:-[]}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks}'
+}
+
+network() {
+    local iface kind="none" name="Not connected" signal=0 ip="" down=0 up=0
+    iface=$(ip route show default 2>/dev/null | awk '{ print $5; exit }')
+    if [ -n "$iface" ]; then
+        ip=$(ip -4 -o addr show dev "$iface" | awk '{ sub("/.*", "", $4); print $4; exit }')
+        if [ -d "/sys/class/net/$iface/wireless" ]; then
+            kind=wifi
+            # (nmcli's wifi list can take seconds; these are instant)
+            name=$(nmcli -t -f GENERAL.CONNECTION dev show "$iface" 2>/dev/null | cut -d: -f2-)
+            signal=$(awk -v i="$iface:" '$1 == i { q = $3 + 0; print int(q * 100 / 70 > 100 ? 100 : q * 100 / 70) }' /proc/net/wireless)
+        else
+            kind=ethernet; name=$(nmcli -t -f GENERAL.CONNECTION dev show "$iface" 2>/dev/null | cut -d: -f2)
+            [ -z "$name" ] && name="Wired"
+        fi
+        # Speed since the last call
+        local rx tx now prev="$RUN/net.prev"
+        rx=$(cat "/sys/class/net/$iface/statistics/rx_bytes"); tx=$(cat "/sys/class/net/$iface/statistics/tx_bytes")
+        now=$(date +%s%N)
+        if read -r pif prx ptx pnow 2>/dev/null < "$prev" && [ "$pif" = "$iface" ]; then
+            local dt=$(( (now - pnow) / 1000000 ))
+            (( dt > 0 )) && down=$(( (rx - prx) * 1000 / dt )) && up=$(( (tx - ptx) * 1000 / dt ))
+        fi
+        echo "$iface $rx $tx $now" > "$prev"
+    fi
+    local wifi_on bt_on bt_dev
+    wifi_on=$([ "$(nmcli radio wifi 2>/dev/null)" = enabled ] && echo true || echo false)
+    bt_on=$(bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo true || echo false)
+    bt_dev=$(bluetoothctl devices Connected 2>/dev/null | cut -d' ' -f3- | head -1)
+    jq -nc --arg kind "$kind" --arg name "$name" --argjson signal "${signal:-0}" --arg ip "$ip" --arg iface "$iface" \
+        --arg down "$(human "$down")/s" --arg up "$(human "$up")/s" --argjson down_b "$down" \
+        --argjson wifi_on "$wifi_on" --argjson bt_on "$bt_on" --arg bt_dev "$bt_dev" \
+        '{kind: $kind, name: $name, signal: $signal, ip: $ip, iface: $iface, down: $down, up: $up,
+          down_b: $down_b, wifi_on: $wifi_on, bt_on: $bt_on, bt_dev: $bt_dev}'
+}
+
+battery() {
+    local b; b=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
+    local pct=0 status="No battery" time="" health=""
+    if [ -n "$b" ]; then
+        pct=$(cat "$b/capacity" 2>/dev/null || echo 0)
+        status=$(cat "$b/status" 2>/dev/null)
+        local now full power
+        now=$(cat "$b/energy_now" "$b/charge_now" 2>/dev/null | head -1)
+        full=$(cat "$b/energy_full" "$b/charge_full" 2>/dev/null | head -1)
+        power=$(cat "$b/power_now" "$b/current_now" 2>/dev/null | head -1)
+        if [ "${power:-0}" -gt 0 ] 2>/dev/null; then
+            local mins=0
+            [ "$status" = Discharging ] && mins=$(( now * 60 / power ))
+            [ "$status" = Charging ] && mins=$(( (full - now) * 60 / power ))
+            (( mins > 0 )) && time="$(( mins / 60 ))h $(( mins % 60 ))m $([ "$status" = Charging ] && echo "until full" || echo left)"
+        fi
+        local design; design=$(cat "$b/energy_full_design" "$b/charge_full_design" 2>/dev/null | head -1)
+        [ "${design:-0}" -gt 0 ] 2>/dev/null && health="$(( full * 100 / design ))%"
+        [ "$status" = "Not charging" ] && status="Plugged in"
+    fi
+    local bright; bright=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d %)
+    jq -nc --argjson pct "$pct" --arg status "$status" --arg time "$time" --arg health "$health" \
+        --argjson bright "${bright:-0}" '{pct: $pct, status: $status, time: $time, health: $health, bright: $bright}'
+}
+
+[ "$2" = --fast ] && FAST=1
+case "$1" in
+    cpu|memory|disk|sound|network|battery) "$1" ;;
+    *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery" >&2; exit 1 ;;
+esac
