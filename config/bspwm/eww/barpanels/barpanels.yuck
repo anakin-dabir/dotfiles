@@ -25,10 +25,10 @@
   :initial '{"vol":0,"muted":false,"mic_vol":0,"mic_muted":false,"sinks":[],"output":""}'
   `~/.config/bspwm/bin/BarPanelData sound`)
 (defpoll bp_network :interval "2s" :run-while {bp_open == "network"}
-  :initial '{"kind":"none","name":"","signal":0,"ip":"","iface":"","down":"","up":"","down_b":0,"wifi_on":false,"bt_on":false,"bt_dev":""}'
+  :initial '{"kind":"none","name":"","signal":0,"ip":"","iface":"","down":"","up":"","down_b":0,"wifi_on":false,"bt_on":false,"bt_dev":"","airplane":false}'
   `~/.config/bspwm/bin/BarPanelData network`)
 (defpoll bp_battery :interval "2s" :run-while {bp_open == "battery"}
-  :initial '{"pct":0,"status":"","time":"","health":"","bright":0}'
+  :initial '{"pct":0,"status":"","time":"","health":"","cycles":"","cap":"","watts":"","bright":0,"profile":"","profiles":[],"can_profile":false,"night":false,"awake":false}'
   `~/.config/bspwm/bin/BarPanelData battery`)
 
 ;; ================= building blocks =================
@@ -107,10 +107,24 @@
 
 ;; On/off switch: a track with a knob that sits left (off) or right (on).
 ;; Plain boxes, not a button, so the GTK theme's button padding can't change its size.
+(defwidget bp-switch-face [on]
+  (box :class "bp-switch ${on ? 'bp-switch-on' : ''}" :space-evenly false :valign "center"
+    (box :class "bp-switch-knob" :hexpand true :valign "center" :halign {on ? "end" : "start"})))
+
 (defwidget bp-switch [on toggle]
   (eventbox :cursor "pointer" :onclick toggle :valign "center" :tooltip {on ? "Turn off" : "Turn on"}
-    (box :class "bp-switch ${on ? 'bp-switch-on' : ''}" :space-evenly false :valign "center"
-      (box :class "bp-switch-knob" :hexpand true :valign "center" :halign {on ? "end" : "start"}))))
+    (bp-switch-face :on on)))
+
+;; A setting that's on or off: icon, name, a line under it, switch.
+;; The whole row is one click target.
+(defwidget bp-toggle [icon title sub on toggle]
+  (eventbox :cursor "pointer" :onclick toggle
+    (box :class "bp-toggle" :space-evenly false :spacing 16   ;; 16 = text lines up with bp-nav rows
+      (label :class "bp-round ${on ? 'bp-round-on' : ''}" :text icon)
+      (box :orientation "v" :space-evenly false :hexpand true :valign "center"
+        (label :class "bp-nav-title" :halign "start" :text title)
+        (label :class "bp-nav-sub" :halign "start" :xalign 0 :limit-width 30 :text sub))
+      (bp-switch-face :on on))))
 
 ;; ================= CPU =================
 
@@ -207,6 +221,10 @@
       (bp-stat :label "󰁅 Download" :value {bp_network.down})
       (bp-stat :label "󰁝 Upload" :value {bp_network.up}))
     (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 4
+      (bp-toggle :icon "󰀝" :title "Airplane mode" :on {bp_network.airplane}
+                 :sub {bp_network.airplane ? "Wi-Fi and Bluetooth are off" : "Off"}
+                 :toggle "~/.config/bspwm/bin/BarPanelAction airplane &")
+      (box :class "bp-sep")
       (bp-nav :icon {bp_network.wifi_on ? "󰖩" : "󰖪"} :title "Wi-Fi" :on {bp_network.wifi_on}
               :sub {bp_network.wifi_on ? (bp_network.kind == "wifi" ? bp_network.name : "Not connected") : "Off"}
               :toggle "~/.config/bspwm/bin/BarPanelAction wifi-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view wifi &")
@@ -293,10 +311,45 @@
                 :value {bp_battery.pct} :orientation "h")
       (box :class "bp-stats" :space-evenly true
         (bp-stat :label "Status" :value {bp_battery.status})
-        (bp-stat :label "Health" :value {bp_battery.health == "" ? "–" : bp_battery.health})))
+        (box :tooltip "How much a full charge holds now, compared with when the battery was new"
+          (bp-stat :label "Health" :value {bp_battery.health == "" ? "–" : bp_battery.health}))
+        (box :tooltip "Times the battery has been charged and used, in full charges"
+          (bp-stat :label "Cycles" :value {bp_battery.cycles == "" ? "–" : bp_battery.cycles})))
+      (box :orientation "v" :space-evenly false :spacing 6 :visible {bp_battery.cap != "" || bp_battery.watts != ""}
+        (box :visible {bp_battery.cap != ""} (bp-row :name "Full charge holds" :value {bp_battery.cap}))
+        (box :visible {bp_battery.watts != ""} (bp-row :name "Using now" :value {bp_battery.watts}))))
+
+    ;; Power mode, on laptops that have them
+    (box :visible {arraylength(bp_battery.profiles) > 0}
+      (bp-card :title "Power mode"
+        (box :class "bp-seg" :space-evenly true :spacing 4
+          (for p in {bp_battery.profiles}
+            (eventbox :cursor {bp_battery.can_profile ? "pointer" : "default"}
+                      :onclick {bp_battery.can_profile ? "~/.config/bspwm/bin/BarPanelAction power-mode ${p.id} &" : ""}
+              (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}"
+                   :orientation "v" :space-evenly false :spacing 3
+                (label :class "bp-seg-icon" :text {p.icon})
+                (label :class "bp-seg-name" :text {p.name})))))
+        (box :space-evenly false :spacing 8 :visible {!bp_battery.can_profile}
+          (label :class "bp-dim" :halign "start" :hexpand true :xalign 0 :wrap true
+                 :text "Switching needs a one-time permission")
+          (eventbox :cursor "pointer"
+            (button :class "bp-chip" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/PowerMode --setup &"
+              "Allow…")))))
+
     (bp-card :title "Display brightness"
       (bp-slider :icon "󰃠" :value {bp_battery.bright} :max 100
                  :onchange "~/.config/bspwm/bin/BarPanelAction bright {} &" :onclick ""))
+
+    (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 2
+      (bp-toggle :icon "󰖔" :title "Night light" :on {bp_battery.night}
+                 :sub {bp_battery.night ? "Warmer colours, easier on the eyes" : "Off"}
+                 :toggle "~/.config/bspwm/bin/BarPanelAction night &")
+      (box :class "bp-sep")
+      (bp-toggle :icon "󰛊" :title "Keep awake" :on {bp_battery.awake}
+                 :sub {bp_battery.awake ? "Won't sleep, even with the lid closed" : "Off"}
+                 :toggle "~/.config/bspwm/bin/BarPanelAction awake &"))
+
     (bp-button :icon "󰐥" :text "Power Options…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --powermenu &")))
 
 ;; ================= Calendar =================

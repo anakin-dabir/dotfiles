@@ -3,12 +3,16 @@
 # Every action updates the dropdown right away instead of waiting for its poll.
 #
 #   vol-set N | vol-mute | mic-set N | mic-mute | sink NAME
-#   bright N
+#   bright N | night | night-restore (at login) | awake | power-mode NAME
+#   airplane
 #   wifi-toggle | bt-toggle | view main|wifi|bt | wifi-scan
 #   wifi-connect N (position in the list) | bt-connect MAC
 #   run COMMAND...          close the dropdown, then run COMMAND
 
 BIN="$HOME/.config/bspwm/bin"
+RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
+SAVED="$HOME/.cache/barpanel"     # kept across restarts
+NIGHT_TEMP=4000                   # night light colour temperature (K; daylight is 6500)
 # --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
 EWW=(timeout 3 eww --no-daemonize -c "$HOME/.config/bspwm/eww")
 upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }
@@ -33,6 +37,52 @@ case "$1" in
 
     bright)   v=$(int "$2"); (( v < 1 )) && v=1
               brightnessctl -q set "$v%"; patch bp_battery ".bright = $v" ;;
+
+    # Warmer screen colours (stays on after a restart: bspwmrc runs night-restore)
+    night)
+        if [ -f "$SAVED/nightlight" ]; then
+            rm -f "$SAVED/nightlight"; redshift -x >/dev/null 2>&1
+        else
+            mkdir -p "$SAVED"; touch "$SAVED/nightlight"; redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1
+        fi
+        push battery ;;
+    night-restore)
+        [ -f "$SAVED/nightlight" ] && redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1 ;;
+
+    # Keep awake: the laptop doesn't sleep, not even with the lid closed,
+    # until this is turned off again (or you log out)
+    awake)
+        pid=$(cat "$RUN/awake.pid" 2>/dev/null)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -- "-$pid" 2>/dev/null; rm -f "$RUN/awake.pid"
+        else
+            mkdir -p "$RUN"
+            setsid systemd-inhibit --what=sleep:idle:handle-lid-switch --mode=block \
+                --who="Keep awake" --why="Turned on in the battery menu" sleep infinity \
+                >/dev/null 2>&1 < /dev/null 7>&- 8>&- 9>&- &
+            echo $! > "$RUN/awake.pid"
+        fi
+        push battery ;;
+
+    power-mode)
+        "$BIN/PowerMode" "$2" && patch bp_battery ".profile = \"$2\"" ;;
+
+    # Airplane mode: switch off every radio; turning it off brings back the
+    # ones that were on before
+    airplane)
+        if rfkill -rn -o SOFT | grep -qvx blocked; then
+            mkdir -p "$SAVED"
+            { [ "$(nmcli radio wifi)" = enabled ] && echo wifi
+              bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo bluetooth; } > "$SAVED/airplane-before"
+            rfkill block all
+        else
+            before=$(cat "$SAVED/airplane-before" 2>/dev/null || printf 'wifi\nbluetooth\n')
+            rfkill unblock all
+            grep -qx wifi <<< "$before" && nmcli radio wifi on || nmcli radio wifi off
+            sleep 1
+            if grep -qx bluetooth <<< "$before"; then bluetoothctl power on; else bluetoothctl power off; fi >/dev/null 2>&1
+        fi
+        push network ;;
 
     wifi-toggle)
         if [ "$(nmcli radio wifi)" = enabled ]; then nmcli radio wifi off; else nmcli radio wifi on; fi

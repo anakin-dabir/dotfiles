@@ -136,36 +136,63 @@ network() {
     wifi_on=$([ "$(nmcli radio wifi 2>/dev/null)" = enabled ] && echo true || echo false)
     bt_on=$(bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo true || echo false)
     bt_dev=$(bluetoothctl devices Connected 2>/dev/null | cut -d' ' -f3- | head -1)
+    # Airplane mode: every radio (Wi-Fi, Bluetooth...) switched off by rfkill
+    local airplane
+    airplane=$(rfkill -rn -o SOFT 2>/dev/null | awk '$1 != "blocked" { on = 1 } END { print (NR && !on) ? "true" : "false" }')
     jq -nc --arg kind "$kind" --arg name "$name" --argjson signal "${signal:-0}" --arg ip "$ip" --arg iface "$iface" \
         --arg down "$(human "$down")/s" --arg up "$(human "$up")/s" --argjson down_b "$down" \
-        --argjson wifi_on "$wifi_on" --argjson bt_on "$bt_on" --arg bt_dev "$bt_dev" \
+        --argjson wifi_on "$wifi_on" --argjson bt_on "$bt_on" --arg bt_dev "$bt_dev" --argjson airplane "$airplane" \
         '{kind: $kind, name: $name, signal: $signal, ip: $ip, iface: $iface, down: $down, up: $up,
-          down_b: $down_b, wifi_on: $wifi_on, bt_on: $bt_on, bt_dev: $bt_dev}'
+          down_b: $down_b, wifi_on: $wifi_on, bt_on: $bt_on, bt_dev: $bt_dev, airplane: $airplane}'
 }
 
 battery() {
     local b; b=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
-    local pct=0 status="No battery" time="" health=""
+    local pct=0 status="No battery" time="" health="" cycles="" cap="" watts=""
     if [ -n "$b" ]; then
         pct=$(cat "$b/capacity" 2>/dev/null || echo 0)
         status=$(cat "$b/status" 2>/dev/null)
-        local now full power
+        local now full power design
         now=$(cat "$b/energy_now" "$b/charge_now" 2>/dev/null | head -1)
         full=$(cat "$b/energy_full" "$b/charge_full" 2>/dev/null | head -1)
         power=$(cat "$b/power_now" "$b/current_now" 2>/dev/null | head -1)
+        design=$(cat "$b/energy_full_design" "$b/charge_full_design" 2>/dev/null | head -1)
         if [ "${power:-0}" -gt 0 ] 2>/dev/null; then
             local mins=0
             [ "$status" = Discharging ] && mins=$(( now * 60 / power ))
             [ "$status" = Charging ] && mins=$(( (full - now) * 60 / power ))
             (( mins > 0 )) && time="$(( mins / 60 ))h $(( mins % 60 ))m $([ "$status" = Charging ] && echo "until full" || echo left)"
+            [ -r "$b/power_now" ] && watts=$(awk -v p="$power" 'BEGIN { printf "%.1f W", p / 1e6 }')
         fi
-        local design; design=$(cat "$b/energy_full_design" "$b/charge_full_design" 2>/dev/null | head -1)
+        # Health: what a full charge holds now, compared with when it was new
         [ "${design:-0}" -gt 0 ] 2>/dev/null && health="$(( full * 100 / design ))%"
+        [ -r "$b/energy_full" ] && [ "${design:-0}" -gt 0 ] &&
+            cap=$(awk -v f="$full" -v d="$design" 'BEGIN { printf "%.1f of %.1f Wh", f / 1e6, d / 1e6 }')
+        cycles=$(cat "$b/cycle_count" 2>/dev/null); [ "$cycles" = 0 ] && cycles=""
         [ "$status" = "Not charging" ] && status="Plugged in"
     fi
     local bright; bright=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d %)
+    # Power mode (laptops that have them), night light, keep awake
+    local profile profiles can=false night=false awake=false
+    profile=$(cat /sys/firmware/acpi/platform_profile 2>/dev/null)
+    profiles=$(cat /sys/firmware/acpi/platform_profile_choices 2>/dev/null)
+    [ -w /sys/firmware/acpi/platform_profile ] && can=true
+    [ -f "$HOME/.cache/barpanel/nightlight" ] && night=true
+    kill -0 "$(cat "$RUN/awake.pid" 2>/dev/null)" 2>/dev/null && awake=true
     jq -nc --argjson pct "$pct" --arg status "$status" --arg time "$time" --arg health "$health" \
-        --argjson bright "${bright:-0}" '{pct: $pct, status: $status, time: $time, health: $health, bright: $bright}'
+        --arg cycles "$cycles" --arg cap "$cap" --arg watts "$watts" --argjson bright "${bright:-0}" \
+        --arg profile "$profile" --arg profiles "$profiles" --argjson can "$can" \
+        --argjson night "$night" --argjson awake "$awake" \
+        '{pct: $pct, status: $status, time: $time, health: $health, cycles: $cycles, cap: $cap,
+          watts: $watts, bright: $bright, profile: $profile,
+          profiles: ($profiles | split(" ") | map(select(. != "")) | map({id: ., name: (
+              {"low-power": "Saver", "cool": "Cool", "quiet": "Quiet", "balanced": "Balanced",
+               "balanced-performance": "Balanced+", "performance": "Performance"}[.] // .),
+              icon: ({"low-power": "󰌪", "cool": "󰜗", "quiet": "󰠝",
+                      "balanced": "󰗑", "balanced-performance": "󰓅",
+                      "performance": "󱓞"}[.] // "󰓅")})),
+          can_profile: $can,
+          night: $night, awake: $awake}'
 }
 
 # Wi-Fi networks in range. --rescan asks the card to search again (takes a

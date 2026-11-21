@@ -92,7 +92,7 @@ changes too. Commit them or ignore them; they're regenerated every time.
 | `super + alt + w` | Wallpaper picker |
 | `super + alt + n` / `b` / `c` | Wi-Fi / Bluetooth / clipboard menus |
 | `super + alt + i` | Notification center panel (or click the bell on any bar; right-click it for Do Not Disturb). Click a notification to jump to its app |
-| click a bar item (any theme) | Dropdown for it: CPU, memory, storage, sound, network (Wi-Fi and Bluetooth lists), battery and brightness, calendar. Styled by the theme |
+| click a bar item (any theme) | Dropdown for it: CPU, memory, storage, sound, network (airplane mode, Wi-Fi and Bluetooth lists), battery (health, power mode, brightness, night light, keep awake), calendar. Styled by the theme. Power mode needs a one-time `PowerMode --setup` (install.sh does it) |
 | `Print` / `shift + Print` | Screenshot menu / Flameshot |
 | `super + alt + p` | Power menu |
 | `super + alt + j` / `g` | Keyboard backlight color / rainbow |

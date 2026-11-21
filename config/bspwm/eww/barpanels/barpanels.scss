@@ -300,6 +300,62 @@ $bp-icons: "Material Design Icons Desktop";
   color: $nc-accent;
 }
 
+// A row that switches a setting (Night light, Airplane mode...)
+.bp-toggle {
+  padding: 6px;
+  border-radius: $nc-card-radius;
+}
+
+.bp-toggle:hover {
+  background-color: rgba($fg, 0.05);
+}
+
+// Pick-one control (power mode): equal tiles, the current one in the accent
+.bp-seg-item {
+  padding: 8px 2px 7px 2px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.06);
+}
+
+.bp-seg-item:hover {
+  background-color: rgba($fg, 0.12);
+}
+
+.bp-seg-on,
+.bp-seg-on:hover {
+  background-color: $nc-accent;
+}
+
+.bp-panel .bp-seg-icon {
+  font-family: $bp-icons;
+  font-size: 17px;
+}
+
+.bp-panel .bp-seg-name {
+  font-size: 10px;
+}
+
+.bp-panel .bp-seg-on label {
+  color: $nc-on-accent;
+}
+
+// Small pill button inside a card
+.bp-chip {
+  padding: 4px 12px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($nc-accent, 0.18);
+}
+
+.bp-chip:hover {
+  background-color: rgba($nc-accent, 0.28);
+}
+
+.bp-panel .bp-chip label {
+  font-size: 11px;
+  font-weight: bold;
+  color: $nc-accent;
+}
+
 // On/off switch in list headers: 42×24 track, 20px knob, 2px inset
 .bp-switch {
   min-width: 38px;
