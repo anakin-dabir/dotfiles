@@ -127,6 +127,8 @@ window, window label, window entry, window button {{ font-family: "{font}", "Adw
 .cc-tile.cc-current .cc-tile-image {{ outline: 3px solid var(--accent-bg-color); outline-offset: 2px; }}
 .cc-tile-name {{ font-size: 0.9em; }}
 .cc-tile.cc-current .cc-tile-name {{ font-weight: bold; color: var(--accent-color); }}
+.cc-mockbar {{ background-color: {_hex(_mix(bg, fg, 0.10))}; border-radius: 8px; padding: 5px 8px; }}
+.cc-chip {{ background-color: {_hex(_mix(bg, fg, 0.16))}; border-radius: 6px; padding: 3px 7px; font-size: 0.82em; }}
 .cc-hero-title {{ font-size: 1.6em; font-weight: 800; }}
 .cc-big {{ font-size: 2.2em; font-weight: 800; }}
 """

@@ -12,12 +12,13 @@ from .pages.bar import BarPage
 from .pages.bluetooth import BluetoothPage
 from .pages.customize import CustomizePage
 from .pages.display import DisplayPage
+from .pages.dropdowns import DropdownsPage
 from .pages.network import NetworkPage
 from .pages.notifications import NotificationsPage
 from .pages.power import PowerPage
 from .pages.sound import SoundPage
 
-PAGES = [AppearancePage, CustomizePage, BarPage, DisplayPage, SoundPage, NetworkPage,
+PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, DisplayPage, SoundPage, NetworkPage,
          BluetoothPage, PowerPage, NotificationsPage, AboutPage]
 
 
@@ -144,6 +145,8 @@ class Window(Adw.ApplicationWindow):
         if row is None:
             return
         page = row.page
+        if self.page is not None and self.page is not page:
+            self.page.leave()
         self.stack.set_visible_child(page)
         self.content.set_title(page.title)
         self.heading.set_title(page.title)
@@ -175,6 +178,8 @@ class Window(Adw.ApplicationWindow):
         return False
 
     def _closing(self, *_):
+        if self.page is not None:
+            self.page.leave()
         if self.timer:
             GLib.source_remove(self.timer)
             self.timer = 0

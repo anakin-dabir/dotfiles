@@ -110,6 +110,7 @@ postman-bin
 powertop
 pyenv
 python-gobject
+python-xlib
 gtk4
 libadwaita
 python-pillow

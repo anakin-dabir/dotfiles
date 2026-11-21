@@ -10,6 +10,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 from .. import rice
 from ..pickers import ColorButton, FontButton
 from ..preview import DesktopPreview
+from ..samples import SampleStrip, cursor_samples, icon_samples
 from ..common import Page, current_rice, group, read_file, run_quiet, text_button, tool
 
 COLORS = [
@@ -127,7 +128,11 @@ class CustomizePage(Page):
         themes, icons, cursors = gtk_themes(), icon_themes(), cursor_themes()
         look.add(self._combo("gtk_theme", "App theme (GTK)", themes, themes))
         look.add(self._combo("gtk_icons", "Icons", icons, icons))
+        self.icon_strip = SampleStrip()
+        look.add(Adw.PreferencesRow(activatable=False, child=self.icon_strip))
         look.add(self._combo("gtk_cursor", "Mouse pointer", cursors, cursors))
+        self.cursor_strip = SampleStrip()
+        look.add(Adw.PreferencesRow(activatable=False, child=self.cursor_strip))
 
         self.load()
 
@@ -143,8 +148,17 @@ class CustomizePage(Page):
         self._show_preview()
         self.window.update_pending()
 
+    def _show_samples(self, v):
+        if v.get("gtk_icons") != getattr(self, "_icons_shown", None):
+            self._icons_shown = v.get("gtk_icons")
+            self.icon_strip.show(icon_samples(v.get("gtk_icons", "")))
+        if v.get("gtk_cursor") != getattr(self, "_cursor_shown", None):
+            self._cursor_shown = v.get("gtk_cursor")
+            self.cursor_strip.show(cursor_samples(v.get("gtk_cursor", "")))
+
     def _show_preview(self):
         v = {**self.vals, **self.changes}
+        self._show_samples(v)
         bar = v.get("main_bar", "")
         if bar and rice.is_polybar(bar):
             sections = rice.launched_sections(bar)

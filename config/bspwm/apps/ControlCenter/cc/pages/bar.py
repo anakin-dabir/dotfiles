@@ -136,6 +136,71 @@ def bar_preview(path, done):
     f.add_done_callback(lambda fut: GLib.idle_add(lambda: (done(fut.result()), widgets_changed(), False)[2]))
 
 
+SHOWS = {
+    "bspwm": "Your desktops; the one you're on is highlighted",
+    "title": "The name of the focused window",
+    "launcher": "A button for the app launcher",
+    "tray": "Icons of apps running in the background",
+    "pulseaudio": "Volume level; scroll on it to change the volume",
+    "network": "Wi-Fi or wired connection and its speed",
+    "battery": "Battery charge",
+    "date": "Date and time",
+    "notifications": "A bell that fills in when there's something unread",
+    "power": "A power button",
+    "updates": "How many system updates are waiting",
+    "mplayer": "The song or video that's playing",
+    "mpd": "The song playing in MPD",
+    "mpd_control": "Play, pause, next and previous buttons",
+    "layout": "How windows are arranged (tiled, monocle...)",
+    "mod": "The window layout mode",
+    "filesystem": "Disk space used",
+    "cpu_bar": "Processor use", "cpu": "Processor use",
+    "memory_bar": "Memory (RAM) in use", "memory": "Memory (RAM) in use",
+    "bluetooth": "Bluetooth on/off and connected devices",
+    "usercard": "A button for your user card",
+    "r00t": "A button for your user menu",
+    "colorpicker": "A button to pick a colour from the screen",
+    "weather": "Current weather",
+    "xkeyboard": "Keyboard layout, and Caps Lock",
+    "brightness": "Screen brightness",
+    "vpn": "Whether a VPN is connected",
+}
+CLICKS = [
+    (r"BarPanel (cpu)", "opens the processor dropdown"), (r"BarPanel (memory)", "opens the memory dropdown"),
+    (r"BarPanel (disk)", "opens the storage dropdown"), (r"BarPanel (sound)", "opens the sound dropdown"),
+    (r"BarPanel (network)", "opens the network dropdown"), (r"BarPanel (battery)", "opens the battery dropdown"),
+    (r"BarPanel (calendar)", "opens the calendar"), (r"^NotifyCenter$", "opens the notification center"),
+    (r"--menu\b", "opens the app launcher"), (r"--powermenu", "opens the power menu"),
+    (r"--checkupdates", "checks for updates"), (r"--player", "opens the music player"),
+    (r"--usercard", "opens the user card"), (r"^Colorpicker", "picks a colour"),
+    (r"--bluetooth", "opens Bluetooth devices"), (r"--keyboard", "switches keyboard layout"),
+    (r"^Layout next", "switches the window layout"), (r"--soundcontrol", "opens volume control"),
+    (r"--terminal", "opens a terminal"), (r"--filemanager", "opens the file manager"),
+    (r"--browser", "opens the browser"), (r"--editor", "opens the editor"),
+]
+
+
+def click_action(info):
+    """What a left click on the item does, in words (or "")."""
+    cmds = [info.get("click-left", "")]
+    for v in info.values():
+        cmds += re.findall(r"%\{A1:([^:]*):", v)
+    for c in cmds:
+        c = c.strip().strip('"')
+        for pattern, words in CLICKS:
+            if c and re.search(pattern, c):
+                return words
+    return ""
+
+
+def explain(name, info):
+    shows = SHOWS.get(name, "")
+    click = click_action(info)
+    if shows and click:
+        return f"{shows} · click: {click}"
+    return shows or (f"Click: {click}" if click else "")
+
+
 def module_sections(bar):
     """{name: {key: value}} for every [module/...] the bar defines."""
     out = {}
@@ -235,6 +300,17 @@ class BarPage(Page):
                                          subtitle="Its items can't be edited here yet. Pick another design to edit items.")
         self.not_polybar.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         self.items.add(self.not_polybar)
+        # A mock of the bar: the items as chips, in order
+        self.mock_group = group(self, "Layout", "The bar's items in order (hover for names). Changes show here first.")
+        self.mock = {side: Gtk.Box(spacing=4) for side, _t in SIDES}
+        strip = Gtk.CenterBox(margin_top=10, margin_bottom=10, margin_start=10, margin_end=10)
+        strip.add_css_class("cc-mockbar")
+        strip.set_start_widget(self.mock["left"])
+        strip.set_center_widget(self.mock["center"])
+        strip.set_end_widget(self.mock["right"])
+        scroller = Gtk.ScrolledWindow(child=strip, vscrollbar_policy=Gtk.PolicyType.NEVER,
+                                      hscrollbar_policy=Gtk.PolicyType.AUTOMATIC, propagate_natural_height=True)
+        self.mock_group.add(Adw.PreferencesRow(activatable=False, child=scroller))
         self.side_groups = {}
         for side, title in SIDES:
             g = group(self, title)
@@ -274,6 +350,7 @@ class BarPage(Page):
         self.items.set_visible(not poly)
         for g in self.side_groups.values():
             g.set_visible(poly)
+        self.mock_group.set_visible(poly)
         self.extra.set_visible(poly)
         self.which.set_visible(False)
         if not poly:
@@ -314,6 +391,22 @@ class BarPage(Page):
 
     # ----- item rows -----
 
+    def _fill_mock(self, lay):
+        for side, box in self.mock.items():
+            while (c := box.get_first_child()) is not None:
+                box.remove(c)
+            for name in lay.get(side, []):
+                title, icon, deco = describe(name, self.modules.get(name, {}))
+                if deco:
+                    dot = Gtk.Label(label="·")
+                    dot.add_css_class("dim-label")
+                    box.append(dot)
+                    continue
+                chip = Gtk.Box(tooltip_text=title)       # icon only, like the real bar; name on hover
+                chip.add_css_class("cc-chip")
+                chip.append(Gtk.Image.new_from_icon_name(icon))
+                box.append(chip)
+
     def _fill_items(self):
         for g, r in self.item_rows:
             g.remove(r)
@@ -321,6 +414,7 @@ class BarPage(Page):
         if not self.bar or not rice.is_polybar(self.bar) or not self.section:
             return
         lay = self.layout()
+        self._fill_mock(lay)
         for side, _title in SIDES:
             g = self.side_groups[side]
             items = lay[side]
@@ -330,8 +424,11 @@ class BarPage(Page):
                 g.add(r)
                 self.item_rows.append((g, r))
             for i, name in enumerate(items):
-                title, icon, deco = describe(name, self.modules.get(name, {}))
-                r = Adw.ActionRow(title=title, subtitle=name)
+                info = self.modules.get(name, {})
+                title, icon, deco = describe(name, info)
+                sub = "Spacing or decoration between items" if deco else explain(name, info)
+                r = Adw.ActionRow(title=title, subtitle=GLib.markup_escape_text(sub), tooltip_text=f"Bar item: {name}")
+                r.set_subtitle_lines(2)
                 img = Gtk.Image.new_from_icon_name(icon)
                 if deco:
                     r.add_css_class("dim-label")

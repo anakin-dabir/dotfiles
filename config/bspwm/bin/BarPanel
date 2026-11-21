@@ -138,8 +138,11 @@ open() { # $1 = name
     read -r mon pos anchor <<< "$placement"
     read -r cpos csize maxh <<< "$rest"
     if [ -n "$filler" ]; then wait "$filler"; else fill "$name" "$maxh"; fi
+    # Which sections the dropdowns show (Control Center > Dropdowns)
+    local shown; shown=$(jq -c . "$BSPDIR/config/dropdowns.json" 2>/dev/null)
     show() {
-        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" >/dev/null 2>&1 &&
+        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" \
+            ${shown:+"bp_show=$shown"} >/dev/null 2>&1 &&
         "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &&
         "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
     }

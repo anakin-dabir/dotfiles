@@ -15,6 +15,7 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("GdkPixbuf", "2.0")
 
 from cc.app import main  # noqa: E402
 

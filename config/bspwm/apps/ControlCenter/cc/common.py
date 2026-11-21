@@ -199,6 +199,9 @@ class Page(Adw.PreferencesPage):
     def refresh(self):
         pass
 
+    def leave(self):
+        """Called when another page is shown or the window closes."""
+
     # Pages that collect changes before applying them override these
     def pending_text(self):
         return ""
