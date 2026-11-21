@@ -6,7 +6,7 @@ CAP=$(cat "$BAT/capacity" 2>/dev/null) || exit 0
 STATUS=$(cat "$BAT/status" 2>/dev/null) || exit 0
 
 # Only warn while discharging (not charging / full / unknown)
-[ "$STATUS" = "Discharging" ] || exit 0
+[ "$STATUS" = "Discharging" ] || { rm -f "${XDG_RUNTIME_DIR:-/tmp}/barpanel/battery-action"; exit 0; }
 
 # Find a user session DBus so notify-send reaches dunst when invoked by systemd
 export DISPLAY=${DISPLAY:-:0}
@@ -17,7 +17,32 @@ notify() {
     notify-send -a battery-warn -u "$urgency" -i battery-caution -r 991337 "$title" "$body"
 }
 
-if   [ "$CAP" -le 2 ];  then notify critical "Battery CRITICAL (${CAP}%)" "Plug in NOW — system will die soon."
-elif [ "$CAP" -le 5 ];  then notify critical "Battery very low (${CAP}%)" "Plug in immediately."
-elif [ "$CAP" -le 15 ]; then notify normal   "Battery low (${CAP}%)"      "Consider plugging in."
+# Settings: Control Center > Power > Low battery (config/power.json)
+CFG="$HOME/.config/bspwm/config/power.json"
+setting() { jq -r --arg k "$1" --arg d "$2" '.[$k] // $d | tostring' "$CFG" 2>/dev/null || echo "$2"; }
+[ "$(setting battery_warn true)" = true ] || exit 0
+LOW=$(setting low 15); VLOW=$(setting very_low 5)
+ACTION=$(setting critical_action none); AT=$(setting critical_at 3)
+RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"; mkdir -p "$RUN"; PENDING="$RUN/battery-action"
+
+# Almost empty: warn, and a minute later sleep / shut down if still unplugged
+if [ "$ACTION" != none ] && [ "$CAP" -le "$AT" ]; then
+    what=$([ "$ACTION" = poweroff ] && echo "Shutting down" || echo "Going to sleep")
+    if [ -f "$PENDING" ] && [ $(( $(date +%s) - $(stat -c %Y "$PENDING") )) -ge 50 ]; then
+        rm -f "$PENDING"
+        case "$ACTION" in
+            suspend) systemctl suspend ;;
+            poweroff) systemctl poweroff ;;
+        esac
+        exit 0
+    fi
+    [ -f "$PENDING" ] || touch "$PENDING"
+    notify critical "Battery almost empty (${CAP}%)" "$what in a minute. Plug in to stop it."
+    exit 0
+fi
+rm -f "$PENDING"
+
+if   [ "$CAP" -le 2 ];        then notify critical "Battery CRITICAL (${CAP}%)" "Plug in NOW — system will die soon."
+elif [ "$CAP" -le "$VLOW" ];  then notify critical "Battery very low (${CAP}%)" "Plug in immediately."
+elif [ "$CAP" -le "$LOW" ];   then notify normal   "Battery low (${CAP}%)"      "Consider plugging in."
 fi

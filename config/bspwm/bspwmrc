@@ -91,6 +91,9 @@ fi
 xset -dpms
 xset s off
 
+# Dark screen / lock when you're away, lock before sleep (Control Center > Power)
+IdleWatch &
+
 # Night light stays on after a restart if it was on (battery menu on the bar)
 BarPanelAction night-restore &
 

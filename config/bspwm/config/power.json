@@ -1,0 +1,10 @@
+{
+  "battery_warn": true,
+  "low": 15,
+  "very_low": 5,
+  "critical_action": "none",
+  "critical_at": 3,
+  "screen_dark": 0,
+  "lock_after": 0,
+  "lock_on_sleep": false
+}
