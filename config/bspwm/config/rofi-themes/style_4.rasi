@@ -31,7 +31,7 @@ mainbox {
     spacing:                    8px;
     padding:                    10px;
     background-color:           transparent;
-    children:                   [ "inputbar", "listview" ];
+    children:                   [ "inputbar", "message", "listview" ];
 }
 
 inputbar {
@@ -58,7 +58,7 @@ entry {
     background-color:           transparent;
     text-color:                 inherit;
     cursor:                     text;
-    placeholder:                "Search apps";
+    placeholder:                "Search apps, maths, files, the web";
     placeholder-color:          inherit;
 }
 
@@ -100,4 +100,15 @@ element-text {
     background-color:           transparent;
     text-color:                 inherit;
     cursor:                     inherit;
+}
+
+message {
+    padding:                    10px 14px;
+    border-radius:              10px;
+    background-color:           @bg-alt;
+}
+textbox {
+    background-color:           transparent;
+    text-color:                 @foreground;
+    markup:                     true;
 }

@@ -71,7 +71,12 @@ choose_launcher_style() {
 
 launch_launcher () {
     ROFI_THEME="$styleDir/style_$current_style.rasi"
-    rofi -show drun -theme "$ROFI_THEME"
+    if [ "$current_style" = 4 ]; then
+        # Spotlight: apps, maths, files and web search (bin/SpotlightSearch)
+        rofi -show spotlight -modes "spotlight:$HOME/.config/bspwm/bin/SpotlightSearch" -theme "$ROFI_THEME"
+    else
+        rofi -show drun -theme "$ROFI_THEME"
+    fi
 }
 
 # -- Main executor -- #
