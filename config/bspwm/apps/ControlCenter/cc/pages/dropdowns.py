@@ -1,5 +1,7 @@
-"""Dropdowns: choose which sections each bar dropdown shows, by ticking
-pictures of the sections. Saved right away (config/dropdowns.json)."""
+"""Dropdowns: choose which sections each bar dropdown shows, and their
+order. One dropdown at a time: a live mock of it (made of real pictures of
+its sections) next to the list of its sections. Saved right away
+(config/dropdowns.json); an open dropdown follows at once."""
 
 import json
 import os
@@ -7,118 +9,23 @@ import threading
 
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
-from .. import ddshots
-from ..common import BSPDIR, Page, group, run_quiet, widgets_changed
+from .. import ddconfig, ddshots
+from ..common import BSPDIR, Page, group, icon_button, run_quiet, widgets_changed
 
-FILE = os.path.join(BSPDIR, "config", "dropdowns.json")
-
-DROPDOWNS = [
-    ("cpu", "Processor", [
-        ("cpu_graph", "Usage graph and cores"),
-        ("cpu_stats", "Temperature, load and threads"),
-        ("cpu_apps", "Apps using the most CPU"),
-        ("cpu_button", "System Monitor button"),
-    ]),
-    ("memory", "Memory", [
-        ("memory_graph", "Usage graph and swap"),
-        ("memory_apps", "Apps using the most memory"),
-        ("memory_button", "System Monitor button"),
-    ]),
-    ("disk", "Storage", [
-        ("disk_buttons", "Files and Analyze buttons"),
-    ]),
-    ("sound", "Sound", [
-        ("sound_volume", "Volume slider"),
-        ("sound_output", "Output devices"),
-        ("sound_mic", "Microphone slider"),
-        ("sound_button", "Sound Settings button"),
-    ]),
-    ("network", "Network", [
-        ("network_speed", "Download and upload speed"),
-        ("network_airplane", "Airplane mode"),
-        ("network_wifi", "Wi-Fi (with its list of networks)"),
-        ("network_bluetooth", "Bluetooth (with its list of devices)"),
-        ("network_button", "Network Settings button"),
-    ]),
-    ("battery", "Battery", [
-        ("battery_details", "Charge, health and cycles"),
-        ("battery_mode", "Power mode"),
-        ("battery_brightness", "Brightness slider"),
-        ("battery_night", "Night light"),
-        ("battery_awake", "Keep awake"),
-        ("battery_buttons", "Settings and Power Off buttons"),
-    ]),
-]
-ALL_KEYS = [k for _d, _t, parts in DROPDOWNS for k, _n in parts]
+MOCK_W = 262          # width of the mock dropdown's pictures
+GAP = 10              # space between its sections
 
 
-def load():
-    shown = {k: True for k in ALL_KEYS}
-    try:
-        with open(FILE) as f:
-            shown.update({k: bool(v) for k, v in json.load(f).items()})
-    except (OSError, ValueError):
-        pass
-    return shown
-
-
-class Section(Gtk.Box):
-    """One dropdown section: its picture, its name, and a tick box on the
-    right. Clicking anywhere on the row ticks or unticks it; unticked
-    sections are faded."""
-
-    PICTURE_W = 230
-
-    def __init__(self, key, name, on_toggle):
-        super().__init__(spacing=16, margin_top=8, margin_bottom=8, margin_start=12, margin_end=14)
-        self.key = key
-        # Picture (scaled to one width so every row lines up)
-        self.picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN, valign=Gtk.Align.CENTER)
-        self.picture.add_css_class("cc-tile-image")
-        self.picture.set_overflow(Gtk.Overflow.HIDDEN)
-        self.placeholder = Gtk.Label(label="…", height_request=40)
-        self.placeholder.add_css_class("dim-label")
-        self.frame = Gtk.Stack(valign=Gtk.Align.CENTER)
-        self.frame.add_named(self.placeholder, "wait")
-        self.frame.add_named(self.picture, "picture")
-        clamp = Adw.Clamp(child=self.frame, maximum_size=self.PICTURE_W, tightening_threshold=self.PICTURE_W,
-                          halign=Gtk.Align.START)
-        clamp.set_size_request(self.PICTURE_W, -1)
-        self.append(clamp)
-        # Name
-        self.label = Gtk.Label(label=name, xalign=0, hexpand=True, wrap=True, valign=Gtk.Align.CENTER)
-        self.append(self.label)
-        # Tick box
-        self.check = Gtk.CheckButton(valign=Gtk.Align.CENTER, tooltip_text="Show in the dropdown")
-        self.check.connect("toggled", lambda c: on_toggle(key, c.get_active()))
-        self.append(self.check)
-        click = Gtk.GestureClick()
-        click.connect("released", self._clicked)
-        self.add_controller(click)
-        self.set_cursor_from_name("pointer")
-
-    def _clicked(self, gesture, _n, x, y):
-        picked = self.pick(x, y, Gtk.PickFlags.DEFAULT)
-        if picked is not None and (picked is self.check or picked.is_ancestor(self.check)):
-            return                           # the tick box handles its own clicks
-        self.check.set_active(not self.check.get_active())
-
-    def set_picture(self, path):
-        if not os.path.exists(path):
-            return
-        info = GdkPixbuf.Pixbuf.get_file_info(path)
-        if info and info[0] is not None and info[1] > 0:       # (format, width, height)
-            self.picture.set_size_request(self.PICTURE_W, round(info[2] * self.PICTURE_W / info[1]))
-        self.picture.set_filename(path)
-        self.frame.set_visible_child_name("picture")
-
-    def set_on(self, on):
-        self.check.set_active(on)
-        self.show_state(on)
-
-    def show_state(self, on):
-        self.frame.set_opacity(1.0 if on else 0.35)
-        self.label.set_opacity(1.0 if on else 0.55)
+def picture(path, width=MOCK_W):
+    """A picture scaled to `width`, or None if it isn't there yet."""
+    if not os.path.exists(path):
+        return None
+    pic = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN)
+    info = GdkPixbuf.Pixbuf.get_file_info(path)
+    if info and info[0] is not None and info[1] > 0:     # (format, width, height)
+        pic.set_size_request(width, round(info[2] * width / info[1]))
+    pic.set_filename(path)
+    return pic
 
 
 class DropdownsPage(Page):
@@ -129,34 +36,174 @@ class DropdownsPage(Page):
 
     def __init__(self, window):
         super().__init__(window)
-        self.shown = load()
-        self.sections = {}
+        self.shown, self.order = ddconfig.load()
         self.capturing = False
-        intro = group(self, description="The panels that open when you click an item on the bar. "
-                                        "Untick what you don't need; it's saved right away.")
+        self.current = ddconfig.DROPDOWNS[0][0]
+
+        top = group(self, description="The panels that open when you click an item on the bar. Pick one, "
+                                      "then switch its sections on or off and change their order. Saved right away.")
+        self.tabs = Adw.ToggleGroup(homogeneous=True, margin_top=4)
+        for dd, title, _units in ddconfig.DROPDOWNS:
+            self.tabs.add(Adw.Toggle(name=dd, label=title))
+        self.tabs.set_active_name(self.current)
+        self.tabs.connect("notify::active-name", self._pick)
+        top.add(self.tabs)
         self.status = Adw.ActionRow(title="Taking pictures of your dropdowns…",
                                     subtitle="Once per theme, off-screen")
         self.status.add_prefix(Adw.Spinner())
         self.status.set_visible(False)
-        intro.add(self.status)
-        for _dd, title, parts in DROPDOWNS:
-            g = group(self, title)
-            box = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-            box.add_css_class("boxed-list")
-            for key, name in parts:
-                sec = Section(key, name, self._toggle)
-                box.append(Gtk.ListBoxRow(child=sec, activatable=False, focusable=False))
-                self.sections[key] = sec
-            g.add(box)
+        top.add(self.status)
+
+        body = group(self)
+        row = Gtk.Box(spacing=20)
+        # Left: the dropdown as it will look
+        self.mock = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=GAP, valign=Gtk.Align.START)
+        self.mock.add_css_class("cc-ddmock")
+        mock_side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, valign=Gtk.Align.START)
+        cap = Gtk.Label(label="Preview", xalign=0)
+        cap.add_css_class("dim-label")
+        cap.add_css_class("caption-heading")
+        mock_side.append(cap)
+        mock_side.append(self.mock)
+        row.append(mock_side)
+        # Right: its sections
+        list_side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, hexpand=True, valign=Gtk.Align.START)
+        cap2 = Gtk.Label(label="Sections, top to bottom", xalign=0)
+        cap2.add_css_class("dim-label")
+        cap2.add_css_class("caption-heading")
+        list_side.append(cap2)
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.list.add_css_class("boxed-list")
+        list_side.append(self.list)
+        row.append(list_side)
+        body.add(row)
+        # Preview and list side by side need more room than the usual
+        # column: widen this page's column (it's an Adw.Clamp inside the page)
+        todo = [self]
+        while todo:
+            w = todo.pop()
+            if isinstance(w, Adw.Clamp):
+                w.set_maximum_size(820)
+                w.set_tightening_threshold(700)
+                break
+            c = w.get_first_child()
+            while c is not None:
+                todo.append(c)
+                c = c.get_next_sibling()
+
+    # ----- showing -----
+
+    def _pick(self, tabs, _p):
+        name = tabs.get_active_name()
+        if name:
+            self.current = name
+            self.build()
+
+    def _units(self):
+        """[(section, card or None, can_up, can_down)] top to bottom."""
+        units = self.order[self.current]
+        out = []
+        for i, u in enumerate(units):
+            if u in ddconfig.CARDS:
+                rows = self.order[u]
+                for j, r in enumerate(rows):
+                    out.append((r, u, j > 0, j < len(rows) - 1))
+            else:
+                out.append((u, None, i > 0, i < len(units) - 1))
+        return out
+
+    def build(self):
+        folder = ddshots.cache_dir()
+        units = self._units()
+
+        # The mock: header, then the shown sections in order (a card's
+        # rows sit together, like in the real dropdown)
+        while (c := self.mock.get_first_child()) is not None:
+            self.mock.remove(c)
+        head = picture(os.path.join(folder, f"head_{self.current}.png"))
+        if head is None:
+            wait = Gtk.Label(label="Pictures coming…", margin_top=30, margin_bottom=30, width_request=MOCK_W)
+            wait.add_css_class("dim-label")
+            self.mock.append(wait)
+        else:
+            self.mock.append(head)
+            card_box, card_of = None, None
+            for key, card, _u, _d in units:
+                if not self.shown.get(key, True):
+                    continue
+                pic = picture(os.path.join(folder, key + ".png"))
+                if pic is None:
+                    continue
+                if card:
+                    if card != card_of:
+                        card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+                        self.mock.append(card_box)
+                        card_of = card
+                    card_box.append(pic)
+                else:
+                    card_of = None
+                    self.mock.append(pic)
+
+        # The list
+        while (r := self.list.get_first_child()) is not None:
+            self.list.remove(r)
+        for key, card, can_up, can_down in units:
+            sub = ""
+            if card:
+                others = [ddconfig.NAMES[o].split(" (")[0] for o in self.order[card] if o != key]
+                sub = "Shares a card with " + " and ".join(others)
+            row = Adw.ActionRow(title=ddconfig.NAMES[key], subtitle=sub)
+            up = icon_button("go-up-symbolic", "Move up", lambda k=key: self.move(k, -1))
+            down = icon_button("go-down-symbolic", "Move down", lambda k=key: self.move(k, 1))
+            up.set_sensitive(can_up)
+            down.set_sensitive(can_down)
+            switch = Gtk.Switch(valign=Gtk.Align.CENTER, active=self.shown.get(key, True))
+            switch.connect("notify::active", lambda s, _p, k=key: self.toggle(k, s.get_active()))
+            row.add_suffix(up)
+            row.add_suffix(down)
+            row.add_suffix(switch)
+            row.set_activatable_widget(switch)
+            self.list.append(row)
+        widgets_changed()
 
     def refresh(self):
-        self.shown = load()
-        self.quietly(lambda: [s.set_on(self.shown.get(k, True)) for k, s in self.sections.items()])
-        folder = ddshots.cache_dir()
-        for k, s in self.sections.items():
-            s.set_picture(os.path.join(folder, k + ".png"))
-        if not os.path.exists(os.path.join(folder, ".complete")):
+        self.shown, self.order = ddconfig.load()
+        self.build()
+        if not os.path.exists(os.path.join(ddshots.cache_dir(), ".complete")):
             self._capture()
+
+    # ----- changes -----
+
+    def toggle(self, key, on):
+        if self.shown.get(key, True) == on:
+            return
+        self.shown[key] = on
+        self._save()
+        GLib.idle_add(lambda: (self.build(), False)[1])
+
+    def move(self, key, step):
+        # A row inside a card moves within the card; anything else moves
+        # among the dropdown's sections (a card moves as one block)
+        card = next((c for c, rows in ddconfig.CARDS.items() if key in rows), None)
+        lst = self.order[card] if card else self.order[self.current]
+        i = lst.index(key)
+        j = i + step
+        if 0 <= j < len(lst):
+            lst[i], lst[j] = lst[j], lst[i]
+            self._save()
+            self.build()
+
+    def _save(self):
+        try:
+            data = ddconfig.save(self.shown, self.order)
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        if not self.capturing:      # an open dropdown follows at once
+            run_quiet(["eww", "--no-daemonize", "-c", os.path.join(BSPDIR, "eww"), "update",
+                       "bp_show=" + json.dumps(data, separators=(",", ":"))])
+
+    # ----- pictures -----
 
     def _capture(self):
         if self.capturing:
@@ -166,38 +213,16 @@ class DropdownsPage(Page):
             return
         self.capturing = True
         self.status.set_visible(True)
-        folder = ddshots.cache_dir()
-
-        def one(key):
-            self.sections[key].set_picture(os.path.join(folder, key + ".png"))
-            return False
 
         def work():
             try:
-                ddshots.capture([(dd, [k for k, _n in parts]) for dd, _t, parts in DROPDOWNS],
-                                {k: False for k in ALL_KEYS}, one)
+                ddshots.capture(lambda _key: False)
             finally:
                 GLib.idle_add(finished)
 
         def finished():
             self.capturing = False
             self.status.set_visible(False)
-            widgets_changed()
+            self.build()
             return False
         threading.Thread(target=work, daemon=True).start()
-
-    def _toggle(self, key, on):
-        self.sections[key].show_state(on)
-        if self._updating:
-            return
-        self.shown[key] = on
-        try:
-            with open(FILE, "w") as f:
-                json.dump(self.shown, f, indent=2)
-                f.write("\n")
-        except OSError as e:
-            self.toast(f"Couldn't save: {e.strerror}")
-            return
-        if not self.capturing:      # an open dropdown follows at once
-            run_quiet(["eww", "--no-daemonize", "-c", os.path.join(BSPDIR, "eww"), "update",
-                       "bp_show=" + json.dumps(self.shown, separators=(",", ":"))])

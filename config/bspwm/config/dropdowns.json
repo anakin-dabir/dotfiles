@@ -3,9 +3,9 @@
   "cpu_stats": true,
   "cpu_apps": true,
   "cpu_button": true,
-  "memory_graph": true,
-  "memory_apps": true,
-  "memory_button": true,
+  "memory_graph": false,
+  "memory_apps": false,
+  "memory_button": false,
   "disk_buttons": true,
   "sound_volume": true,
   "sound_output": true,
@@ -21,5 +21,54 @@
   "battery_brightness": true,
   "battery_night": true,
   "battery_awake": true,
-  "battery_buttons": true
+  "battery_buttons": true,
+  "network_rows": true,
+  "battery_toggles": true,
+  "order": {
+    "cpu": [
+      "cpu_graph",
+      "cpu_stats",
+      "cpu_apps",
+      "cpu_button"
+    ],
+    "memory": [
+      "memory_graph",
+      "memory_apps",
+      "memory_button"
+    ],
+    "disk": [
+      "disk_buttons"
+    ],
+    "sound": [
+      "sound_volume",
+      "sound_output",
+      "sound_mic",
+      "sound_button"
+    ],
+    "network": [
+      "network_speed",
+      "network_rows",
+      "network_button"
+    ],
+    "network_rows": [
+      "network_airplane",
+      "network_wifi",
+      "network_bluetooth"
+    ],
+    "battery": [
+      "battery_details",
+      "battery_mode",
+      "battery_brightness",
+      "battery_toggles",
+      "battery_buttons"
+    ],
+    "battery_toggles": [
+      "battery_night",
+      "battery_awake"
+    ]
+  },
+  "first": {
+    "network_rows": "network_airplane",
+    "battery_toggles": "battery_night"
+  }
 }

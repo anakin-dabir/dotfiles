@@ -39,14 +39,9 @@
 
 ;; Which sections each dropdown shows (Control Center > Dropdowns; BarPanel
 ;; loads config/dropdowns.json when a dropdown opens)
-(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_details":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true}')
+(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_details":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true,"network_rows":true,"battery_toggles":true,"order":{"cpu":["cpu_graph","cpu_stats","cpu_apps","cpu_button"],"memory":["memory_graph","memory_apps","memory_button"],"disk":["disk_buttons"],"sound":["sound_volume","sound_output","sound_mic","sound_button"],"network":["network_speed","network_rows","network_button"],"network_rows":["network_airplane","network_wifi","network_bluetooth"],"battery":["battery_details","battery_mode","battery_brightness","battery_toggles","battery_buttons"],"battery_toggles":["battery_night","battery_awake"]},"first":{"network_rows":"network_airplane","battery_toggles":"battery_night"}}')
 
 ;; ================= building blocks =================
-
-;; A section that can be switched off (hidden sections take no space)
-(defwidget bp-part [on ?spacing]
-  (box :visible on :orientation "v" :space-evenly false :spacing {spacing == "" ? 0 : spacing}
-    (children)))
 
 (defwidget bp-head [icon title value ?sub]
   (box :class "bp-head" :space-evenly false :spacing 12
@@ -141,32 +136,232 @@
         (label :class "bp-nav-sub" :halign "start" :xalign 0 :limit-width 30 :text sub))
       (bp-switch-face :on on))))
 
+;; ----- sections (each dropdown shows them in the order saved in
+;; config/dropdowns.json: Control Center > Dropdowns) -----
+
+(defwidget bp-s-cpu_graph []
+  (bp-card :title "Last minute"
+    (graph :class "bp-graph" :value {bp_cpu.total} :time-range "60s" :min 0 :max 100
+           :dynamic false :thickness 2 :line-style "round" :height 56)
+    (box :class "bp-cores" :spacing 4 :height 30
+      (for c in {bp_cpu.cores}
+        (progress :class "bp-core ${c >= 90 ? 'bp-hot' : ''}" :orientation "v" :flipped true :value c)))))
+
+(defwidget bp-s-cpu_stats []
+  (box :class "bp-card bp-stats" :space-evenly true
+    (bp-stat :label "Temperature" :value {bp_cpu.temp == "" ? "–" : bp_cpu.temp})
+    (bp-stat :label "Load average" :value {bp_cpu.load})
+    (bp-stat :label "Threads" :value {bp_cpu.threads})))
+
+(defwidget bp-s-cpu_apps []
+  (bp-card :title "Using the most CPU"
+    (label :class "bp-dim" :halign "start" :visible {arraylength(bp_cpu.procs) == 0} :text "Measuring…")
+    (box :orientation "v" :space-evenly false :spacing 8
+      (for p in {bp_cpu.procs}
+        (bp-row :name {p.name} :value "${p.pct}%")))))
+
+(defwidget bp-s-cpu_button []
+  (bp-button :icon "󰍹" :text "System Monitor"
+             :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -r &"))
+
+(defwidget bp-s-memory_graph []
+  (bp-card :title "Last minute"
+    (graph :class "bp-graph" :value {bp_memory.pct} :time-range "60s" :min 0 :max 100
+           :dynamic false :thickness 2 :line-style "round" :height 48)
+    (bp-row :name "Swap" :value "${bp_memory.swap_used} of ${bp_memory.swap_total}")
+    (bp-meter :value {bp_memory.swap_pct})))
+
+(defwidget bp-s-memory_apps []
+  (bp-card :title "Apps using the most memory"
+    (box :orientation "v" :space-evenly false :spacing 10
+      (for a in {bp_memory.apps}
+        (bp-app :name {a.name} :value {a.size} :pct {a.pct})))))
+
+(defwidget bp-s-memory_button []
+  (bp-button :icon "󰍹" :text "System Monitor"
+             :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -p &"))
+
+(defwidget bp-s-disk_buttons []
+  (box :space-evenly true :spacing 8
+    (bp-button :icon "󰉋" :text "Files" :onclick "~/.config/bspwm/bin/BarPanelAction run thunar &")
+    (bp-button :icon "󰄨" :text "Analyze" :onclick "~/.config/bspwm/bin/BarPanelAction run kitty -e ncdu ~ &")))
+
+(defwidget bp-s-sound_volume []
+  (bp-card :title "Volume"
+    (bp-slider :icon {bp_sound.muted ? "󰖁" : "󰕾"} :value {bp_sound.vol}
+               :onchange "~/.config/bspwm/bin/BarPanelAction vol-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction vol-mute &")))
+
+(defwidget bp-s-sound_output []
+  (bp-card :title "Output"
+    (box :orientation "v" :space-evenly false :spacing 2
+      (for s in {bp_sound.sinks}
+        (eventbox :cursor "pointer"
+          (button :class "bp-item ${s.default ? 'bp-item-on' : ''}"
+                  :onclick "~/.config/bspwm/bin/BarPanelAction sink '${s.name}' &"
+            (box :space-evenly false :spacing 12
+              (label :class "bp-item-icon"
+                     :text {s.kind == "headphones" ? "󰋋" : s.kind == "hdmi" ? "󰡁" : s.kind == "bluetooth" ? "󰂯" : "󰓃"})
+              (label :class "bp-item-name" :halign "start" :hexpand true :xalign 0 :limit-width 30 :text {s.desc})
+              (label :class "bp-check" :visible {s.default} :text "󰄬"))))))))
+
+(defwidget bp-s-sound_mic []
+  (bp-card :title "Microphone"
+    (bp-slider :icon {bp_sound.mic_muted ? "󰍭" : "󰍬"} :value {bp_sound.mic_vol}
+               :onchange "~/.config/bspwm/bin/BarPanelAction mic-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction mic-mute &")))
+
+(defwidget bp-s-sound_button []
+  (bp-button :icon "󰒓" :text "Sound Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter sound &"))
+
+(defwidget bp-s-network_speed []
+  (box :class "bp-card bp-stats" :space-evenly true
+    (bp-stat :label "󰁅 Download" :value {bp_network.down})
+    (bp-stat :label "󰁝 Upload" :value {bp_network.up})))
+
+(defwidget bp-s-network_button []
+  (bp-button :icon "󰒓" :text "Network Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &"))
+
+(defwidget bp-s-battery_details []
+  (bp-card
+    (progress :class "bp-meter ${bp_battery.pct <= 20 ? 'bp-hot' : bp_battery.status == 'Charging' ? 'bp-good' : ''}"
+              :value {bp_battery.pct} :orientation "h")
+    (box :class "bp-stats" :space-evenly true
+      (bp-stat :label "Status" :value {bp_battery.status})
+      (box :tooltip "How much a full charge holds now, compared with when the battery was new"
+        (bp-stat :label "Health" :value {bp_battery.health == "" ? "–" : bp_battery.health}))
+      (box :tooltip "Times the battery has been charged and used, in full charges"
+        (bp-stat :label "Cycles" :value {bp_battery.cycles == "" ? "–" : bp_battery.cycles})))
+    (box :orientation "v" :space-evenly false :spacing 6 :visible {bp_battery.cap != "" || bp_battery.watts != ""}
+      (box :visible {bp_battery.cap != ""} (bp-row :name "Full charge holds" :value {bp_battery.cap}))
+      (box :visible {bp_battery.watts != ""} (bp-row :name "Using now" :value {bp_battery.watts})))))
+
+(defwidget bp-s-battery_brightness []
+  (bp-card :title "Display brightness"
+    (bp-slider :icon "󰃠" :value {bp_battery.bright} :max 100
+               :onchange "~/.config/bspwm/bin/BarPanelAction bright {} &" :onclick "")))
+
+(defwidget bp-s-battery_buttons []
+  (box :space-evenly true :spacing 8
+    (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter power &")
+    (bp-button :icon "󰐥" :text "Power Off…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --powermenu &")))
+
+(defwidget bp-s-network_airplane []
+  (bp-toggle :icon "󰀝" :title "Airplane mode" :on {bp_network.airplane}
+             :sub {bp_network.airplane ? "Wi-Fi and Bluetooth are off" : "Off"}
+             :toggle "~/.config/bspwm/bin/BarPanelAction airplane &"))
+
+(defwidget bp-s-network_wifi []
+  (bp-nav :icon {bp_network.wifi_on ? "󰖩" : "󰖪"} :title "Wi-Fi" :on {bp_network.wifi_on}
+          :sub {bp_network.wifi_on ? (bp_network.kind == "wifi" ? bp_network.name : "Not connected") : "Off"}
+          :toggle "~/.config/bspwm/bin/BarPanelAction wifi-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view wifi &"))
+
+(defwidget bp-s-network_bluetooth []
+  (bp-nav :icon {bp_network.bt_on ? "󰂯" : "󰂲"} :title "Bluetooth" :on {bp_network.bt_on}
+          :sub {bp_network.bt_on ? (bp_network.bt_dev != "" ? bp_network.bt_dev : "On") : "Off"}
+          :toggle "~/.config/bspwm/bin/BarPanelAction bt-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view bt &"))
+
+(defwidget bp-s-battery_night []
+  (bp-toggle :icon "󰖔" :title "Night light" :on {bp_battery.night}
+             :sub {bp_battery.night ? "Warmer colours, easier on the eyes" : "Off"}
+             :toggle "~/.config/bspwm/bin/BarPanelAction night &"))
+
+(defwidget bp-s-battery_awake []
+  (bp-toggle :icon "󰛊" :title "Keep awake" :on {bp_battery.awake}
+             :sub {bp_battery.awake ? "Won't sleep, even with the lid closed" : "Off"}
+             :toggle "~/.config/bspwm/bin/BarPanelAction awake &"))
+
+(defwidget bp-s-battery_mode []
+  (box :visible {arraylength(bp_battery.profiles) > 0}
+    (bp-card :title "Power mode"
+      (box :class "bp-seg" :space-evenly true :spacing 4
+        (for p in {bp_battery.profiles}
+          (eventbox :cursor {bp_battery.can_profile ? "pointer" : "default"}
+                    :onclick {bp_battery.can_profile ? "~/.config/bspwm/bin/BarPanelAction power-mode ${p.id} &" : ""}
+            (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}"
+                 :orientation "v" :space-evenly false :spacing 3
+              (label :class "bp-seg-icon" :text {p.icon})
+              (label :class "bp-seg-name" :text {p.name})))))
+      (box :space-evenly false :spacing 8 :visible {!bp_battery.can_profile}
+        (label :class "bp-dim" :halign "start" :hexpand true :xalign 0 :wrap true
+               :text "Switching needs a one-time permission")
+        (eventbox :cursor "pointer"
+          (button :class "bp-chip" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/PowerMode --setup &"
+            "Allow…"))))))
+
+;; ----- order -----
+
+(defwidget bp-c-network_rows []
+  (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 4
+    (for r in {bp_show.order.network_rows}
+      (box :visible {bp_show[r]} :orientation "v" :space-evenly false :spacing 4
+        (box :class "bp-sep" :visible {r != bp_show.first.network_rows})
+          (box :visible {r == "network_airplane"} :orientation "v" :space-evenly false (bp-s-network_airplane))
+          (box :visible {r == "network_wifi"} :orientation "v" :space-evenly false (bp-s-network_wifi))
+          (box :visible {r == "network_bluetooth"} :orientation "v" :space-evenly false (bp-s-network_bluetooth))))))
+
+(defwidget bp-c-battery_toggles []
+  (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 2
+    (for r in {bp_show.order.battery_toggles}
+      (box :visible {bp_show[r]} :orientation "v" :space-evenly false :spacing 2
+        (box :class "bp-sep" :visible {r != bp_show.first.battery_toggles})
+          (box :visible {r == "battery_night"} :orientation "v" :space-evenly false (bp-s-battery_night))
+          (box :visible {r == "battery_awake"} :orientation "v" :space-evenly false (bp-s-battery_awake))))))
+
+(defwidget bp-o-cpu []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.cpu}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "cpu_graph"} :orientation "v" :space-evenly false (bp-s-cpu_graph))
+        (box :visible {k == "cpu_stats"} :orientation "v" :space-evenly false (bp-s-cpu_stats))
+        (box :visible {k == "cpu_apps"} :orientation "v" :space-evenly false (bp-s-cpu_apps))
+        (box :visible {k == "cpu_button"} :orientation "v" :space-evenly false (bp-s-cpu_button))))))
+
+(defwidget bp-o-memory []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.memory}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "memory_graph"} :orientation "v" :space-evenly false (bp-s-memory_graph))
+        (box :visible {k == "memory_apps"} :orientation "v" :space-evenly false (bp-s-memory_apps))
+        (box :visible {k == "memory_button"} :orientation "v" :space-evenly false (bp-s-memory_button))))))
+
+(defwidget bp-o-disk []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.disk}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "disk_buttons"} :orientation "v" :space-evenly false (bp-s-disk_buttons))))))
+
+(defwidget bp-o-sound []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.sound}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "sound_volume"} :orientation "v" :space-evenly false (bp-s-sound_volume))
+        (box :visible {k == "sound_output"} :orientation "v" :space-evenly false (bp-s-sound_output))
+        (box :visible {k == "sound_mic"} :orientation "v" :space-evenly false (bp-s-sound_mic))
+        (box :visible {k == "sound_button"} :orientation "v" :space-evenly false (bp-s-sound_button))))))
+
+(defwidget bp-o-network []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.network}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "network_speed"} :orientation "v" :space-evenly false (bp-s-network_speed))
+        (box :visible {k == "network_rows"} :orientation "v" :space-evenly false (bp-c-network_rows))
+        (box :visible {k == "network_button"} :orientation "v" :space-evenly false (bp-s-network_button))))))
+
+(defwidget bp-o-battery []
+  (box :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.battery}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "battery_details"} :orientation "v" :space-evenly false (bp-s-battery_details))
+        (box :visible {k == "battery_mode"} :orientation "v" :space-evenly false (bp-s-battery_mode))
+        (box :visible {k == "battery_brightness"} :orientation "v" :space-evenly false (bp-s-battery_brightness))
+        (box :visible {k == "battery_toggles"} :orientation "v" :space-evenly false (bp-c-battery_toggles))
+        (box :visible {k == "battery_buttons"} :orientation "v" :space-evenly false (bp-s-battery_buttons))))))
+
 ;; ================= CPU =================
 
 (defwidget bp-cpu-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰍛" :title "Processor" :sub {bp_cpu.model} :value "${bp_cpu.total}%")
-    (bp-part :on {bp_show.cpu_graph}
-    (bp-card :title "Last minute"
-      (graph :class "bp-graph" :value {bp_cpu.total} :time-range "60s" :min 0 :max 100
-             :dynamic false :thickness 2 :line-style "round" :height 56)
-      (box :class "bp-cores" :spacing 4 :height 30
-        (for c in {bp_cpu.cores}
-          (progress :class "bp-core ${c >= 90 ? 'bp-hot' : ''}" :orientation "v" :flipped true :value c)))))
-    (bp-part :on {bp_show.cpu_stats}
-    (box :class "bp-card bp-stats" :space-evenly true
-      (bp-stat :label "Temperature" :value {bp_cpu.temp == "" ? "–" : bp_cpu.temp})
-      (bp-stat :label "Load average" :value {bp_cpu.load})
-      (bp-stat :label "Threads" :value {bp_cpu.threads})))
-    (bp-part :on {bp_show.cpu_apps}
-    (bp-card :title "Using the most CPU"
-      (label :class "bp-dim" :halign "start" :visible {arraylength(bp_cpu.procs) == 0} :text "Measuring…")
-      (box :orientation "v" :space-evenly false :spacing 8
-        (for p in {bp_cpu.procs}
-          (bp-row :name {p.name} :value "${p.pct}%")))))
-    (bp-part :on {bp_show.cpu_button}
-    (bp-button :icon "󰍹" :text "System Monitor"
-               :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -r &"))))
+    (bp-o-cpu)))
 
 ;; ================= Memory =================
 
@@ -174,20 +369,7 @@
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰘚" :title "Memory" :sub "${bp_memory.used} of ${bp_memory.total} · ${bp_memory.free} free"
              :value "${bp_memory.pct}%")
-    (bp-part :on {bp_show.memory_graph}
-    (bp-card :title "Last minute"
-      (graph :class "bp-graph" :value {bp_memory.pct} :time-range "60s" :min 0 :max 100
-             :dynamic false :thickness 2 :line-style "round" :height 48)
-      (bp-row :name "Swap" :value "${bp_memory.swap_used} of ${bp_memory.swap_total}")
-      (bp-meter :value {bp_memory.swap_pct})))
-    (bp-part :on {bp_show.memory_apps}
-    (bp-card :title "Apps using the most memory"
-      (box :orientation "v" :space-evenly false :spacing 10
-        (for a in {bp_memory.apps}
-          (bp-app :name {a.name} :value {a.size} :pct {a.pct})))))
-    (bp-part :on {bp_show.memory_button}
-    (bp-button :icon "󰍹" :text "System Monitor"
-               :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -p &"))))
+    (bp-o-memory)))
 
 ;; ================= Storage =================
 
@@ -202,10 +384,7 @@
         (box :space-evenly false
           (label :class "bp-dim" :halign "start" :hexpand true :text "${d.used} of ${d.size}")
           (label :class "bp-dim" :text "${d.free} free"))))
-    (bp-part :on {bp_show.disk_buttons}
-    (box :space-evenly true :spacing 8
-      (bp-button :icon "󰉋" :text "Files" :onclick "~/.config/bspwm/bin/BarPanelAction run thunar &")
-      (bp-button :icon "󰄨" :text "Analyze" :onclick "~/.config/bspwm/bin/BarPanelAction run kitty -e ncdu ~ &")))))
+    (bp-o-disk)))
 
 ;; ================= Sound =================
 
@@ -213,28 +392,7 @@
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon {bp_sound.muted ? "󰖁" : "󰕾"} :title "Sound" :sub {bp_sound.output}
              :value {bp_sound.muted ? "Muted" : "${bp_sound.vol}%"})
-    (bp-part :on {bp_show.sound_volume}
-    (bp-card :title "Volume"
-      (bp-slider :icon {bp_sound.muted ? "󰖁" : "󰕾"} :value {bp_sound.vol}
-                 :onchange "~/.config/bspwm/bin/BarPanelAction vol-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction vol-mute &")))
-    (bp-part :on {bp_show.sound_output}
-    (bp-card :title "Output"
-      (box :orientation "v" :space-evenly false :spacing 2
-        (for s in {bp_sound.sinks}
-          (eventbox :cursor "pointer"
-            (button :class "bp-item ${s.default ? 'bp-item-on' : ''}"
-                    :onclick "~/.config/bspwm/bin/BarPanelAction sink '${s.name}' &"
-              (box :space-evenly false :spacing 12
-                (label :class "bp-item-icon"
-                       :text {s.kind == "headphones" ? "󰋋" : s.kind == "hdmi" ? "󰡁" : s.kind == "bluetooth" ? "󰂯" : "󰓃"})
-                (label :class "bp-item-name" :halign "start" :hexpand true :xalign 0 :limit-width 30 :text {s.desc})
-                (label :class "bp-check" :visible {s.default} :text "󰄬"))))))))
-    (bp-part :on {bp_show.sound_mic}
-    (bp-card :title "Microphone"
-      (bp-slider :icon {bp_sound.mic_muted ? "󰍭" : "󰍬"} :value {bp_sound.mic_vol}
-                 :onchange "~/.config/bspwm/bin/BarPanelAction mic-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction mic-mute &")))
-    (bp-part :on {bp_show.sound_button}
-    (bp-button :icon "󰒓" :text "Sound Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter sound &"))))
+    (bp-o-sound)))
 
 ;; ================= Network =================
 
@@ -244,28 +402,7 @@
              :title {bp_network.kind == "none" ? "Not connected" : bp_network.name}
              :sub {bp_network.kind == "none" ? "" : "${bp_network.kind == 'wifi' ? 'Wi-Fi' : 'Ethernet'} · ${bp_network.ip}"}
              :value {bp_network.kind == "wifi" ? "${bp_network.signal}%" : ""})
-    (bp-part :on {bp_show.network_speed}
-    (box :class "bp-card bp-stats" :space-evenly true
-      (bp-stat :label "󰁅 Download" :value {bp_network.down})
-      (bp-stat :label "󰁝 Upload" :value {bp_network.up})))
-    (bp-part :on {bp_show.network_airplane || bp_show.network_wifi || bp_show.network_bluetooth}
-      (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 4
-        (bp-part :on {bp_show.network_airplane}
-          (bp-toggle :icon "󰀝" :title "Airplane mode" :on {bp_network.airplane}
-                     :sub {bp_network.airplane ? "Wi-Fi and Bluetooth are off" : "Off"}
-                     :toggle "~/.config/bspwm/bin/BarPanelAction airplane &"))
-        (bp-part :on {bp_show.network_wifi} :spacing 4
-          (box :class "bp-sep" :visible {bp_show.network_airplane})
-          (bp-nav :icon {bp_network.wifi_on ? "󰖩" : "󰖪"} :title "Wi-Fi" :on {bp_network.wifi_on}
-                  :sub {bp_network.wifi_on ? (bp_network.kind == "wifi" ? bp_network.name : "Not connected") : "Off"}
-                  :toggle "~/.config/bspwm/bin/BarPanelAction wifi-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view wifi &"))
-        (bp-part :on {bp_show.network_bluetooth} :spacing 4
-          (box :class "bp-sep" :visible {bp_show.network_airplane || bp_show.network_wifi})
-          (bp-nav :icon {bp_network.bt_on ? "󰂯" : "󰂲"} :title "Bluetooth" :on {bp_network.bt_on}
-                  :sub {bp_network.bt_on ? (bp_network.bt_dev != "" ? bp_network.bt_dev : "On") : "Off"}
-                  :toggle "~/.config/bspwm/bin/BarPanelAction bt-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view bt &"))))
-    (bp-part :on {bp_show.network_button}
-      (bp-button :icon "󰒓" :text "Network Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &"))))
+    (bp-o-network)))
 
 (defwidget bp-wifi-list []
   (box :orientation "v" :space-evenly false :spacing 12
@@ -339,59 +476,7 @@
     (bp-head :icon {bp_battery.status == "Charging" ? "󰂄" : "󰁹"} :title "Battery"
              :sub {bp_battery.time != "" ? bp_battery.time : bp_battery.status}
              :value "${bp_battery.pct}%")
-    (bp-part :on {bp_show.battery_details}
-    (bp-card
-      (progress :class "bp-meter ${bp_battery.pct <= 20 ? 'bp-hot' : bp_battery.status == 'Charging' ? 'bp-good' : ''}"
-                :value {bp_battery.pct} :orientation "h")
-      (box :class "bp-stats" :space-evenly true
-        (bp-stat :label "Status" :value {bp_battery.status})
-        (box :tooltip "How much a full charge holds now, compared with when the battery was new"
-          (bp-stat :label "Health" :value {bp_battery.health == "" ? "–" : bp_battery.health}))
-        (box :tooltip "Times the battery has been charged and used, in full charges"
-          (bp-stat :label "Cycles" :value {bp_battery.cycles == "" ? "–" : bp_battery.cycles})))
-      (box :orientation "v" :space-evenly false :spacing 6 :visible {bp_battery.cap != "" || bp_battery.watts != ""}
-        (box :visible {bp_battery.cap != ""} (bp-row :name "Full charge holds" :value {bp_battery.cap}))
-        (box :visible {bp_battery.watts != ""} (bp-row :name "Using now" :value {bp_battery.watts})))))
-
-    ;; Power mode, on laptops that have them
-    (box :visible {bp_show.battery_mode && arraylength(bp_battery.profiles) > 0}
-      (bp-card :title "Power mode"
-        (box :class "bp-seg" :space-evenly true :spacing 4
-          (for p in {bp_battery.profiles}
-            (eventbox :cursor {bp_battery.can_profile ? "pointer" : "default"}
-                      :onclick {bp_battery.can_profile ? "~/.config/bspwm/bin/BarPanelAction power-mode ${p.id} &" : ""}
-              (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}"
-                   :orientation "v" :space-evenly false :spacing 3
-                (label :class "bp-seg-icon" :text {p.icon})
-                (label :class "bp-seg-name" :text {p.name})))))
-        (box :space-evenly false :spacing 8 :visible {!bp_battery.can_profile}
-          (label :class "bp-dim" :halign "start" :hexpand true :xalign 0 :wrap true
-                 :text "Switching needs a one-time permission")
-          (eventbox :cursor "pointer"
-            (button :class "bp-chip" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/PowerMode --setup &"
-              "Allow…")))))
-
-    (bp-part :on {bp_show.battery_brightness}
-    (bp-card :title "Display brightness"
-      (bp-slider :icon "󰃠" :value {bp_battery.bright} :max 100
-                 :onchange "~/.config/bspwm/bin/BarPanelAction bright {} &" :onclick "")))
-
-    (bp-part :on {bp_show.battery_night || bp_show.battery_awake}
-      (box :class "bp-card bp-list" :orientation "v" :space-evenly false :spacing 2
-        (bp-part :on {bp_show.battery_night}
-          (bp-toggle :icon "󰖔" :title "Night light" :on {bp_battery.night}
-                     :sub {bp_battery.night ? "Warmer colours, easier on the eyes" : "Off"}
-                     :toggle "~/.config/bspwm/bin/BarPanelAction night &"))
-        (bp-part :on {bp_show.battery_awake} :spacing 2
-          (box :class "bp-sep" :visible {bp_show.battery_night})
-          (bp-toggle :icon "󰛊" :title "Keep awake" :on {bp_battery.awake}
-                     :sub {bp_battery.awake ? "Won't sleep, even with the lid closed" : "Off"}
-                     :toggle "~/.config/bspwm/bin/BarPanelAction awake &"))))
-
-    (bp-part :on {bp_show.battery_buttons}
-    (box :space-evenly true :spacing 8
-      (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter power &")
-      (bp-button :icon "󰐥" :text "Power Off…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --powermenu &")))))
+    (bp-o-battery)))
 
 ;; ================= Calendar =================
 
