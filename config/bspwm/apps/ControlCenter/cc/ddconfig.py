@@ -51,7 +51,6 @@ DROPDOWNS = [
         ("network_button", "Network Settings button"),
     ]),
     ("battery", "Battery", [
-        ("battery_details", "Charge level bar"),
         ("battery_mode", "Power mode"),
         ("battery_brightness", "Brightness slider"),
         ("battery_toggles", [

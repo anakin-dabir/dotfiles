@@ -41,7 +41,7 @@
 
 ;; Which sections each dropdown shows (Control Center > Dropdowns; BarPanel
 ;; loads config/dropdowns.json when a dropdown opens)
-(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_clean":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_details":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true,"network_rows":true,"battery_toggles":true,"order":{"cpu":["cpu_graph","cpu_stats","cpu_apps","cpu_button"],"memory":["memory_graph","memory_apps","memory_button"],"disk":["disk_clean","disk_buttons"],"sound":["sound_volume","sound_output","sound_mic","sound_button"],"network":["network_speed","network_rows","network_button"],"network_rows":["network_airplane","network_wifi","network_bluetooth"],"battery":["battery_details","battery_mode","battery_brightness","battery_toggles","battery_buttons"],"battery_toggles":["battery_night","battery_awake"]},"first":{"network_rows":"network_airplane","battery_toggles":"battery_night"},"any":{"cpu":true,"memory":true,"disk":true,"sound":true,"network":true,"battery":true}}')
+(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_clean":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true,"network_rows":true,"battery_toggles":true,"order":{"cpu":["cpu_graph","cpu_stats","cpu_apps","cpu_button"],"memory":["memory_graph","memory_apps","memory_button"],"disk":["disk_clean","disk_buttons"],"sound":["sound_volume","sound_output","sound_mic","sound_button"],"network":["network_speed","network_rows","network_button"],"network_rows":["network_airplane","network_wifi","network_bluetooth"],"battery":["battery_mode","battery_brightness","battery_toggles","battery_buttons"],"battery_toggles":["battery_night","battery_awake"]},"first":{"network_rows":"network_airplane","battery_toggles":"battery_night"},"any":{"cpu":true,"memory":true,"disk":true,"sound":true,"network":true,"battery":true}}')
 
 ;; ================= building blocks =================
 
@@ -187,11 +187,15 @@
 (defwidget bp-s-memory_apps []
   (bp-card :title "Apps using the most memory"
     (box :orientation "v" :space-evenly false :spacing 10
+      ;; name · size · ×  on one line, the usage bar under the whole row
       (for a in {bp_memory.apps}
-        (box :space-evenly false :spacing 6
-          (box :hexpand true (bp-app :name {a.name} :value {a.size} :pct {a.pct}))
-          (box :visible {a.kill} :valign "center" (bp-close :proc {a.proc} :id "close:${a.proc}"))
-          (box :visible {!a.kill} :class "bp-x-space"))))))
+        (box :class "bp-proc" :orientation "v" :space-evenly false :spacing 6
+          (box :space-evenly false :spacing 8
+            (label :class "bp-row-name" :halign "start" :hexpand true :xalign 0 :limit-width 24 :text {a.name})
+            (label :class "bp-row-value" :valign "center" :text {a.size})
+            (box :visible {a.kill} :valign "center" (bp-close :proc {a.proc} :id "close:${a.proc}"))
+            (box :visible {!a.kill} :class "bp-x-space"))
+          (progress :class "bp-thin" :value {a.pct} :orientation "h"))))))
 
 (defwidget bp-s-memory_button []
   (bp-button :icon "󰍹" :text "System Monitor"
@@ -266,11 +270,6 @@
 (defwidget bp-s-network_button []
   (bp-button :icon "󰒓" :text "Network Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &"))
 
-(defwidget bp-s-battery_details []
-  (bp-card
-    (progress :class "bp-meter ${bp_battery.pct <= 20 ? 'bp-hot' : bp_battery.status == 'Charging' ? 'bp-good' : ''}"
-              :value {bp_battery.pct} :orientation "h")))
-
 (defwidget bp-s-battery_brightness []
   (bp-card :title "Display brightness"
     (bp-slider :icon "󰃠" :value {bp_battery.bright} :max 100
@@ -308,21 +307,24 @@
 
 (defwidget bp-s-battery_mode []
   (box :visible {arraylength(bp_battery.profiles) > 0}
-    (bp-card :title "Power mode"
-      (box :class "bp-seg" :space-evenly true :spacing 4
+    (box :class "bp-card" :orientation "v" :space-evenly false :spacing 10
+      (box :class "bp-card-head" :space-evenly false
+        (label :class "bp-section" :halign "start" :hexpand true :valign "center" :text "Power mode")
+        ;; not allowed yet: one small button instead of a sentence
+        (box :visible {!bp_battery.can_profile}
+          (eventbox :cursor "pointer"
+            (button :class "bp-chip bp-chip-small" :tooltip "Asks for your password once"
+                    :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/PowerMode --setup &"
+              "󰌾 Allow changes…"))))
+      ;; one segmented strip; the current mode filled with the accent
+      (box :class "bp-seg ${bp_battery.can_profile ? '' : 'bp-seg-locked'}" :space-evenly true :spacing 2
         (for p in {bp_battery.profiles}
           (eventbox :cursor {bp_battery.can_profile ? "pointer" : "default"}
                     :onclick {bp_battery.can_profile ? "~/.config/bspwm/bin/BarPanelAction power-mode ${p.id} &" : ""}
             (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}"
-                 :orientation "v" :space-evenly false :spacing 3
+                 :orientation "v" :space-evenly false :spacing 2 :tooltip {p.name}
               (label :class "bp-seg-icon" :text {p.icon})
-              (label :class "bp-seg-name" :text {p.name})))))
-      (box :space-evenly false :spacing 8 :visible {!bp_battery.can_profile}
-        (label :class "bp-dim" :halign "start" :hexpand true :xalign 0 :wrap true
-               :text "Switching needs a one-time permission")
-        (eventbox :cursor "pointer"
-          (button :class "bp-chip" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/PowerMode --setup &"
-            "Allow…"))))))
+              (label :class "bp-seg-name" :text {p.name}))))))))
 
 ;; ----- order -----
 
@@ -388,7 +390,6 @@
   (box :visible {bp_show.any.battery} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.battery}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
-        (box :visible {k == "battery_details"} :orientation "v" :space-evenly false (bp-s-battery_details))
         (box :visible {k == "battery_mode"} :orientation "v" :space-evenly false (bp-s-battery_mode))
         (box :visible {k == "battery_brightness"} :orientation "v" :space-evenly false (bp-s-battery_brightness))
         (box :visible {k == "battery_toggles"} :orientation "v" :space-evenly false (bp-c-battery_toggles))

@@ -17,7 +17,6 @@
   "network_wifi": true,
   "network_bluetooth": true,
   "network_button": true,
-  "battery_details": true,
   "battery_mode": true,
   "battery_brightness": true,
   "battery_night": true,
@@ -58,7 +57,6 @@
       "network_bluetooth"
     ],
     "battery": [
-      "battery_details",
       "battery_mode",
       "battery_brightness",
       "battery_toggles",

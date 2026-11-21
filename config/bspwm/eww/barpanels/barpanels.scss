@@ -118,7 +118,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-thin trough {
-  min-height: 4px;
+  min-height: 5px;
 }
 
 .bp-meter progress,
@@ -129,7 +129,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-thin progress {
-  min-height: 4px;
+  min-height: 5px;
   background-color: rgba($nc-accent, 0.7);
 }
 
@@ -311,14 +311,20 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 // Pick-one control (power mode): equal tiles, the current one in the accent
-.bp-seg-item {
-  padding: 8px 2px 7px 2px;
+// Segmented control (power mode): one rounded strip, the chosen part filled
+.bp-seg {
+  padding: 3px;
   border-radius: $nc-card-radius;
-  background-color: rgba($fg, 0.06);
+  background-color: rgba($fg, 0.07);
+}
+
+.bp-seg-item {
+  padding: 7px 2px 6px 2px;
+  border-radius: max($nc-card-radius - 3px, 4px);
 }
 
 .bp-seg-item:hover {
-  background-color: rgba($fg, 0.12);
+  background-color: rgba($fg, 0.07);
 }
 
 .bp-seg-on,
@@ -328,7 +334,7 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-panel .bp-seg-icon {
   font-family: $bp-icons;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .bp-panel .bp-seg-name {
@@ -337,6 +343,22 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-panel .bp-seg-on label {
   color: $nc-on-accent;
+}
+
+.bp-seg-locked {
+  opacity: 0.55;
+}
+
+.bp-panel .bp-chip-small {
+  padding: 1px 10px;
+}
+
+.bp-card-head {
+  min-height: 22px;      // same height with or without a button in it
+}
+
+.bp-panel .bp-chip-small label {
+  font-size: 10px;
 }
 
 // Small pill button inside a card
@@ -454,9 +476,9 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-panel .bp-x {
   font-family: $bp-icons;
-  font-size: 13px;
-  min-width: 22px;        // a circle: as wide as it is tall
-  min-height: 22px;
+  font-size: 12px;
+  min-width: 20px;        // a circle: as wide as it is tall
+  min-height: 20px;
   padding: 0;
   border-radius: 999px;
   color: rgba($fg, 0.45);
@@ -468,7 +490,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-x-space {
-  min-width: 22px;       // same as the close button, so values line up
+  min-width: 20px;       // same as the close button, so values line up
 }
 
 .bp-panel .bp-x-sure,
