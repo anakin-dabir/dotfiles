@@ -3,9 +3,10 @@
 import os
 import re
 
-from gi.repository import Gtk
+from gi.repository import Adw, Gtk
 
-from ..common import BSPDIR, Page, current_rice, group, launch, run_quiet, thumbnail, tool
+from .. import rice
+from ..common import BSPDIR, HOME, Page, current_rice, group, have, launch, run_quiet, thumbnail, tool
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
 
@@ -60,6 +61,24 @@ class AppearancePage(Page):
             thumbnail(os.path.join(rices_dir, name, "preview.webp"), 260, 344,
                       lambda tex, t=t: tex and t.picture.set_paintable(tex))
 
+        # How the wallpaper is chosen (the theme's ENGINE)
+        modes = group(self, "Wallpaper mode")
+        self.modes = [("Default", "One picture", "The one you pick below"),
+                      ("Random", "Random", "A random picture from this theme's collection at each start"),
+                      ("CustomDir", "Random from a folder", "A random picture from a folder of yours at each start"),
+                      ("Slideshow", "Slideshow", "A new picture from this theme's collection every 15 minutes")]
+        if have("xwinwrap"):
+            self.modes.append(("Animated", "Animated", "A looping video"))
+        self.mode_row = Adw.ComboRow(title="Mode", model=Gtk.StringList.new([m[1] for m in self.modes]))
+        self.mode_row.connect("notify::selected", self._mode)
+        modes.add(self.mode_row)
+        self.folder_row = Adw.EntryRow(title="Folder with your wallpapers", show_apply_button=True)
+        self.folder_row.connect("apply", lambda r: self._path("CUSTOM_DIR", r.get_text()))
+        modes.add(self.folder_row)
+        self.video_row = Adw.EntryRow(title="Video file (mp4, mkv, gif)", show_apply_button=True)
+        self.video_row.connect("apply", lambda r: self._path("ANIMATED_WALL", r.get_text()))
+        modes.add(self.video_row)
+
         self.walls = group(self, "Wallpaper")
         more = Gtk.Box(spacing=6)
         b = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open the wallpaper folder")
@@ -71,6 +90,7 @@ class AppearancePage(Page):
         self.walls.add(self.wall_grid)
         self.wall_tiles = {}
         self.load_walls()
+        self.load_mode()
         self.mark()
 
     # ----- themes -----
@@ -128,21 +148,60 @@ class AppearancePage(Page):
         self.mark()
 
     def set_wall(self, path):
-        # Same as WallSelect: remember it in the theme, show it, recolor
+        # Remember it in the theme (one picture mode) and show it
         try:
-            cfg = self.theme_config()
-            with open(cfg) as f:
-                text = f.read()
-            text = re.sub(r"^ENGINE=.*$", 'ENGINE="Default"', text, flags=re.M)
-            text = re.sub(r"^DEFAULT_WALL=.*$", f'DEFAULT_WALL="{path}"', text, flags=re.M)
-            with open(cfg, "w") as f:
-                f.write(text)
+            rice.set_theme_vars({"ENGINE": "Default", "DEFAULT_WALL": path})
         except OSError as e:
             self.toast(f"Couldn't save the wallpaper: {e.strerror}")
             return
-        run_quiet(["feh", "--bg-fill", path])
-        launch([tool("WallSync")])
+        run_quiet([tool("WallApply")])         # also stops a slideshow / video
+        self.load_mode()
         self.mark()
+
+    # ----- wallpaper mode -----
+
+    def load_mode(self):
+        v = rice.theme_vars(self.rice)
+        engine = v.get("ENGINE", "Default")
+        names = [m[0] for m in self.modes]
+
+        def put():
+            if engine in names:
+                self.mode_row.set_selected(names.index(engine))
+            self.mode_row.set_subtitle(dict((m[0], m[2]) for m in self.modes).get(engine, ""))
+            self.folder_row.set_text(v.get("CUSTOM_DIR", "").replace(HOME, "~"))
+            self.video_row.set_text(v.get("ANIMATED_WALL", "").replace(HOME, "~"))
+        self.quietly(put)
+        self.folder_row.set_visible(engine == "CustomDir")
+        self.video_row.set_visible(engine == "Animated")
+
+    def _mode(self, row, _p):
+        if self._updating or row.get_selected() >= len(self.modes):
+            return
+        engine = self.modes[row.get_selected()][0]
+        try:
+            rice.set_theme_vars({"ENGINE": engine})
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self.load_mode()
+        if engine == "CustomDir" and not os.path.isdir(os.path.expanduser(self.folder_row.get_text())):
+            self.toast("Type the folder with your wallpapers, then press ✓")
+            return
+        run_quiet([tool("WallApply")], lambda _ok: self.mark())
+
+    def _path(self, var, text):
+        path = os.path.expanduser(text.strip())
+        ok = os.path.isdir(path) if var == "CUSTOM_DIR" else os.path.isfile(path)
+        if not ok:
+            self.toast("That folder doesn't exist" if var == "CUSTOM_DIR" else "That file doesn't exist")
+            return
+        try:
+            rice.set_theme_vars({var: path})
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        run_quiet([tool("WallApply")], lambda _ok: (self.mark(), self.toast("Wallpaper updated")))
 
     # ----- state -----
 
@@ -158,4 +217,5 @@ class AppearancePage(Page):
         if rice != self.rice and not self.applying:    # changed from elsewhere (rofi, keybind)
             self.rice = rice
             self.load_walls()
+            self.load_mode()
         self.mark()

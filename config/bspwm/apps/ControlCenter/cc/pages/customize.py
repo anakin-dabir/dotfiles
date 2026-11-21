@@ -11,7 +11,7 @@ from .. import rice
 from ..pickers import ColorButton, FontButton
 from ..preview import DesktopPreview
 from ..samples import SampleStrip, cursor_samples, gtk_theme_preview, icon_samples
-from ..common import Page, current_rice, group, read_file, run_quiet, text_button, tool
+from ..common import BSPDIR, HOME, Page, current_rice, group, read_file, run_quiet, text_button, tool
 
 COLORS = [
     ("bg", "Background", "Windows, bar and menus"),
@@ -110,6 +110,9 @@ class CustomizePage(Page):
         win.add(self._switch("P_SHADOWS", "Shadows"))
         win.add(self._switch("P_BLUR", "Blur", "Behind see-through windows and the bar"))
         win.add(self._switch("P_FADE", "Fade windows in and out"))
+        win.add(self._switch("P_ANIMATIONS", "Animations", "Windows open, close and move with animations",
+                             on="@", off="#"))
+        win.add(self._color_row("SHADOW_C", "Shadow colour", ""))
         win.add(self._spin("P_TERM_OPACITY", "Terminal opacity", "1 is solid", 0.5, 1.0, 0.05, digits=2))
 
         fonts = group(self, "Fonts", "The bar's own font is on the Bar page.")
@@ -144,6 +147,22 @@ class CustomizePage(Page):
         look.add(self._combo("gtk_cursor", "Mouse pointer", cursors, cursors))
         self.cursor_strip = SampleStrip()
         look.add(Adw.PreferencesRow(activatable=False, child=self.cursor_strip))
+
+        # Not part of a theme: applied right away, for every theme
+        general = group(self, "For all themes", "Applied right away (not saved with the theme).")
+        self.backend = Adw.ComboRow(title="Compositor backend", subtitle="How picom draws: try another if you see glitches",
+                                    model=Gtk.StringList.new(["glx", "xrender", "egl"]))
+        self.backend.connect("notify::selected", self._backend)
+        general.add(self.backend)
+        self.vsync = Adw.SwitchRow(title="vSync", subtitle="No tearing; turn off if it makes things lag")
+        self.vsync.connect("notify::active", lambda r, _p: self._updating or self._picom_set("vsync", "true" if r.get_active() else "false"))
+        general.add(self.vsync)
+        self.pixel = Adw.SwitchRow(title="Pixel art in new terminals", subtitle="A random colour script when a terminal opens")
+        self.pixel.connect("notify::active", lambda r, _p: self._updating or self._zshrc("colorscript -r", r.get_active()))
+        general.add(self.pixel)
+        self.fzf = Adw.SwitchRow(title="Tab completion menu (fzf-tab)", subtitle="A searchable menu when you press Tab in the terminal")
+        self.fzf.connect("notify::active", lambda r, _p: self._updating or self._zshrc("disable-fzf-tab", not r.get_active()))
+        general.add(self.fzf)
 
         self.load()
 
@@ -212,10 +231,10 @@ class CustomizePage(Page):
         self.widgets[var] = ("spin", row, fmt)
         return row
 
-    def _switch(self, var, title, sub=""):
+    def _switch(self, var, title, sub="", on="true", off="false"):
         row = Adw.SwitchRow(title=title, subtitle=sub)
-        row.connect("notify::active", lambda r, _p: self._changed(var, "true" if r.get_active() else "false"))
-        self.widgets[var] = ("switch", row, None)
+        row.connect("notify::active", lambda r, _p: self._changed(var, on if r.get_active() else off))
+        self.widgets[var] = ("switch", row, on)
         return row
 
     def _combo(self, var, title, values, labels):
@@ -238,6 +257,66 @@ class CustomizePage(Page):
         row.set_activatable_widget(btn)
         self.widgets[var] = ("font", btn, family_only)
         return row
+
+    # ----- "for all themes" options -----
+
+    PICOM = os.path.join(BSPDIR, "config", "picom", "picom.conf")
+    ZSHRC = os.path.join(HOME, ".zshrc")
+
+    def _picom_get(self, key):
+        m = re.search(rf'(?m)^{key}\s*=\s*"?([^";]+)"?;', read_file(self.PICOM))
+        return m.group(1).strip() if m else ""
+
+    def _picom_set(self, key, value):
+        text = read_file(self.PICOM)
+        quoted = f'"{value}"' if key == "backend" else value
+        new = re.sub(rf'(?m)^{key}\s*=.*$', f"{key} = {quoted};", text, count=1)
+        try:
+            with open(self.PICOM, "w") as f:
+                f.write(new + "\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        run_quiet(["pkill", "-USR1", "-x", "picom"])        # picom re-reads its config
+        self.toast("Compositor updated")
+
+    def _backend(self, row, _p):
+        if not self._updating:
+            self._picom_set("backend", ["glx", "xrender", "egl"][row.get_selected()])
+
+    def _zshrc_on(self, marker):
+        for line in read_file(self.ZSHRC).splitlines():
+            if marker in line:
+                return not line.lstrip().startswith("#")
+        return False
+
+    def _zshrc(self, marker, on):
+        """Comment or uncomment the line in ~/.zshrc that contains marker."""
+        try:
+            with open(self.ZSHRC) as f:
+                lines = f.read().split("\n")
+        except OSError:
+            return
+        for i, line in enumerate(lines):
+            if marker in line:
+                bare = line.lstrip().lstrip("#").lstrip()
+                lines[i] = bare if on else "# " + bare
+                break
+        else:
+            return
+        with open(self.ZSHRC, "w") as f:
+            f.write("\n".join(lines))
+        self.toast("Applied to new terminals")
+
+    def _load_general(self):
+        backend = self._picom_get("backend")
+        def put():
+            if backend in ("glx", "xrender", "egl"):
+                self.backend.set_selected(["glx", "xrender", "egl"].index(backend))
+            self.vsync.set_active(self._picom_get("vsync") == "true")
+            self.pixel.set_active(self._zshrc_on("colorscript -r"))
+            self.fzf.set_active(not self._zshrc_on("disable-fzf-tab"))
+        self.quietly(put)
 
     @staticmethod
     def _font_value(desc, family_only):
@@ -277,7 +356,7 @@ class CustomizePage(Page):
                     except ValueError:
                         pass
                 elif kind == "switch":
-                    w.set_active(val == "true")
+                    w.set_active(val == extra)
                 elif kind == "combo":
                     if val not in w.values and val:
                         w.values.append(val)
@@ -288,6 +367,7 @@ class CustomizePage(Page):
                     if val:
                         w.set_desc(Pango.FontDescription.from_string(val))
         self.quietly(put)
+        self._load_general()
         self._show_preview()
         self.window.update_pending()
 

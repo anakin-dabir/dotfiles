@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Show the current theme's wallpaper the way its ENGINE says (one picture,
+# random, from a folder, slideshow, animated). Used after changing the
+# wallpaper mode (Control Center > Appearance) without reloading the theme.
+export PATH="$HOME/.config/bspwm/bin:$PATH"
+read -r RICE < "$HOME/.config/bspwm/.rice"
+. "$HOME/.config/bspwm/rices/$RICE/theme-config.bash"
+# Stop what the previous mode left running
+pkill -x xwinwrap 2>/dev/null
+if [ -f /tmp/wall_refresh.pid ]; then
+    kill "$(cat /tmp/wall_refresh.pid)" 2>/dev/null
+    rm -f /tmp/wall_refresh.pid
+fi
+. "$HOME/.config/bspwm/config/modules/02-wallpaper.sh" >/dev/null 2>&1 < /dev/null
