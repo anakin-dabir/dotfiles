@@ -39,9 +39,9 @@ super + {y,v,m}
 super + {p,t,w}
     OpenApps --{soundcontrol,telegram,whats}
 
-# Rice Editor App
+# Customize the theme (Control Center; it replaces the old Rice Editor)
 super + r
-    RiceEditor
+    ControlCenter customize
 
 # ----- Rofi Applets ----- #
 
