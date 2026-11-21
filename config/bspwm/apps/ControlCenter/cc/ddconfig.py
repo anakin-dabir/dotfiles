@@ -84,11 +84,6 @@ DROPDOWNS = [
         ("windows_focused", "Float, Full screen and Pin"),
         ("windows_layout", "Side by side / One at a time"),
     ]),
-    ("power", "Power", [
-        ("power_session", "Up time, computer and kernel"),
-        ("power_actions", "Lock, Sleep and Log out"),
-        ("power_off", "Restart and Shut down"),
-    ]),
     ("weather", "Weather", [
         ("weather_stats", "Feels like, humidity, wind, rain"),
         ("weather_hours", "Next hours"),

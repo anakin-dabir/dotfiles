@@ -37,9 +37,6 @@
   "windows_list": true,
   "windows_focused": true,
   "windows_layout": true,
-  "power_session": true,
-  "power_actions": true,
-  "power_off": true,
   "weather_stats": true,
   "weather_hours": true,
   "weather_days": true,
@@ -114,11 +111,6 @@
       "windows_focused",
       "windows_layout"
     ],
-    "power": [
-      "power_session",
-      "power_actions",
-      "power_off"
-    ],
     "weather": [
       "weather_stats",
       "weather_hours",
@@ -143,7 +135,6 @@
     "clipboard": true,
     "capture": true,
     "windows": true,
-    "power": true,
     "weather": true
   }
 }
