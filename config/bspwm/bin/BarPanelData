@@ -104,14 +104,16 @@ measure_cleanable() {
     rm -f "$t.c" "$t.p" "$t.o"
 }
 cleanable() {
+    # Never waits: the last numbers (or "-" the first time), measured again in
+    # the background; an open Storage dropdown gets the new ones when ready
     local f="$RUN/clean.txt"     # (BarPanelAction deletes it after a clean-up)
-    if [ -s "$f" ]; then
-        cat "$f"
-        if [ -z "$(find "$f" -mmin -1)" ]; then
-            ( measure_cleanable > "$f.new" && mv "$f.new" "$f" ) >/dev/null 2>&1 7>&- &
+    if [ -s "$f" ]; then cat "$f"; else echo "- - -"; fi
+    if [ ! -s "$f" ] || [ -z "$(find "$f" -mmin -1)" ]; then
+        if mkdir "$RUN/clean.lock" 2>/dev/null; then          # (one measurement at a time)
+            ( measure_cleanable > "$f.new" && mv "$f.new" "$f"
+              rmdir "$RUN/clean.lock"
+              [ "$(cat "$RUN/open" 2>/dev/null)" = disk ] && "$0" disk --push ) >/dev/null 2>&1 7>&- &
         fi
-    else
-        measure_cleanable | tee "$f"
     fi
 }
 
@@ -130,9 +132,15 @@ disk() {
     # measured again in the background while the last numbers are shown)
     local cache pkgs orphans
     read -r cache pkgs orphans < <(cleanable)
-    jq -c --arg cache "$(human "${cache:-0}")" --argjson cache_b "${cache:-0}" \
-        --arg pkgs "$(human "${pkgs:-0}")" --argjson pkgs_b "${pkgs:-0}" --argjson orphans "${orphans:-0}" \
-        --arg total "$(human $(( ${cache:-0} + ${pkgs:-0} )))" \
+    local c_txt p_txt t_txt
+    if [ "$cache" = - ]; then            # (not measured yet: "…" until it is)
+        c_txt="…"; p_txt="…"; t_txt="…"; cache=0; pkgs=0; orphans=0
+    else
+        c_txt=$(human "${cache:-0}"); p_txt=$(human "${pkgs:-0}"); t_txt=$(human $(( ${cache:-0} + ${pkgs:-0} )))
+    fi
+    jq -c --arg cache "$c_txt" --argjson cache_b "${cache:-0}" \
+        --arg pkgs "$p_txt" --argjson pkgs_b "${pkgs:-0}" --argjson orphans "${orphans:-0}" \
+        --arg total "$t_txt" \
         '{disks: ., cache: $cache, cache_b: $cache_b, pkgs: $pkgs, pkgs_b: $pkgs_b, orphans: $orphans, total: $total}' "$RUN/disks.json"
 }
 

@@ -117,5 +117,8 @@ done &
 # Desktop widgets: clock, what's playing, weather (Control Center > Appearance)
 DesktopWidgets &
 
+# Storage's clean-up sizes, measured once now so its dropdown opens at once
+(sleep 20; BarPanelData disk >/dev/null 2>&1) &
+
 # Your startup apps (Control Center > Apps)
 Startup &
