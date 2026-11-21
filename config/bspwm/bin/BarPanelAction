@@ -26,6 +26,15 @@ patch() { # var jq-filter
 }
 int() { printf '%.0f' "$1" 2>/dev/null || echo 0; }
 
+# Switches move the moment they're clicked; the change itself (a radio
+# powering up...) can take a second. Until it's done, a "hold" file makes
+# the dropdown's own refresh keep showing the new position (BarPanelData).
+flip() { # var field value
+    mkdir -p "$RUN"; echo "$3" > "$RUN/hold.$1.$2"
+    patch "$1" ".$2 = $3"
+}
+settled() { rm -f "$RUN"/hold.*; }
+
 case "$1" in
     vol-set)  v=$(int "$2"); pamixer --set-volume "$v" --unmute
               patch bp_sound ".vol = $v | .muted = false" ;;
@@ -41,11 +50,13 @@ case "$1" in
     # Warmer screen colours (stays on after a restart: bspwmrc runs night-restore)
     night)
         if [ -f "$SAVED/nightlight" ]; then
+            flip bp_battery night false
             rm -f "$SAVED/nightlight"; redshift -x >/dev/null 2>&1
         else
+            flip bp_battery night true
             mkdir -p "$SAVED"; touch "$SAVED/nightlight"; redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1
         fi
-        push battery ;;
+        settled ;;
     night-restore)
         [ -f "$SAVED/nightlight" ] && redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1 ;;
 
@@ -54,42 +65,56 @@ case "$1" in
     awake)
         pid=$(cat "$RUN/awake.pid" 2>/dev/null)
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            flip bp_battery awake false
             kill -- "-$pid" 2>/dev/null; rm -f "$RUN/awake.pid"
         else
-            mkdir -p "$RUN"
+            flip bp_battery awake true
             setsid systemd-inhibit --what=sleep:idle:handle-lid-switch --mode=block \
                 --who="Keep awake" --why="Turned on in the battery menu" sleep infinity \
                 >/dev/null 2>&1 < /dev/null 7>&- 8>&- 9>&- &
             echo $! > "$RUN/awake.pid"
         fi
-        push battery ;;
+        settled ;;
 
     power-mode)
-        "$BIN/PowerMode" "$2" && patch bp_battery ".profile = \"$2\"" ;;
+        flip bp_battery profile "\"$2\""
+        "$BIN/PowerMode" "$2"; settled; push battery ;;   # (goes back if it didn't work)
 
     # Airplane mode: switch off every radio; turning it off brings back the
     # ones that were on before
     airplane)
         if rfkill -rn -o SOFT | grep -qvx blocked; then
+            flip bp_network airplane true; flip bp_network wifi_on false; flip bp_network bt_on false
             mkdir -p "$SAVED"
             { [ "$(nmcli radio wifi)" = enabled ] && echo wifi
               bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo bluetooth; } > "$SAVED/airplane-before"
             rfkill block all
         else
             before=$(cat "$SAVED/airplane-before" 2>/dev/null || printf 'wifi\nbluetooth\n')
+            flip bp_network airplane false
+            grep -qx wifi <<< "$before" && flip bp_network wifi_on true
+            grep -qx bluetooth <<< "$before" && flip bp_network bt_on true
             rfkill unblock all
             grep -qx wifi <<< "$before" && nmcli radio wifi on || nmcli radio wifi off
             sleep 1
             if grep -qx bluetooth <<< "$before"; then bluetoothctl power on; else bluetoothctl power off; fi >/dev/null 2>&1
         fi
-        push network ;;
+        settled; push network ;;
 
     wifi-toggle)
-        if [ "$(nmcli radio wifi)" = enabled ]; then nmcli radio wifi off; else nmcli radio wifi on; fi
-        push network; sleep 3; push network wifi ;;
+        if [ "$(nmcli radio wifi)" = enabled ]; then
+            flip bp_network wifi_on false; nmcli radio wifi off
+        else
+            flip bp_network wifi_on true; nmcli radio wifi on
+        fi
+        settled; push network; sleep 3; push network wifi ;;   # (networks show up after a few seconds)
     bt-toggle)
-        if bluetoothctl show | grep -q 'Powered: yes'; then bluetoothctl power off; else bluetoothctl power on; fi
-        sleep 0.5; push network bt ;;
+        if bluetoothctl show | grep -q 'Powered: yes'; then
+            flip bp_network bt_on false; bluetoothctl power off
+        else
+            flip bp_network bt_on true; bluetoothctl power on
+        fi >/dev/null 2>&1
+        settled; push network bt ;;
 
     view)
         # Fill the list before showing it (networks from the last scan), so

@@ -12,6 +12,17 @@ human() { # bytes -> "1.2 GB"
         printf (i <= 2 ? "%.0f %s" : "%.1f %s"), b, u[i] }'
 }
 
+# Switches that are still changing (BarPanelAction "flip"): keep showing
+# their new position. Holds older than 15s are left-overs and ignored.
+holds() { # var  (filters the JSON on stdin)
+    local f filter="." now; now=$(date +%s)
+    for f in "$RUN/hold.$1".*; do
+        [ -f "$f" ] && (( now - $(stat -c %Y "$f") < 15 )) || continue
+        filter+=" | .${f##*.} = $(cat "$f")"
+    done
+    jq -c "$filter"
+}
+
 # Friendlier names for common process names
 pretty() {
     case "$1" in
@@ -232,11 +243,12 @@ for a in "${@:2}"; do
 done
 case "$1" in
     cpu|memory|disk|sound|network|battery|wifi|bt)
+        out=$("$1" | holds "bp_$1")
         if [ "$PUSH" = 1 ]; then
             # Send straight to the open dropdown instead of waiting for its next poll
-            eww --no-daemonize -c "$HOME/.config/bspwm/eww" update "bp_$1=$("$1")" >/dev/null 2>&1
+            eww --no-daemonize -c "$HOME/.config/bspwm/eww" update "bp_$1=$out" >/dev/null 2>&1
         else
-            "$1"
+            echo "$out"
         fi ;;
     *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery|wifi|bt [--push] [--fast] [--rescan]" >&2; exit 1 ;;
 esac
