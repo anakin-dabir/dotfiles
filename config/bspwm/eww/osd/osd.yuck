@@ -1,0 +1,20 @@
+;; On-screen pop-up for volume, brightness and keyboard layout (bin/OSD).
+;; Shown near the bottom of the screen, gone 1.5 s after the last change.
+
+(defvar osd '{"icon":"","value":0,"text":"","bar":true,"off":false}')
+
+(defwidget osd-box []
+  (box :class "osd ${osd.off ? 'osd-off' : ''}" :space-evenly false :spacing 14
+    (label :class "osd-icon" :valign "center" :text {osd.icon})
+    (box :orientation "v" :valign "center" :space-evenly false :spacing 7 :hexpand true
+      (label :class "osd-text" :halign "start" :xalign 0 :limit-width 26 :text {osd.text})
+      (progress :class "osd-bar" :visible {osd.bar} :value {osd.value} :orientation "h"))
+    (label :class "osd-value" :valign "center" :visible {osd.bar} :text {osd.off ? "" : "${osd.value}"})))
+
+(defwindow osd
+  :geometry (geometry :x "0px" :y "-96px" :width "320px" :anchor "bottom center")
+  :stacking "overlay"
+  :wm-ignore true
+  :focusable false
+  :resizable false
+  (osd-box))

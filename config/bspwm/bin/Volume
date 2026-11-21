@@ -37,13 +37,8 @@ show_notification() {
     local vol
 
     vol=$(get_volume)
-    get_icon "$vol"
-
-    if [ "$vol" = "muted" ]; then
-        notify -i "$icon" "Volumen: muted"
-    else
-        notify -i "$icon" "Volumen: ${vol}%"
-    fi
+    # The on-screen pop-up (bin/OSD)
+    if [ "$vol" = "muted" ]; then OSD volume muted; else OSD volume "$vol"; fi
 }
 
 # Adjust volume
@@ -58,14 +53,11 @@ toggle_mute() {
     local vol
 
     pamixer --toggle-mute
-
     if [ "$(pamixer --get-mute)" = "true" ]; then
-        get_icon muted
-        notify -i "$icon" "Muted"
+        OSD volume muted
     else
         vol=$(get_volume)
-        get_icon "$vol"
-        notify -i "$icon" "Unmuted"
+        OSD volume "$vol"
     fi
 }
 

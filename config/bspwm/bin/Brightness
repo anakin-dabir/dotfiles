@@ -28,14 +28,9 @@ get_brightness() {
     brightnessctl i | extract_pct
 }
 
-send_notification() {
-    brightness="$1"
-    icon="$DIR/brightness.svg"
-
-    # The graphical bar comes from the int:value hint, dunst draws it itself.
-    dunstify "Brightness $brightness%" -i "$icon" -r 5555 -h int:value:"$brightness"
+send_notification() {      # (the on-screen pop-up, bin/OSD)
+    OSD brightness "$1"
 }
-
 adjust_brightness() {
     current="$(get_brightness)"
 

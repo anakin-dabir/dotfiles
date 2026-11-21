@@ -1,0 +1,46 @@
+// On-screen pop-up (bin/OSD): the theme's colours, font and corners.
+
+.osd {
+  font-family: $nc-font;
+  color: $fg;
+  background-color: rgba($bg, 0.94);
+  border: $nc-border;
+  border-radius: $nc-radius + 6px;
+  padding: 14px 18px;
+  margin: 4px;
+}
+.osd label {
+  font-family: $nc-font;
+  color: $fg;
+}
+.osd .osd-icon {
+  font-family: "Material Design Icons Desktop";
+  font-size: 26px;
+  min-width: 30px;
+  color: $nc-accent;
+}
+.osd-off .osd-icon {
+  color: rgba($fg, 0.45);
+}
+.osd .osd-text {
+  font-size: 12px;
+  font-weight: bold;
+}
+.osd .osd-value {
+  font-size: 15px;
+  font-weight: bold;
+  min-width: 34px;
+}
+.osd-bar trough {
+  min-height: 6px;
+  border-radius: 99px;
+  background-color: rgba($fg, 0.14);
+}
+.osd-bar progress {
+  min-height: 6px;
+  border-radius: 99px;
+  background-color: $nc-accent;
+}
+.osd-off .osd-bar progress {
+  background-color: rgba($fg, 0.35);
+}
