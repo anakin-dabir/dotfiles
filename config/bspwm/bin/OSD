@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# On-screen pop-up (eww/osd): a rounded box with an icon, a bar and the value,
-# near the bottom of the screen; gone 1.5 s after the last change.
+# On-screen pop-up (eww/osd): a pill that fills with the accent colour up to the level,
+# icon and value on top; near the bottom of the screen, gone 1.5 s after the last change.
 #
 #   OSD volume [N|muted]      OSD brightness N      OSD layout "English (US)"
 #   OSD mic [N|muted]

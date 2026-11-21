@@ -1,46 +1,51 @@
-// On-screen pop-up (bin/OSD): the theme's colours, font and corners.
+// On-screen pop-up (bin/OSD): a pill filling with the accent colour.
+// Colours, font and accent come from the theme (colors.scss).
 
 .osd {
-  font-family: $nc-font;
-  color: $fg;
-  background-color: rgba($bg, 0.94);
-  border: $nc-border;
-  border-radius: $nc-radius + 6px;
-  padding: 14px 18px;
-  margin: 4px;
+  margin: 10px;
+}
+
+// the pill (trough) and how full it is (progress)
+.osd-fill trough {
+  min-height: 50px;
+  border-radius: 999px;
+  background-color: rgba($bg, 0.92);
+  border: 1px solid rgba($fg, 0.10);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.osd-fill progress {
+  min-height: 50px;
+  border-radius: 999px;
+  background-image: linear-gradient(90deg, rgba($nc-accent, 0.55), rgba($nc-accent, 0.95));
+}
+.osd-off .osd-fill progress {
+  background-image: none;
+  background-color: rgba($fg, 0.18);
+}
+
+.osd-content {
+  padding: 0 20px 0 18px;
 }
 .osd label {
   font-family: $nc-font;
-  color: $fg;
+  color: #ffffff;
 }
 .osd .osd-icon {
   font-family: "Material Design Icons Desktop";
-  font-size: 26px;
-  min-width: 30px;
-  color: $nc-accent;
+  font-size: 22px;
 }
 .osd-off .osd-icon {
-  color: rgba($fg, 0.45);
+  color: rgba(255, 255, 255, 0.5);
 }
-.osd .osd-text {
-  font-size: 12px;
+.osd-plain .osd-icon {
+  color: $nc-accent;
+}
+.osd-plain .osd-text {
+  color: $fg;
+  font-size: 13px;
   font-weight: bold;
 }
 .osd .osd-value {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: bold;
-  min-width: 34px;
-}
-.osd-bar trough {
-  min-height: 6px;
-  border-radius: 99px;
-  background-color: rgba($fg, 0.14);
-}
-.osd-bar progress {
-  min-height: 6px;
-  border-radius: 99px;
-  background-color: $nc-accent;
-}
-.osd-off .osd-bar progress {
-  background-color: rgba($fg, 0.35);
 }
