@@ -19,10 +19,11 @@ from .pages.dropdowns import DropdownsPage
 from .pages.network import NetworkPage
 from .pages.notifications import NotificationsPage
 from .pages.power import PowerPage
+from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
 
 PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, DisplayPage, SoundPage, NetworkPage,
-         BluetoothPage]
+         BluetoothPage, ShortcutsPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
 PAGES += [PowerPage, NotificationsPage, AboutPage]
@@ -45,6 +46,7 @@ KEYWORDS = {
     "power": "battery sleep suspend lock power mode saver performance lid",
     "notifications": "do not disturb dunst popups",
     "about": "system version kernel computer",
+    "shortcuts": "keys keybindings hotkeys sxhkd keyboard shortcuts",
 }
 
 
