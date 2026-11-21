@@ -169,8 +169,19 @@ def show_files(name):
 
 # ----- what was chosen -----
 
+def detach():
+    """Whatever is started from here must not keep rofi's pipe open: rofi waits
+    for it to close, with the keyboard grabbed (it looked frozen)."""
+    devnull = os.open(os.devnull, os.O_RDWR)
+    sys.stdout.flush()
+    for fd in (0, 1, 2):
+        os.dup2(devnull, fd)
+
+
 def act(info, text):
     kind, _, value = info.partition(":")
+    if kind != "files":             # (files: rofi stays open with the list we print)
+        detach()
     if kind == "app":
         app = DesktopAppInfo.new(value)
         if app:
