@@ -84,6 +84,10 @@ Print
 shift + Print
 	flameshot gui
 
+# Text from the screen (OCR): select an area, its text is copied
+ctrl + Print
+	Capture text
+
 # PowerMenu
 super + alt + p
     OpenApps --powermenu

@@ -575,7 +575,7 @@
           (label :class "bp-sub" :halign "start" :xalign 0 :limit-width 28 :visible {bp_media.artist != ""} :text {bp_media.artist})))
       (box :orientation "v" :space-evenly false :spacing 2 :visible {bp_media.seek}
         (eventbox :cursor "pointer"
-          (scale :class "bp-slider bp-seek" :hexpand true :min 0 :max 101 :value {bp_media.pct}
+          (scale :class "bp-seek" :hexpand true :min 0 :max 101 :value {bp_media.pct}
                  :onchange "~/.config/bspwm/bin/BarPanelAction media seek {} &"))
         (box
           (label :class "bp-media-time" :halign "start" :text {bp_media.pos})
@@ -656,11 +656,12 @@
 (defwidget bp-capture-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰄀" :title "Screenshot" :sub "Saved, and copied to the clipboard" :value "")
-    (box :space-evenly true :spacing 8
+    (box :space-evenly true :spacing 6
       (bp-capture-tile :icon "󰍹" :text "Screen" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture screen &")
       (bp-capture-tile :icon "󰆞" :text "Area" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture area &")
       (bp-capture-tile :icon "󰖯" :text "Window" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture window &")
-      (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &"))
+      (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &")
+      (bp-capture-tile :icon "󱄺" :text "Text" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture text &"))
     (box :class "bp-card bp-rec ${bp_capture.recording ? 'bp-rec-on' : ''}" :space-evenly false :spacing 12
       (label :class "bp-rec-dot" :valign "center" :text "󰑊")
       (box :orientation "v" :space-evenly false :hexpand true :valign "center"

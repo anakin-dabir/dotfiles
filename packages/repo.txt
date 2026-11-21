@@ -191,3 +191,5 @@ lm_sensors
 libpulse
 xdg-desktop-portal
 xdg-desktop-portal-gtk
+tesseract
+tesseract-data-eng

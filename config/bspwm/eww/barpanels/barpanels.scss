@@ -659,7 +659,7 @@ $bp-icons: "Material Design Icons Desktop";
 
 // ----- screenshot -----
 .bp-tile {
-  padding: 12px 4px 10px 4px;
+  padding: 12px 0 10px 0;
   border-radius: $nc-card-radius;
   background-color: rgba($fg, 0.05);
 }
@@ -691,4 +691,30 @@ $bp-icons: "Material Design Icons Desktop";
   border-radius: 8px;
   background-size: cover;
   background-position: center;
+}
+
+// Media progress: a thin line; the knob shows when you point at it (click to jump)
+.bp-seek trough {
+  min-height: 4px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($fg, 0.14);
+}
+.bp-seek highlight {
+  border-radius: $nc-pill-radius;
+  background-color: $fg;
+}
+.bp-seek slider {
+  min-width: 12px;
+  min-height: 12px;
+  margin: -4px 0;
+  border-radius: $nc-pill-radius;
+  background-color: transparent;
+  box-shadow: none;
+}
+.bp-seek:hover highlight {
+  background-color: $nc-accent;
+}
+.bp-seek:hover slider {
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }

@@ -364,8 +364,11 @@ media() {
 
 # Bar text: "Title · Artist" (nothing when nothing is playing)
 media_bar() {
-    media | jq -r 'if .has then ((if .playing then "" else "󰏤 " end) + .title + (if .artist != "" then " · " + .artist else "" end))
-                   | if length > 32 then .[0:31] + "…" else . end else "" end'
+    local blue; blue=$(sed -n 's/^blue *= *//p' "$HOME/.config/bspwm/bars/colors.ini" | head -1)
+    media | jq -r --arg c "${blue:-#0A84FF}" 'if .has then
+        "%{F\($c)}" + (if .playing then "󰝚" else "󰏤" end) + "%{F-} "
+        + ((.title + (if .artist != "" then " · " + .artist else "" end)) | if length > 32 then .[0:31] + "…" else . end)
+      else "" end'
 }
 
 # ----- weather (Open-Meteo: no account or key needed) -----
