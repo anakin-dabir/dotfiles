@@ -43,9 +43,15 @@ class DropdownsPage(Page):
 
         top = group(self, description="The panels that open when you click an item on the bar. Pick one, "
                                       "then switch its sections on or off and change their order. Saved right away.")
-        # One button per dropdown, in rows (too many for one strip)
-        self.tabs = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, column_spacing=4,
-                                row_spacing=4, min_children_per_line=7, max_children_per_line=7, margin_top=4)
+        # One button per dropdown, in one row that scrolls sideways
+        self.tabs = Gtk.Box(spacing=6, margin_bottom=8)
+        self.tab_scroll = Gtk.ScrolledWindow(child=self.tabs, margin_top=4,
+                                             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
+                                             vscrollbar_policy=Gtk.PolicyType.NEVER)
+        # (the mouse wheel scrolls it sideways too)
+        wheel = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL)
+        wheel.connect("scroll", self._tabs_wheel)
+        self.tab_scroll.add_controller(wheel)
         self.tab_buttons = {}
         first = None
         for dd, title, _units in ddconfig.DROPDOWNS:
@@ -58,7 +64,7 @@ class DropdownsPage(Page):
             b.connect("toggled", lambda btn, d=dd: btn.get_active() and self._pick(d))
             self.tabs.append(b)
             self.tab_buttons[dd] = b
-        top.add(self.tabs)
+        top.add(self.tab_scroll)
 
         body = group(self)
         row = Gtk.Box(spacing=20)
@@ -103,6 +109,25 @@ class DropdownsPage(Page):
         if name and name != self.current:
             self.current = name
             self.build()
+            self._show_tab(name)
+
+    def _tabs_wheel(self, _c, _dx, dy):
+        adj = self.tab_scroll.get_hadjustment()
+        adj.set_value(adj.get_value() + dy * 60)
+        return True
+
+    def _show_tab(self, name):
+        """Scroll the row so the picked tab is in view."""
+        b = self.tab_buttons.get(name)
+        ok, bounds = b.compute_bounds(self.tabs) if b else (False, None)
+        if not ok:
+            return
+        adj = self.tab_scroll.get_hadjustment()
+        x, w = bounds.get_x(), bounds.get_width()
+        if x < adj.get_value():
+            adj.set_value(x - 6)
+        elif x + w > adj.get_value() + adj.get_page_size():
+            adj.set_value(x + w - adj.get_page_size() + 6)
 
     def _missing(self):
         """Sections this computer never shows (no picture of them in a full

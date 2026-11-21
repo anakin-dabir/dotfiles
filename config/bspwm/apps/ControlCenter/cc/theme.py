@@ -131,7 +131,7 @@ window, window label, window entry, window button {{ font-family: "{font}", "Adw
 .cc-swatch {{ padding: 4px; border-radius: 999px; min-width: 0; min-height: 0; }}
 .cc-ddmock {{ background-color: {_hex(bg)}; border: 1px solid {_hex(_mix(bg, fg, 0.14))}; border-radius: {radius + 4}px; padding: 12px; }}
 .cc-mockbar {{ background-color: {_hex(_mix(bg, fg, 0.10))}; border-radius: 8px; padding: 5px 8px; }}
-.cc-ddtab {{ padding: 6px 2px; font-weight: bold; }}
+.cc-ddtab {{ padding: 6px 14px; font-weight: bold; }}
 .cc-ddtab:checked {{ background-color: var(--accent-bg-color); color: var(--accent-fg-color); }}
 .cc-chip {{ background-color: {_hex(_mix(bg, fg, 0.16))}; border-radius: 6px; padding: 3px 7px; font-size: 0.82em; }}
 .cc-hero-title {{ font-size: 1.6em; font-weight: 800; }}
