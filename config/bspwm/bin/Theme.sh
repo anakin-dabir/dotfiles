@@ -96,3 +96,6 @@ unset module
 
 # Finally load the bar
 . "$HOME"/.config/bspwm/bars/"$main_bar"/Bar.bash
+
+# The dock keeps its space (the theme just set the window padding again)
+"$HOME/.config/bspwm/bin/Dock" &

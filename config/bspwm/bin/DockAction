@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# The dock's clicks: DockAction open ID [WINDOW] | pin ID | unpin ID
+CFG="$HOME/.config/bspwm/config/dock.json"
+case "$1" in
+    open)
+        if [ -n "$3" ]; then
+            # running: go to its window (and its workspace); again: the next one of the same app
+            focused=$(bspc query -N -n focused.window)
+            if [ "$(printf '%d' "$focused" 2>/dev/null)" = "$(printf '%d' "$3" 2>/dev/null)" ]; then
+                bspc node "$3" -g hidden=on 2>/dev/null       # (focused already: hide it, like a dock)
+            else
+                bspc node "$3" -g hidden=off 2>/dev/null; bspc node "$3" -f
+            fi
+        elif [[ "$2" == *.desktop ]]; then
+            setsid gtk-launch "${2%.desktop}" >/dev/null 2>&1 &
+        fi ;;
+    pin)
+        jq --arg id "$2" '.pinned = ((.pinned // []) + [$id] | unique)' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG" ;;
+    unpin)
+        jq --arg id "$2" '.pinned = ((.pinned // []) - [$id])' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG" ;;
+esac
+# (the dock updates by itself on window changes; pins: nudge it)
+[ "$1" != open ] && bspc node -f focused >/dev/null 2>&1
+exit 0

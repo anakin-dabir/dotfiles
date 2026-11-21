@@ -1,0 +1,32 @@
+// The dock: a frosted bar with the theme's colours and corners.
+
+.dock {
+  padding: 8px 10px 4px 10px;
+  border-radius: $nc-radius + 8px;
+  background-color: rgba($bg, 0.78);
+  border: 1px solid rgba($fg, 0.10);
+  margin: 6px;
+}
+.dock-app {
+  padding: 6px 6px 3px 6px;
+  border-radius: $nc-radius + 2px;
+}
+.dock-app:hover {
+  background-color: rgba($fg, 0.10);
+}
+.dock-focused {
+  background-color: rgba($nc-accent, 0.18);
+}
+.dock-dot {
+  min-width: 5px;
+  min-height: 5px;
+  border-radius: 99px;
+  background-color: transparent;
+}
+.dock-dot-on {
+  background-color: rgba($fg, 0.75);
+}
+.dock-focused .dock-dot-on {
+  min-width: 14px;
+  background-color: $nc-accent;
+}

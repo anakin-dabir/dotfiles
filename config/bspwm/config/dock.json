@@ -1,0 +1,13 @@
+{
+  "on": true,
+  "pinned": [
+    "kitty.desktop",
+    "Alacritty.desktop",
+    "brave-browser-beta.desktop",
+    "google-chrome.desktop",
+    "thunar.desktop",
+    "code-oss.desktop",
+    "control-center.desktop"
+  ],
+  "reserve": true
+}

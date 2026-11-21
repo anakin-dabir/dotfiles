@@ -13,6 +13,7 @@ from ..preview import current_wallpaper
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
 DAYNIGHT = os.path.join(BSPDIR, "config", "daynight.json")
 WIDGETS = os.path.join(BSPDIR, "config", "widgets.json")
+DOCK = os.path.join(BSPDIR, "config", "dock.json")
 CORNERS = [("top left", "Top left"), ("top right", "Top right"), ("bottom left", "Bottom left"),
            ("bottom right", "Bottom right")]
 
@@ -124,6 +125,26 @@ class AppearancePage(Page):
         self.dw_corner.connect("notify::selected", lambda r, _p: self._dw_set(corner=CORNERS[r.get_selected()][0]))
         dw.add(self.dw_corner)
         self._dw_load()
+
+        # The dock (bin/Dock, config/dock.json)
+        self.dock = group(self, "Dock", "Your apps at the bottom of the screen. Click: open or go to it; "
+                                        "right click: pin or unpin.")
+        self.dock_on = Adw.SwitchRow(title="Show the dock")
+        self.dock_on.add_prefix(Gtk.Image.new_from_icon_name("view-app-grid-symbolic"))
+        self.dock_on.connect("notify::active", lambda r, _p: self._dock_set(on=r.get_active()))
+        self.dock.add(self.dock_on)
+        self.dock_reserve = Adw.SwitchRow(title="Keep windows clear of it", subtitle="Off: windows can go under it")
+        self.dock_reserve.connect("notify::active", lambda r, _p: self._dock_set(reserve=r.get_active()))
+        self.dock.add(self.dock_reserve)
+        self.dock_pins = Adw.ExpanderRow(title="Pinned apps", subtitle="Always in the dock")
+        self.dock.add(self.dock_pins)
+        self.dock_pin_rows = []
+        add = Gtk.MenuButton(icon_name="list-add-symbolic", tooltip_text="Pin an app", valign=Gtk.Align.CENTER)
+        add.add_css_class("flat")
+        from .apps import app_picker
+        add.set_popover(app_picker(lambda a: self._dock_pin(a.get_id())))
+        self.dock_pins.add_suffix(add)
+        self._dock_load()
 
         # How the wallpaper is chosen (the theme's ENGINE)
         modes = group(self, "Wallpaper mode")
@@ -264,6 +285,84 @@ class AppearancePage(Page):
         run_quiet([tool("WallApply")], lambda _ok: self.mark())   # also stops a slideshow / video
         self.load_mode()
         self.mark()
+
+    # ----- dock -----
+
+    def _dock(self):
+        try:
+            with open(DOCK) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            c = {}
+        return {"on": bool(c.get("on", False)), "reserve": bool(c.get("reserve", True)),
+                "pinned": list(c.get("pinned", []))}
+
+    def _dock_load(self):
+        c = self._dock()
+        self.quietly(lambda: (self.dock_on.set_active(c["on"]), self.dock_reserve.set_active(c["reserve"])))
+        self.dock_reserve.set_sensitive(c["on"])
+        for r in self.dock_pin_rows:
+            self.dock_pins.remove(r)
+        self.dock_pin_rows.clear()
+        for i, app_id in enumerate(c["pinned"]):
+            app = Gio.DesktopAppInfo.new(app_id)
+            if app is None:
+                continue
+            r = Adw.ActionRow(title=GLib.markup_escape_text(app.get_name()))
+            if app.get_icon():
+                r.add_prefix(Gtk.Image.new_from_gicon(app.get_icon()))
+            up = Gtk.Button(icon_name="go-up-symbolic", valign=Gtk.Align.CENTER, tooltip_text="Move left")
+            up.add_css_class("flat")
+            up.set_sensitive(i > 0)
+            up.connect("clicked", lambda _b, i=i: self._dock_move(i))
+            rm = Gtk.Button(icon_name="list-remove-symbolic", valign=Gtk.Align.CENTER, tooltip_text="Unpin")
+            rm.add_css_class("flat")
+            rm.connect("clicked", lambda _b, a=app_id: self._dock_unpin(a))
+            r.add_suffix(up)
+            r.add_suffix(rm)
+            self.dock_pins.add_row(r)
+            self.dock_pin_rows.append(r)
+        self.dock_pins.set_subtitle(f"{len(self.dock_pin_rows)} apps, always in the dock")
+
+    def _dock_save(self, c):
+        GLib.timeout_add(150, lambda: (run_quiet(["bspc", "node", "-f", "focused"]), False)[1])   # (the dock looks again)
+        try:
+            with open(DOCK, "w") as f:
+                json.dump(c, f, indent=2)
+                f.write("\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return False
+        return True
+
+    def _dock_set(self, **changes):
+        if self._updating:
+            return
+        c = self._dock()
+        c.update(changes)
+        if self._dock_save(c):
+            self._dock_load()
+            run_quiet([tool("Dock")])
+
+    def _dock_pin(self, app_id):
+        c = self._dock()
+        if app_id not in c["pinned"]:
+            c["pinned"].append(app_id)
+            if self._dock_save(c):
+                self._dock_load()
+
+    def _dock_unpin(self, app_id):
+        c = self._dock()
+        c["pinned"] = [p for p in c["pinned"] if p != app_id]
+        if self._dock_save(c):
+            self._dock_load()
+
+    def _dock_move(self, i):
+        c = self._dock()
+        if 0 < i < len(c["pinned"]):
+            c["pinned"][i - 1], c["pinned"][i] = c["pinned"][i], c["pinned"][i - 1]
+            if self._dock_save(c):
+                self._dock_load()
 
     # ----- desktop widgets -----
 

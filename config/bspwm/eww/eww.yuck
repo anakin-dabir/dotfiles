@@ -5,3 +5,4 @@
 (include "barpanels/barpanels.yuck")
 (include "osd/osd.yuck")
 (include "desktop/desktop.yuck")
+(include "dock/dock.yuck")
