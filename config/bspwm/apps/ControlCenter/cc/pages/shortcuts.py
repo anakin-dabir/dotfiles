@@ -150,12 +150,10 @@ class ShortcutsPage(Page):
         self.groups = []
         self.rows = []
         self.key = None
-        bottom = group(self, "More")
-        add = Adw.ActionRow(title="Add your own shortcut", subtitle="Any keys, any command", activatable=True)
-        add.add_prefix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
-        add.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
-        add.connect("activated", lambda *_: self._add())
-        bottom.add(add)
+        # "+" at the top right of the window: add your own shortcut
+        self.header_widget = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add your own shortcut")
+        self.header_widget.connect("clicked", lambda *_: self._add())
+        bottom = group(self)
         self.reset_row = Adw.ActionRow(title="Reset all shortcuts", subtitle="Back to how they were before any change here")
         self.reset_row.add_suffix(text_button("Reset…", self._reset))
         bottom.add(self.reset_row)
@@ -168,6 +166,7 @@ class ShortcutsPage(Page):
         acts = sk.actions()
         key = repr([(a.name, a.keys, a.on, a.all_keys) for a in acts])
         self.reset_row.set_visible(sk.has_original())
+        self.bottom.set_visible(sk.has_original())
         if key == self.key:
             return
         self.key = key

@@ -92,6 +92,9 @@ class Window(Adw.ApplicationWindow):
                                               tooltip_text="Show or hide the preview")
         self.sticky_toggle.connect("toggled", lambda *_: self._show_sticky())
         header.pack_end(self.sticky_toggle)
+        # A page's own button(s) at the top right (e.g. Shortcuts' "+")
+        self.page_header = Gtk.Box(spacing=6)
+        header.pack_end(self.page_header)
         content_view.set_content(self.toasts)
 
         # "Unsaved changes · Discard · Apply" (pages that collect changes)
@@ -340,6 +343,13 @@ class Window(Adw.ApplicationWindow):
                 self.sticky.remove(current)
             widget.set_hexpand(True)
             self.sticky.append(widget)
+        current_head = self.page_header.get_first_child()
+        head = getattr(page, "header_widget", None)
+        if current_head is not head:
+            if current_head is not None:
+                self.page_header.remove(current_head)
+            if head is not None:
+                self.page_header.append(head)
         self._show_sticky()
         self.split.set_show_content(True)
         self.update_pending()
