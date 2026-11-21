@@ -11,6 +11,17 @@
 read -r RICE < "$HOME"/.config/bspwm/.rice
 # Load theme configuration
 . "$HOME"/.config/bspwm/rices/"$RICE"/theme-config.bash
+
+# Accent from the wallpaper (Control Center > Customize > Colors), on top of
+# the theme's own: window borders, menus, dropdowns and the bar's icons
+_wall_accent=""
+if [ "${WALL_ACCENT:-off}" = on ]; then
+    _wall_accent=$("$HOME/.config/bspwm/bin/WallAccent" 2>/dev/null)
+    if [ -n "$_wall_accent" ]; then
+        FOCUSED_BC="$_wall_accent"
+        rofi_selected="${_wall_accent}F0"
+    fi
+fi
 # Path to modules dir
 MODULE_DIR="$HOME/.config/bspwm/config/modules"
 
@@ -74,7 +85,12 @@ _write() {
 # Load all the modules
 for module in "$MODULE_DIR"/*.sh; do
     [ -e "$module" ] || continue
+    if [ -n "$_wall_accent" ] && [ "${module##*/}" = 02-bar.sh ]; then
+        # the bar's icons take the accent too (only the bar: terminals keep their blue)
+        _theme_blue=$blue; blue=$_wall_accent; . "$module"; blue=$_theme_blue
+    else
         . "$module"
+    fi
 done
 unset module
 

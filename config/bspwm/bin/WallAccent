@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""An accent colour from the wallpaper: its most vivid colour that's common
+enough to matter, kept bright enough to read. Prints #RRGGBB, or nothing
+when the wallpaper has no real colour (black and white, grey...).
+
+    WallAccent [IMAGE]      (default: the wallpaper on screen, ~/.fehbg)
+"""
+
+import colorsys
+import os
+import re
+import sys
+
+from PIL import Image
+
+
+def wallpaper():
+    try:
+        with open(os.path.expanduser("~/.fehbg")) as f:
+            m = re.search(r"--bg-\w+\s+'([^']+)'", f.read())
+            return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+def accent(path):
+    img = Image.open(path).convert("RGB")
+    img.thumbnail((96, 96))
+    buckets = {}                                 # hue bucket -> [weight, r, g, b]
+    data = img.tobytes()
+    for i in range(0, len(data), 3):
+        r, g, b = data[i], data[i + 1], data[i + 2]
+        h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        if s < 0.30 or v < 0.25:                 # greys, near-black: not a colour
+            continue
+        w = s * s * v                            # vivid and bright counts most
+        k = int(h * 24)
+        e = buckets.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+        e[0] += w
+        e[1] += r * w
+        e[2] += g * w
+        e[3] += b * w
+    total = sum(e[0] for e in buckets.values())
+    if not buckets or total < 0.02 * img.width * img.height:
+        return None                              # (hardly any colour)
+    w, r, g, b = max(buckets.values(), key=lambda e: e[0])
+    h, s, v = colorsys.rgb_to_hsv(r / w / 255, g / w / 255, b / w / 255)
+    s = min(max(s, 0.55), 0.90)                  # readable on dark and light
+    v = min(max(v, 0.72), 0.95)
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    # dark colours (deep blue, purple) brighter until they read on a dark background
+    while 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.30 and (v < 1 or s > 0.35):
+        v, s = min(1.0, v + 0.04), max(0.35, s - 0.03)
+        r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return "#{:02X}{:02X}{:02X}".format(round(r * 255), round(g * 255), round(b * 255))
+
+
+if __name__ == "__main__":
+    path = sys.argv[1] if len(sys.argv) > 1 else wallpaper()
+    if path and os.path.isfile(path):
+        try:
+            a = accent(path)
+        except (OSError, ValueError):
+            a = None
+        if a:
+            print(a)

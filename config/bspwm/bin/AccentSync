@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The accent follows the wallpaper (Control Center > Customize > Colors >
+# Accent from the wallpaper): after a wallpaper change, or when that switch
+# changes, only the colours are written again (borders, bar, menus,
+# dropdowns) - not the whole theme.
+#
+#   AccentSync           when the accent should change (WallApply runs it)
+#   AccentSync --force   write the colours even if the accent is the same
+
+RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"; mkdir -p "$RUN"
+read -r RICE < "$HOME/.config/bspwm/.rice"
+. "$HOME/.config/bspwm/rices/$RICE/theme-config.bash"
+MODULE_DIR="$HOME/.config/bspwm/config/modules"
+
+new=""
+[ "${WALL_ACCENT:-off}" = on ] && new=$("$HOME/.config/bspwm/bin/WallAccent" 2>/dev/null)
+last=$(cat "$RUN/wall-accent" 2>/dev/null)
+[ "$1" != --force ] && [ "$new" = "$last" ] && exit 0
+echo "$new" > "$RUN/wall-accent"
+
+if [ -n "$new" ]; then
+    FOCUSED_BC="$new"; rofi_selected="${new}F0"
+fi
+_write() { local t=$1 tmp; tmp=$(mktemp "$(dirname "$t")/.tmp.XXXXXX") && cat > "$tmp" && mv -f "$tmp" "$t"; }
+. "$MODULE_DIR/01-bspwm.sh"
+_theme_blue=$blue; [ -n "$new" ] && blue=$new; . "$MODULE_DIR/02-bar.sh"; blue=$_theme_blue
+. "$MODULE_DIR/04-rofi.sh"
+. "$MODULE_DIR/06-eww.sh" >/dev/null 2>&1
+[ -f "$MODULE_DIR/06-jgmenu.sh" ] && . "$MODULE_DIR/06-jgmenu.sh"
+polybar-msg cmd restart >/dev/null 2>&1
+eww --no-daemonize -c "$HOME/.config/bspwm/eww" reload >/dev/null 2>&1
+exit 0

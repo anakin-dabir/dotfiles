@@ -122,3 +122,6 @@ ANIMATED_WALL="$HOME/.config/bspwm/config/assets/animated_wall.mp4"
 
 # Added by Control Center
 LAUNCHER_STYLE="4"
+
+# Added by Control Center
+WALL_ACCENT="off"

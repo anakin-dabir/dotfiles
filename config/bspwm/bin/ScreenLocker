@@ -39,7 +39,10 @@ setting() { jq -r --arg k "$1" --arg d "$2" '.[$k] // $d | tostring' "$CFG" 2>/d
 read -r RICE < "$BSPDIR/.rice"
 THEME="$BSPDIR/rices/$RICE/theme-config.bash"
 var() { sed -n "s/^$1=[\"']\\{0,1\\}\\([^\"']*\\)[\"']\\{0,1\\}.*/\\1/p" "$THEME" | head -1; }
-ACCENT=$(var FOCUSED_BC); ACCENT=${ACCENT#\#}; ACCENT=${ACCENT:0:6}; [ -n "$ACCENT" ] || ACCENT=0A84FF
+# (the accent in use: the dropdowns' one, which follows the wallpaper when that's on)
+ACCENT=$(sed -n 's/^\$nc-accent: *#\([0-9A-Fa-f]\{6\}\).*/\1/p' "$BSPDIR/eww/colors.scss" 2>/dev/null | head -1)
+[ -n "$ACCENT" ] || { ACCENT=$(var FOCUSED_BC); ACCENT=${ACCENT#\#}; ACCENT=${ACCENT:0:6}; }
+[ -n "$ACCENT" ] || ACCENT=0A84FF
 RED=$(var red); RED=${RED#\#}; RED=${RED:0:6}; [ -n "$RED" ] || RED=FF453A
 FONT=$(var dunst_font); FONT=$(echo "$FONT" | sed 's/ [0-9.]*$//'); [ -n "$FONT" ] || FONT="Sans"
 

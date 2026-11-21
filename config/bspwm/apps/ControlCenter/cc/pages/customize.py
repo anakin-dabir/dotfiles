@@ -11,7 +11,7 @@ from .. import launchershots, rice
 from ..pickers import ColorButton, FontButton
 from ..preview import DesktopPreview
 from ..samples import SampleStrip, cursor_samples, gtk_theme_preview, icon_samples
-from ..common import BSPDIR, HOME, Page, current_rice, group, launch, read_file, run_quiet, text_button, tool
+from ..common import BSPDIR, HOME, Page, current_rice, group, launch, read_file, run, run_quiet, text_button, tool
 
 COLORS = [
     ("bg", "Background", "Windows, bar and menus"),
@@ -96,6 +96,12 @@ class CustomizePage(Page):
                                        margin_start=12, margin_end=12)
 
         colors = group(self, "Colors")
+        # Accent taken from the wallpaper (bin/WallAccent), saved right away
+        self.wall_accent = Adw.SwitchRow(title="Accent from the wallpaper",
+                                         subtitle="Borders, bar icons, menus and dropdowns take its main colour")
+        self.wall_accent.add_prefix(Gtk.Image.new_from_icon_name("color-select-symbolic"))
+        self.wall_accent.connect("notify::active", self._wall_accent)
+        colors.add(self.wall_accent)
         for var, title, sub in COLORS:
             colors.add(self._color_row(var, title, sub))
         pal = Adw.ExpanderRow(title="Color palette", subtitle="Bar icons, terminal colours, warnings")
@@ -247,6 +253,37 @@ class CustomizePage(Page):
                 return False
             return True
         GLib.timeout_add_seconds(2, check)
+
+    # ----- accent from the wallpaper -----
+
+    def _wall_accent(self, row, _p):
+        if self._updating:
+            return
+        on = row.get_active()
+        try:
+            rice.set_theme_vars({"WALL_ACCENT": "on" if on else "off"}, self.rice)
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self.vals["WALL_ACCENT"] = "on" if on else "off"
+        run_quiet([tool("AccentSync"), "--force"])
+        self._wall_accent_show()
+        self.toast("The accent follows your wallpaper" if on else "The theme's own accent is back")
+
+    def _wall_accent_show(self):
+        on = rice.theme_vars(self.rice).get("WALL_ACCENT", "off") == "on"
+        self.quietly(lambda: self.wall_accent.set_active(on))
+
+        def got(ok, out, _e):
+            color = out.strip() if ok else ""
+            if on and color:
+                self.wall_accent.set_subtitle(f"Now {color}, from your wallpaper. The Accent colour below is the theme's own.")
+            elif on:
+                self.wall_accent.set_subtitle("Your wallpaper has no strong colour: the theme's accent is used")
+            else:
+                self.wall_accent.set_subtitle("Borders, bar icons, menus and dropdowns take its main colour"
+                                              + (f" (it would be {color})" if color else ""))
+        run([tool("WallAccent")], got)
 
     # ----- rows -----
 
@@ -449,6 +486,7 @@ class CustomizePage(Page):
                     if val:
                         w.set_desc(Pango.FontDescription.from_string(val))
         self.quietly(put)
+        self._wall_accent_show()
         self._load_general()
         self._show_preview()
         self.window.update_pending()
