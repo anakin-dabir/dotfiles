@@ -31,7 +31,8 @@ PAGES += [PowerPage, NotificationsPage, AboutPage]
 KEYWORDS = {
     "appearance": "theme rice wallpaper background picture slideshow",
     "customize": "colours colors accent font size border gap corners rounded shadow blur fade "
-                 "animations transparency opacity terminal gtk icons cursor picom vsync",
+                 "animations transparency opacity terminal gtk icons cursor picom vsync "
+                 "app menu launcher rofi spotlight launchpad",
     "bar": "polybar modules items widgets panel top bar",
     "dropdowns": "panels menus processor cpu memory ram storage disk sound network battery",
     "display": "screen brightness night light redshift resolution refresh rate monitor",
@@ -265,14 +266,29 @@ class Window(Adw.ApplicationWindow):
             return
         widget = row.match[1]
 
+        tries = [20]
+
         def focus():
+            # Scroll so the setting is near the top, then put the focus on it
+            sw = widget.get_ancestor(Gtk.ScrolledWindow)
+            if sw is not None and sw.get_child() is not None:
+                adj = sw.get_vadjustment()
+                ok, pt = widget.compute_point(sw.get_child(), Graphene.Point().init(0, 0))
+                if (not ok or adj.get_upper() <= 0) and tries[0] > 0:
+                    tries[0] -= 1                 # not laid out yet
+                    return True
+                if ok:
+                    adj.set_value(min(max(0, pt.y - 12), adj.get_upper() - adj.get_page_size()))
+                    if tries[0] >= 0:            # once more when pictures above it have loaded
+                        tries[0] = -1
+                        GLib.timeout_add(400, lambda: (focus(), False)[1])
             target = widget
             if isinstance(widget, Adw.PreferencesGroup):       # a heading: its first row
                 target = self._first_focusable(widget) or widget
             self.set_focus_visible(True)
             target.grab_focus()
             return False
-        GLib.idle_add(focus)
+        GLib.timeout_add(50, focus)            # (once the page has its size)
 
     @staticmethod
     def _first_focusable(w):

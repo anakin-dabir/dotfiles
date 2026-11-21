@@ -7,11 +7,11 @@ import re
 
 from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 
-from .. import rice
+from .. import launchershots, rice
 from ..pickers import ColorButton, FontButton
 from ..preview import DesktopPreview
 from ..samples import SampleStrip, cursor_samples, gtk_theme_preview, icon_samples
-from ..common import BSPDIR, HOME, Page, current_rice, group, read_file, run_quiet, text_button, tool
+from ..common import BSPDIR, HOME, Page, current_rice, group, launch, read_file, run_quiet, text_button, tool
 
 COLORS = [
     ("bg", "Background", "Windows, bar and menus"),
@@ -148,6 +148,19 @@ class CustomizePage(Page):
         self.cursor_strip = SampleStrip()
         look.add(Adw.PreferencesRow(activatable=False, child=self.cursor_strip))
 
+        # The app menu (super+space): a style per theme, saved right away
+        self.menu = group(self, "App menu", "Opens with super+space. Saved in this theme right away.")
+        self.menu.set_header_suffix(text_button("Open", lambda: launch([tool("RofiLauncher")])))
+        self.menu_grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, column_spacing=4,
+                                     row_spacing=4, min_children_per_line=3, max_children_per_line=3)
+        self.menu.add(self.menu_grid)
+        self.menu_tiles = {}
+        self.menu_shown = None
+        self.menu_capturing = False
+        for n, name in launchershots.styles():
+            self.menu_grid.append(self._menu_tile(n, name))
+        self._menu_pictures(take=False)        # (new pictures only once the page is opened)
+
         # Not part of a theme: applied right away, for every theme
         general = group(self, "For all themes", "Applied right away (not saved with the theme).")
         self.backend = Adw.ComboRow(title="Compositor backend", subtitle="How picom draws: try another if you see glitches",
@@ -165,6 +178,75 @@ class CustomizePage(Page):
         general.add(self.fzf)
 
         self.load()
+
+    # ----- app menu -----
+
+    def _menu_tile(self, n, name):
+        b = Gtk.Button(tooltip_text=f"Use {name} in this theme")
+        b.add_css_class("flat")
+        b.add_css_class("cc-tile")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        pic = Gtk.Picture(content_fit=Gtk.ContentFit.CONTAIN, can_shrink=True)
+        pic.set_size_request(150, 100)
+        pic.add_css_class("cc-tile-image")
+        pic.set_overflow(Gtk.Overflow.HIDDEN)
+        label = Gtk.Label(label=name, ellipsize=3)
+        label.add_css_class("cc-tile-name")
+        box.append(pic)
+        box.append(label)
+        b.set_child(box)
+        b.picture = pic
+        b.connect("clicked", lambda *_: self._menu_pick(n, name))
+        self.menu_tiles[n] = b
+        return b
+
+    def _menu_style(self):
+        """This theme's app menu style (or the one for every theme)."""
+        v = rice.theme_vars(self.rice).get("LAUNCHER_STYLE", "")
+        if not v.isdigit():
+            v = read_file(os.path.join(BSPDIR, "config", ".launcher"), "1").strip()
+        return int(v) if v.isdigit() else 1
+
+    def _menu_mark(self):
+        cur = self._menu_style()
+        for n, t in self.menu_tiles.items():
+            (t.add_css_class if n == cur else t.remove_css_class)("cc-current")
+
+    def _menu_pick(self, n, name):
+        try:
+            rice.set_theme_vars({"LAUNCHER_STYLE": str(n)}, self.rice)
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self.vals["LAUNCHER_STYLE"] = str(n)
+        self._menu_mark()
+        self.toast(f"App menu: {name}")
+
+    def _menu_pictures(self, take=True):
+        """Show the pictures; take new ones (off-screen, a few seconds) if the
+        theme or the styles changed. The old ones stay until they're ready."""
+        folder = launchershots.shown_dir()
+        stamp = (folder, launchershots.is_complete(folder))
+        if stamp != self.menu_shown:
+            self.menu_shown = stamp
+            for n, t in self.menu_tiles.items():
+                path = os.path.join(folder, f"style_{n}.png")
+                if os.path.exists(path):
+                    t.picture.set_filename(path)
+        self._menu_mark()
+        if not take or launchershots.is_complete(launchershots.cache_dir()) or self.menu_capturing:
+            return
+        self.menu_capturing = True
+        launch(["python3", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                                        "take-launcher-pictures.py")])
+
+        def check():
+            if launchershots.is_complete(launchershots.cache_dir()):
+                self.menu_capturing = False
+                self._menu_pictures()
+                return False
+            return True
+        GLib.timeout_add_seconds(2, check)
 
     # ----- rows -----
 
@@ -374,6 +456,7 @@ class CustomizePage(Page):
     def refresh(self):
         if current_rice() != self.rice and not self.changes:
             self.load()
+        self._menu_pictures()
 
     def pending_text(self):
         n = len(self.changes)

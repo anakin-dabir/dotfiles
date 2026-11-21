@@ -18,6 +18,14 @@ read -r current_style < "$cfgStyle"
 styleDir="$HOME/.config/bspwm/config/rofi-themes"
 rofiAssetDir="$HOME/.config/bspwm/config/assets"
 
+# Each theme can have its own style (LAUNCHER_STYLE in its theme-config.bash,
+# set from Control Center > Customize > App menu); otherwise the one above
+read -r rice < "$HOME/.config/bspwm/.rice"
+themeCfg="$HOME/.config/bspwm/rices/$rice/theme-config.bash"
+theme_style=$(sed -n 's/^LAUNCHER_STYLE="\{0,1\}\([0-9][0-9]*\)"\{0,1\}.*/\1/p' "$themeCfg" 2>/dev/null | tail -n 1)
+[ -n "$theme_style" ] && [ -f "$styleDir/style_$theme_style.rasi" ] && current_style=$theme_style
+[ -f "$styleDir/style_$current_style.rasi" ] || current_style=1
+
 # Function to select the styles
 choose_launcher_style() {
 
@@ -49,8 +57,15 @@ choose_launcher_style() {
                 -selected-row "$selected_index"
     )
 
-    # Write the selection to config file
-    [ -n "$selected" ] && echo "${selected}" > "$cfgStyle"
+    # Remember it for this theme
+    [ -n "$selected" ] || return
+    if grep -q '^LAUNCHER_STYLE=' "$themeCfg" 2>/dev/null; then
+        sed -i "s/^LAUNCHER_STYLE=.*/LAUNCHER_STYLE=\"$selected\"/" "$themeCfg"
+    elif [ -f "$themeCfg" ]; then
+        printf '\n# App menu style (config/rofi-themes/style_N.rasi)\nLAUNCHER_STYLE="%s"\n' "$selected" >> "$themeCfg"
+    else
+        echo "$selected" > "$cfgStyle"
+    fi
 
 }
 

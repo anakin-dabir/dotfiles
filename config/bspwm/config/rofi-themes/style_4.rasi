@@ -1,0 +1,103 @@
+/* Spotlight: a slim search bar near the top; the list grows with the results */
+
+configuration {
+    modi:                       "drun";
+    show-icons:                 true;
+    application-fallback-icon:  "Adwaita";
+    drun-display-format:        "{name}";
+    disable-history:            false;      /* apps you use most come first */
+    hover-select:               true;
+    me-select-entry:            "";
+    me-accept-entry:            "MousePrimary";
+}
+
+@import "shared.rasi"
+
+window {
+    transparency:               "real";
+    location:                   north;
+    anchor:                     north;
+    y-offset:                   18%;
+    width:                      620px;
+    border:                     1px;
+    border-color:               @bg-alt;
+    border-radius:              14px;
+    padding:                    0px;
+    cursor:                     "default";
+    background-color:           @background;
+}
+
+mainbox {
+    spacing:                    8px;
+    padding:                    10px;
+    background-color:           transparent;
+    children:                   [ "inputbar", "listview" ];
+}
+
+inputbar {
+    spacing:                    12px;
+    padding:                    12px 16px;
+    border-radius:              10px;
+    background-color:           @bg-alt;
+    text-color:                 @foreground;
+    children:                   [ "textbox-search", "entry" ];
+}
+
+textbox-search {
+    expand:                     false;
+    str:                        "";
+    font:                       "Symbols Nerd Font 13";
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 @selected;
+}
+
+entry {
+    expand:                     true;
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 inherit;
+    cursor:                     text;
+    placeholder:                "Search apps";
+    placeholder-color:          inherit;
+}
+
+listview {
+    columns:                    1;
+    lines:                      7;
+    dynamic:                    true;
+    fixed-height:               false;
+    cycle:                      true;
+    scrollbar:                  false;
+    spacing:                    2px;
+    background-color:           transparent;
+    text-color:                 @foreground;
+}
+
+element {
+    spacing:                    12px;
+    padding:                    7px 10px;
+    border-radius:              8px;
+    background-color:           transparent;
+    text-color:                 @foreground;
+    cursor:                     pointer;
+}
+element normal.normal, element alternate.normal {
+    background-color:           transparent;
+    text-color:                 inherit;
+}
+element selected.normal {
+    background-color:           @selected;
+    text-color:                 @background;
+}
+element-icon {
+    size:                       28px;
+    background-color:           transparent;
+    cursor:                     inherit;
+}
+element-text {
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 inherit;
+    cursor:                     inherit;
+}

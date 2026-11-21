@@ -1,0 +1,110 @@
+/* Side panel: a tall panel on the left, with your wallpaper on top */
+
+configuration {
+    modi:                       "drun,run,window";
+    show-icons:                 true;
+    application-fallback-icon:  "Adwaita";
+    drun-display-format:        "{name}";
+    window-format:              "{w} · {c}";
+    display-drun:               "Apps";
+    display-run:                "Run";
+    display-window:             "Windows";
+    disable-history:            true;
+    hover-select:               true;
+    me-select-entry:            "";
+    me-accept-entry:            "MousePrimary";
+}
+
+@import "shared.rasi"
+
+window {
+    transparency:               "real";
+    location:                   west;
+    anchor:                     west;
+    x-offset:                   10px;
+    width:                      380px;
+    border-radius:              12px;
+    cursor:                     "default";
+    background-color:           @background;
+}
+
+mainbox {
+    spacing:                    10px;
+    padding:                    10px;
+    background-color:           transparent;
+    children:                   [ "inputbar", "listview", "mode-switcher" ];
+}
+
+inputbar {
+    padding:                    96px 12px 12px 12px;
+    border-radius:              10px;
+    background-color:           transparent;
+    background-image:           url("~/.cache/rofi_header.webp", width);
+    text-color:                 @foreground;
+    children:                   [ "entry" ];
+}
+entry {
+    padding:                    10px 12px;
+    border-radius:              8px;
+    background-color:           @background-alt;
+    text-color:                 inherit;
+    cursor:                     text;
+    placeholder:                "Search";
+    placeholder-color:          inherit;
+}
+
+listview {
+    columns:                    1;
+    lines:                      11;
+    spacing:                    2px;
+    cycle:                      true;
+    dynamic:                    true;
+    fixed-height:               true;
+    scrollbar:                  false;
+    background-color:           transparent;
+    text-color:                 @foreground;
+}
+
+element {
+    spacing:                    12px;
+    padding:                    8px 10px;
+    border-radius:              8px;
+    background-color:           transparent;
+    text-color:                 @foreground;
+    cursor:                     pointer;
+}
+element normal.normal, element alternate.normal {
+    background-color:           transparent;
+    text-color:                 inherit;
+}
+element selected.normal {
+    background-color:           @selected;
+    text-color:                 @background;
+}
+element-icon {
+    size:                       26px;
+    background-color:           transparent;
+    cursor:                     inherit;
+}
+element-text {
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 inherit;
+    cursor:                     inherit;
+}
+
+mode-switcher {
+    spacing:                    8px;
+    background-color:           transparent;
+}
+button {
+    padding:                    8px;
+    border-radius:              8px;
+    background-color:           @bg-alt;
+    text-color:                 @foreground;
+    cursor:                     pointer;
+}
+button selected {
+    background-color:           @selected;
+    text-color:                 @background;
+}

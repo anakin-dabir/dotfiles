@@ -1,0 +1,111 @@
+/* Launchpad: the whole screen, big icons in a grid */
+
+configuration {
+    modi:                       "drun";
+    show-icons:                 true;
+    application-fallback-icon:  "Adwaita";
+    drun-display-format:        "{name}";
+    disable-history:            true;
+    hover-select:               true;
+    me-select-entry:            "";
+    me-accept-entry:            "MousePrimary";
+}
+
+@import "shared.rasi"
+
+window {
+    transparency:               "real";
+    fullscreen:                 true;
+    padding:                    7% 14%;
+    cursor:                     "default";
+    background-color:           @background;
+}
+
+mainbox {
+    spacing:                    48px;
+    background-color:           transparent;
+    children:                   [ "inputbar", "listview" ];
+}
+
+inputbar {
+    background-color:           transparent;
+    text-color:                 @foreground;
+    children:                   [ "pad", "searchbox", "pad" ];
+}
+pad {
+    expand:                     true;
+    background-color:           transparent;
+}
+searchbox {
+    expand:                     false;
+    orientation:                horizontal;
+    spacing:                    10px;
+    padding:                    10px 18px;
+    border-radius:              20px;
+    border:                     1px;
+    border-color:               @selected;
+    background-color:           @bg-alt;
+    children:                   [ "textbox-search", "entry" ];
+}
+textbox-search {
+    expand:                     false;
+    str:                        "";
+    font:                       "Symbols Nerd Font 12";
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 @foreground;
+}
+entry {
+    expand:                     false;
+    width:                      280px;
+    vertical-align:             0.5;
+    background-color:           transparent;
+    text-color:                 @foreground;
+    cursor:                     text;
+    placeholder:                "Search";
+    placeholder-color:          inherit;
+}
+
+listview {
+    columns:                    7;
+    flow:                       horizontal;   /* row by row */
+    lines:                      4;
+    spacing:                    16px;
+    cycle:                      true;
+    dynamic:                    true;
+    fixed-height:               true;
+    fixed-columns:              true;
+    scrollbar:                  false;
+    background-color:           transparent;
+    text-color:                 @foreground;
+}
+
+element {
+    orientation:                vertical;
+    spacing:                    12px;
+    padding:                    18px 8px;
+    border-radius:              18px;
+    background-color:           transparent;
+    text-color:                 @foreground;
+    cursor:                     pointer;
+}
+element normal.normal, element alternate.normal {
+    background-color:           transparent;
+    text-color:                 inherit;
+}
+element selected.normal {
+    background-color:           @bg-alt;
+    text-color:                 @selected;
+}
+element-icon {
+    size:                       64px;
+    horizontal-align:           0.5;
+    background-color:           transparent;
+    cursor:                     inherit;
+}
+element-text {
+    horizontal-align:           0.5;
+    background-color:           transparent;
+    text-color:                 inherit;
+    cursor:                     inherit;
+}
