@@ -1,0 +1,6 @@
+{
+  "clock": true,
+  "media": true,
+  "weather": false,
+  "corner": "top left"
+}

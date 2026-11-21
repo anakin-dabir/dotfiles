@@ -12,6 +12,9 @@ from ..preview import current_wallpaper
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
 DAYNIGHT = os.path.join(BSPDIR, "config", "daynight.json")
+WIDGETS = os.path.join(BSPDIR, "config", "widgets.json")
+CORNERS = [("top left", "Top left"), ("top right", "Top right"), ("bottom left", "Bottom left"),
+           ("bottom right", "Bottom right")]
 
 
 def is_light(name):
@@ -105,6 +108,22 @@ class AppearancePage(Page):
         self.dn_night_at.connect("apply", lambda r: self._dn_time("night_at", r.get_text()))
         dn.add(self.dn_night_at)
         self._dn_load()
+
+        # Desktop widgets (bin/DesktopWidgets, config/widgets.json)
+        dw = group(self, "Desktop widgets", "On the desktop, behind your windows.")
+        self.dw_rows = {}
+        for key, title, icon in (("clock", "Clock and date", "preferences-system-time-symbolic"),
+                                 ("media", "What's playing", "audio-x-generic-symbolic"),
+                                 ("weather", "Weather", "weather-few-clouds-symbolic")):
+            r = Adw.SwitchRow(title=title)
+            r.add_prefix(Gtk.Image.new_from_icon_name(icon))
+            r.connect("notify::active", lambda row, _p, k=key: self._dw_set(**{k: row.get_active()}))
+            dw.add(r)
+            self.dw_rows[key] = r
+        self.dw_corner = Adw.ComboRow(title="Where", model=Gtk.StringList.new([t for _v, t in CORNERS]))
+        self.dw_corner.connect("notify::selected", lambda r, _p: self._dw_set(corner=CORNERS[r.get_selected()][0]))
+        dw.add(self.dw_corner)
+        self._dw_load()
 
         # How the wallpaper is chosen (the theme's ENGINE)
         modes = group(self, "Wallpaper mode")
@@ -245,6 +264,42 @@ class AppearancePage(Page):
         run_quiet([tool("WallApply")], lambda _ok: self.mark())   # also stops a slideshow / video
         self.load_mode()
         self.mark()
+
+    # ----- desktop widgets -----
+
+    def _dw(self):
+        try:
+            with open(WIDGETS) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            c = {}
+        return {"clock": bool(c.get("clock", False)), "media": bool(c.get("media", False)),
+                "weather": bool(c.get("weather", False)), "corner": c.get("corner", "top left")}
+
+    def _dw_load(self):
+        c = self._dw()
+
+        def put():
+            for k, r in self.dw_rows.items():
+                r.set_active(c[k])
+            self.dw_corner.set_selected(next((i for i, (v, _t) in enumerate(CORNERS) if v == c["corner"]), 0))
+        self.quietly(put)
+        self.dw_corner.set_sensitive(any(c[k] for k in self.dw_rows))
+
+    def _dw_set(self, **changes):
+        if self._updating:
+            return
+        c = self._dw()
+        c.update(changes)
+        try:
+            with open(WIDGETS, "w") as f:
+                json.dump(c, f, indent=2)
+                f.write("\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self._dw_load()
+        run_quiet([tool("DesktopWidgets")])
 
     # ----- day and night -----
 

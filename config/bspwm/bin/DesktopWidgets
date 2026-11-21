@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Desktop widgets (eww/desktop): a clock, what's playing, the weather - on the
+# desktop behind windows. From config/widgets.json:
+#   {"clock": true, "media": false, "weather": false, "corner": "top left"}
+# Run at login (bspwmrc) and by Control Center after a change.
+
+BSPDIR="$HOME/.config/bspwm"
+EWW=(timeout 3 eww --no-daemonize -c "$BSPDIR/eww")
+CFG="$BSPDIR/config/widgets.json"
+[ -s "$CFG" ] || exit 0
+"$BSPDIR/bin/EwwDaemon" >/dev/null 2>&1
+
+show=$(jq -c '{clock: (.clock // true), media: (.media // false), weather: (.weather // false)}' "$CFG")
+corner=$(jq -r '.corner // "top left"' "$CFG")
+"${EWW[@]}" close desktop >/dev/null 2>&1
+if [ "$(jq -r '[.clock, .media, .weather] | any' <<< "$show")" != true ]; then
+    "${EWW[@]}" update "dw_show=$show" >/dev/null 2>&1
+    exit 0
+fi
+"${EWW[@]}" update "dw_show=$show" >/dev/null 2>&1
+case "$corner" in
+    "top right")    pos="40x70" ;;
+    "bottom left")  pos="40x60" ;;
+    "bottom right") pos="40x60" ;;
+    *)              pos="40x70"; corner="top left" ;;
+esac
+"${EWW[@]}" open desktop --screen 0 --anchor "$corner" --pos "$pos" >/dev/null 2>&1
+exit 0

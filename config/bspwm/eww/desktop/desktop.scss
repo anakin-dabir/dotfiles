@@ -1,0 +1,64 @@
+// Desktop widgets: the theme's font and accent, a soft shadow so they read on any wallpaper.
+
+.dw {
+  font-family: $nc-font;
+}
+.dw label {
+  font-family: $nc-font;
+  color: #ffffff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+.dw-clock .dw-time {
+  font-size: 84px;
+  font-weight: bold;
+  letter-spacing: -2px;
+}
+.dw-clock .dw-date {
+  font-size: 20px;
+  margin-top: -6px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.dw-card {
+  padding: 14px 16px;
+  border-radius: $nc-radius + 4px;
+  background-color: rgba($bg, 0.62);
+  border: 1px solid rgba($fg, 0.08);
+}
+.dw-card label {
+  text-shadow: none;
+}
+.dw-art {
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+}
+.dw-art-empty {
+  background-color: rgba($nc-accent, 0.25);
+}
+.dw .dw-icon, .dw .dw-weather-icon {
+  font-family: "Material Design Icons Desktop";
+  color: $nc-accent;
+}
+.dw .dw-icon { font-size: 26px; }
+.dw .dw-weather-icon { font-size: 40px; }
+.dw .dw-title {
+  font-size: 15px;
+  font-weight: bold;
+}
+.dw .dw-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.dw-controls {
+  margin-top: 6px;
+}
+.dw-controls button {
+  font-family: "Material Design Icons Desktop";
+  font-size: 18px;
+  color: #ffffff;
+}
+.dw-controls button:hover {
+  color: $nc-accent;
+}
