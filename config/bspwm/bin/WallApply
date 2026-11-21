@@ -12,3 +12,6 @@ if [ -f /tmp/wall_refresh.pid ]; then
     rm -f /tmp/wall_refresh.pid
 fi
 . "$HOME/.config/bspwm/config/modules/02-wallpaper.sh" >/dev/null 2>&1 < /dev/null
+
+# The lock screen's background follows the wallpaper (made now, so locking stays instant)
+ScreenLocker --prepare >/dev/null 2>&1 &

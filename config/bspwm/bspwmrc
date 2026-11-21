@@ -94,6 +94,9 @@ xset s off
 # Keyboard layouts, Caps Lock, key repeat (Control Center > Typing)
 KeyboardSetup &
 
+# The lock screen's background, ready before it's needed
+ScreenLocker --prepare &
+
 # Dark screen / lock when you're away, lock before sleep (Control Center > Power)
 IdleWatch &
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # =============================================================
 # Date:   23.04.2025
 #
@@ -14,190 +14,132 @@
 # Copyright (C) 2021-2026 gh0stzk <z0mbi3.zk@protonmail.com>
 # Licensed under GPL-3.0 license
 # =============================================================
+#
+# Lock screen: your wallpaper blurred and darkened, a big clock and the date,
+# your picture in a circle with your name, and a thin ring around it that
+# lights up in the theme's accent colour as you type (red when it's wrong).
+#
+#   ScreenLocker             lock now
+#   ScreenLocker --prepare   make the background ahead of time (locking is instant then)
+#   ScreenLocker --preview F write the background to F (Control Center > Power)
+#
+# Settings (Control Center > Power > Lock screen): config/lock.json
+#   {"background": "wallpaper" | "theme" | "screen", "picture": true}
+# Your picture: ~/.face, else config/assets/profile.png.
 
-TEMP_IMAGE="/tmp/i3lock.jpg"
+BSPDIR="$HOME/.config/bspwm"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/control-center/lock"
+CFG="$BSPDIR/config/lock.json"
 TEMP_LAYOUT="/tmp/lockerpreviouskeymap"
+mkdir -p "$CACHE"
 
-# Colors
-bg=#1C1C1E
-fg=#F5F5F7
-ring=#007AFF
-wrong=#FF3B30
-date=#98989D
-verify=#34C759
+setting() { jq -r --arg k "$1" --arg d "$2" '.[$k] // $d | tostring' "$CFG" 2>/dev/null || echo "$2"; }
 
-save_current_keymap() {
-    setxkbmap -query | grep "layout: " | awk '{print $2}' > "$TEMP_LAYOUT"
-    setxkbmap -query | grep "options:" | awk '{print $2}' > "${TEMP_LAYOUT}_options"
+# ----- the theme: accent, red, font -----
+read -r RICE < "$BSPDIR/.rice"
+THEME="$BSPDIR/rices/$RICE/theme-config.bash"
+var() { sed -n "s/^$1=[\"']\\{0,1\\}\\([^\"']*\\)[\"']\\{0,1\\}.*/\\1/p" "$THEME" | head -1; }
+ACCENT=$(var FOCUSED_BC); ACCENT=${ACCENT#\#}; ACCENT=${ACCENT:0:6}; [ -n "$ACCENT" ] || ACCENT=0A84FF
+RED=$(var red); RED=${RED#\#}; RED=${RED:0:6}; [ -n "$RED" ] || RED=FF453A
+FONT=$(var dunst_font); FONT=$(echo "$FONT" | sed 's/ [0-9.]*$//'); [ -n "$FONT" ] || FONT="Sans"
+
+# ----- screen size (the main screen; other screens get the same picture) -----
+read -r W H < <(xrandr 2>/dev/null | awk '/ connected primary [0-9]/ { split($4, a, /[x+]/); print a[1], a[2]; exit }')
+[ -n "$W" ] || read -r W H < <(xrandr 2>/dev/null | awk '/ connected [0-9]/ { split($3, a, /[x+]/); print a[1], a[2]; exit }')
+W=${W:-1920}; H=${H:-1080}
+
+# ----- the background -----
+picture_file() { [ -f "$HOME/.face" ] && echo "$HOME/.face" || echo "$BSPDIR/config/assets/profile.png"; }
+user_name() {
+    local n; n=$(getent passwd "$USER" | cut -d: -f5 | cut -d, -f1)
+    [ -n "$n" ] && echo "$n" || echo "${USER^}"
 }
 
-restore_previous_keymap() {
-    if [ -f "$TEMP_LAYOUT" ]; then
-        previous_layout=$(cat "$TEMP_LAYOUT")
-        if [ -f "${TEMP_LAYOUT}_options" ]; then
-            previous_options=$(cat "${TEMP_LAYOUT}_options")
-            setxkbmap -layout "$previous_layout" -option "$previous_options"
-        else
-            setxkbmap -layout "$previous_layout"
-        fi
-        rm -f "$TEMP_LAYOUT" "${TEMP_LAYOUT}_options"
-    fi
-}
-
-# Get screen resolution dynamically
-get_screen_resolution() {
-    # Try xrandr first (most common)
-    if command -v xrandr >/dev/null 2>&1; then
-        resolution=$(xrandr | grep '\*' | awk '{print $1}' | head -n1)
-    # Fallback to xdpyinfo
-    elif command -v xdpyinfo >/dev/null 2>&1; then
-        resolution=$(xdpyinfo | awk '/dimensions:/ {print $2}')
-    # Last resort: use fixed resolution
-    else
-        resolution="1920x1080"
-    fi
-
-    SCREEN_WIDTH=$(echo $resolution | cut -d'x' -f1)
-    SCREEN_HEIGHT=$(echo $resolution | cut -d'x' -f2)
-}
-
-# Calculate positions based on screen resolution
-calculate_positions() {
-    # Center horizontally
-    CENTER_X=$((SCREEN_WIDTH * 25 / 100))  # Left position... 25% of screen width
-
-    # Some other options:
-    # CENTER_X=$((SCREEN_WIDTH / 2)) # Exact center (uncomment if preferred)
-    # CENTER_X=$((SCREEN_WIDTH * 75 / 100)) # Right position...
-
-    # Calculate vertical positions as percentages of screen height
-    # Adjust these percentages to your preference
-    TIME_Y=$((SCREEN_HEIGHT * 36 / 100))      # 36% from top
-    DATE_Y=$((SCREEN_HEIGHT * 42 / 100))      # 42% from top
-    IND_Y=$((SCREEN_HEIGHT * 56 / 100))       # 56% from top (indicator)
-    VERIF_Y=$((SCREEN_HEIGHT * 76 / 100))     # 76% from top
-    GREETER_Y=$((SCREEN_HEIGHT * 72 / 100))   # 72% from top
-    WRONG_Y=$((SCREEN_HEIGHT * 76 / 100))     # 76% from top
-
-    # Calculate font sizes based on screen resolution
-    # Base sizes for 1920x1080, scale for other resolutions
-    BASE_WIDTH=1920
-    BASE_HEIGHT=1080
-
-    # Scale factor formula...
-    SCALE_FACTOR=$(echo "scale=2; sqrt(($SCREEN_WIDTH * $SCREEN_HEIGHT) / ($BASE_WIDTH * $BASE_HEIGHT))" | bc)
-
-    # If bc is not available, use a simpler approach
-    if [ -z "$SCALE_FACTOR" ]; then
-        if [ $SCREEN_WIDTH -le 1366 ]; then
-            SCALE_FACTOR=0.8
-        elif [ $SCREEN_WIDTH -le 1920 ]; then
-            SCALE_FACTOR=1.0
-        elif [ $SCREEN_WIDTH -le 2560 ]; then
-            SCALE_FACTOR=1.3
-        else
-            SCALE_FACTOR=1.5
-        fi
-    fi
-
-    # Calculate font sizes
-    TIME_SIZE=$(echo "140 * $SCALE_FACTOR" | bc | cut -d. -f1)
-    DATE_SIZE=$(echo "45 * $SCALE_FACTOR" | bc | cut -d. -f1)
-    TEXT_SIZE=$(echo "23 * $SCALE_FACTOR" | bc | cut -d. -f1)
-    RADIUS=$(echo "30 * $SCALE_FACTOR" | bc | cut -d. -f1)
-    RING_WIDTH=$(echo "60 * $SCALE_FACTOR" | bc | cut -d. -f1)
-
-    # Fallback if bc is not available
-    if [ -z "$TIME_SIZE" ]; then
-        TIME_SIZE=140
-        DATE_SIZE=45
-        TEXT_SIZE=23
-        RADIUS=30
-        RING_WIDTH=60
-    fi
-}
-
-default_lockscreen () {
-
-    save_current_keymap
-    setxkbmap -layout us
-
-    get_screen_resolution
-    calculate_positions
-
-    maim -u ${TEMP_IMAGE}
-    magick $TEMP_IMAGE -blur 5x4 $TEMP_IMAGE
-    i3lock -n --force-clock -i $TEMP_IMAGE -e --indicator \
-        --radius=$RADIUS --ring-width=$RING_WIDTH --inside-color=$bg \
-        --ring-color=$ring --insidever-color=$verify --ringver-color=$verify \
-        --insidewrong-color=$wrong --ringwrong-color=$wrong --line-uses-inside \
-        --keyhl-color=$verify --separator-color=$verify --bshl-color=$verify \
-        --time-str="%H:%M" --time-size=$TIME_SIZE --date-str="%a, %d %b" \
-        --date-size=$DATE_SIZE --verif-text="Verifying Password..." --wrong-text="Wrong Password!" \
-        --noinput-text="" --greeter-text="Type the password to Unlock" --ind-pos="$CENTER_X:$IND_Y" \
-        --time-font="JetBrainsMono NF:style=Bold" --date-font="JetBrainsMono NF" --verif-font="JetBrainsMono NF" \
-        --greeter-font="JetBrainsMono NF" --wrong-font="JetBrainsMono NF" --verif-size=$TEXT_SIZE \
-        --greeter-size=$TEXT_SIZE --wrong-size=$TEXT_SIZE --time-pos="$CENTER_X:$TIME_Y" \
-        --date-pos="$CENTER_X:$DATE_Y" --greeter-pos="$CENTER_X:$GREETER_Y" --wrong-pos="$CENTER_X:$WRONG_Y" \
-        --verif-pos="$CENTER_X:$VERIF_Y" --date-color=$date --time-color=$date \
-        --greeter-color=$fg --wrong-color=$wrong --verif-color=$verify \
-        --pointer=default --refresh-rate=0 \
-        --pass-media-keys --pass-volume-keys
-        restore_previous_keymap
-}
-
-rice_lockscreen () {
-
-    save_current_keymap
-    setxkbmap -layout us
-
-    get_screen_resolution
-    calculate_positions
-
-    # Current Rice
-    read -r RICE < "$HOME"/.config/bspwm/.rice
-    # Wallpapers dir
-    image_dir="$HOME/.config/bspwm/rices/${RICE}/walls"
-
-    # Select random image
-    lock_image=$(find "$image_dir" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | shuf -n 1)
-
-    # If the image is *.webp convert to /tmp/lock_image.jpg
-    case "$lock_image" in
-        *.webp|*.jpg|*.jpeg|*.png)
-            magick "$lock_image" "$TEMP_IMAGE" || exit 1
-        ;;
+source_image() {
+    case "$(setting background wallpaper)" in
+        screen) echo "screen" ;;
+        theme)  find "$BSPDIR/rices/$RICE/walls" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | shuf -n 1 ;;
+        *)      sed -n "s/.*--bg-[a-z]* '\\([^']*\\)'.*/\\1/p" "$HOME/.fehbg" 2>/dev/null | head -1 ;;
     esac
-
-    i3lock -n --force-clock -i $TEMP_IMAGE --scale -e --indicator \
-        --radius=$RADIUS --ring-width=$RING_WIDTH --inside-color=$bg \
-        --ring-color=$ring --insidever-color=$verify --ringver-color=$verify \
-        --insidewrong-color=$wrong --ringwrong-color=$wrong --line-uses-inside \
-        --keyhl-color=$verify --separator-color=$verify --bshl-color=$verify \
-        --time-str="%H:%M" --time-size=$TIME_SIZE --date-str="%a, %d %b" \
-        --date-size=$DATE_SIZE --verif-text="Verifying Password..." --wrong-text="Wrong Password!" \
-        --noinput-text="" --greeter-text="Type the password to Unlock" --ind-pos="$CENTER_X:$IND_Y" \
-        --time-font="JetBrainsMono NF:style=Bold" --date-font="JetBrainsMono NF" --verif-font="JetBrainsMono NF" \
-        --greeter-font="JetBrainsMono NF" --wrong-font="JetBrainsMono NF" --verif-size=$TEXT_SIZE \
-        --greeter-size=$TEXT_SIZE --wrong-size=$TEXT_SIZE --time-pos="$CENTER_X:$TIME_Y" \
-        --date-pos="$CENTER_X:$DATE_Y" --greeter-pos="$CENTER_X:$GREETER_Y" --wrong-pos="$CENTER_X:$WRONG_Y" \
-        --verif-pos="$CENTER_X:$VERIF_Y" --date-color=$date --time-color=$date \
-        --greeter-color=$fg --wrong-color=$wrong --verif-color=$verify \
-        --pointer=default --refresh-rate=0 \
-        --pass-media-keys --pass-volume-keys
-
-	 restore_previous_keymap
 }
 
-case $1 in
-    -r|--rice)
-        rice_lockscreen ;;
-    -h|--help)
-        echo -e "ScreenLocker [options]
-Note: If an option is not specified, the screen locks with a screenshot with a blur effect.
+make_background() { # src out
+    local src=$1 out=$2 pic=$(picture_file) cy=$((H * 58 / 100)) size=150
+    local font_file; font_file=$(fc-match -f '%{file}' "$FONT:style=Bold" 2>/dev/null)
+    if [ "$src" = screen ]; then maim -u "$CACHE/screen.png" && src="$CACHE/screen.png"; fi
+    [ -f "$src" ] || { magick -size "${W}x${H}" "xc:#1c1c1e" "$out"; src=$out; }
+    # blur fast: shrink, blur, grow back; then darken a little
+    local args=("$src" -resize "${W}x${H}^" -gravity center -extent "${W}x${H}"
+                -resize 8% -blur 0x3 -resize "${W}x${H}!" -blur 0x10 -fill black -colorize 45%)
+    if [ "$(setting picture true)" = true ] && [ -f "$pic" ]; then
+        magick "$pic" -resize "${size}x${size}^" -gravity center -extent "${size}x${size}" \
+            \( -size "${size}x${size}" xc:black -fill white -draw "circle $((size / 2)),$((size / 2)) $((size / 2)),0" \) \
+            -alpha off -compose CopyOpacity -composite "$CACHE/face.png"
+        args+=(-gravity northwest "$CACHE/face.png" -geometry "+$((W / 2 - size / 2))+$((cy - size / 2))" -compose over -composite)
+        args+=(-gravity north -fill white -pointsize 20)
+        [ -n "$font_file" ] && args+=(-font "$font_file")
+        args+=(-annotate "+0+$((cy + size / 2 + 22))" "$(user_name)")
+    fi
+    magick "${args[@]}" "$out"
+}
 
-Options:
-	[-r] [--rice]	Set the screen locker with a random wallpaper of the current theme.\n" ;;
-    *)
-        default_lockscreen ;;
+background() { # prints the path of the background (made now if needed)
+    local src key out
+    src=$(source_image)
+    if [ "$src" = screen ]; then out="$CACHE/screen-lock.png"; make_background screen "$out"; echo "$out"; return; fi
+    key=$(printf 'v2 %s %s %s %s %s %s %s' "$src" "$(stat -c %Y "$src" 2>/dev/null)" "$W" "$H" \
+          "$(stat -c %Y "$(picture_file)" 2>/dev/null)" "$(setting picture true)" "$(user_name)" | md5sum | cut -c1-16)
+    out="$CACHE/$key.png"
+    if [ ! -s "$out" ]; then
+        find "$CACHE" -name '*.png' ! -name face.png -mmin +1 -delete 2>/dev/null   # (old ones)
+        make_background "$src" "$out"
+    fi
+    echo "$out"
+}
+
+# ----- keyboard layout: typed in US while locked, yours back after -----
+save_current_keymap() {
+    setxkbmap -query | awk '/layout:/ {print $2}' > "$TEMP_LAYOUT"
+    setxkbmap -query | awk '/options:/ {print $2}' > "${TEMP_LAYOUT}_options"
+}
+restore_previous_keymap() {
+    [ -f "$TEMP_LAYOUT" ] || return
+    if [ -s "${TEMP_LAYOUT}_options" ]; then
+        setxkbmap -layout "$(cat "$TEMP_LAYOUT")" -option "" -option "$(cat "${TEMP_LAYOUT}_options")"
+    else
+        setxkbmap -layout "$(cat "$TEMP_LAYOUT")"
+    fi
+    rm -f "$TEMP_LAYOUT" "${TEMP_LAYOUT}_options"
+}
+
+lock() {
+    local img; img=$(background)
+    pgrep -x i3lock >/dev/null && return      # (already locked)
+    save_current_keymap
+    setxkbmap -layout us
+    local cy="y+h*0.58" ring=$((150 / 2 + 7))
+    i3lock -n -e --force-clock -i "$img" --fill --indicator \
+        --time-str="%H:%M" --date-str="%A, %-d %B" \
+        --time-font="$FONT:style=Bold" --date-font="$FONT" --greeter-font="$FONT" \
+        --verif-font="$FONT" --wrong-font="$FONT" \
+        --time-size=104 --date-size=22 --greeter-size=15 --verif-size=15 --wrong-size=15 \
+        --time-color=ffffffff --date-color=ffffffcc --greeter-color=ffffff99 \
+        --verif-color=ffffffcc --wrong-color="${RED}ff" \
+        --time-pos="x+w/2:y+h*0.27" --date-pos="x+w/2:y+h*0.27+46" \
+        --ind-pos="x+w/2:$cy" --radius="$ring" --ring-width=4 \
+        --greeter-text="Type your password" --verif-text="Checking…" --wrong-text="Wrong password" \
+        --noinput-text="" --greeter-pos="x+w/2:$cy+150" --verif-pos="x+w/2:$cy+150" --wrong-pos="x+w/2:$cy+150" \
+        --inside-color=00000000 --ring-color=ffffff40 --line-color=00000000 --separator-color=00000000 \
+        --keyhl-color="${ACCENT}ff" --bshl-color="${RED}ff" \
+        --insidever-color=00000000 --ringver-color="${ACCENT}ff" \
+        --insidewrong-color=00000000 --ringwrong-color="${RED}ff" \
+        --pointer=default --refresh-rate=1 --pass-media-keys --pass-volume-keys --pass-screen-keys
+    restore_previous_keymap
+}
+
+case "$1" in
+    --prepare) background >/dev/null ;;
+    --preview) [ -n "$2" ] && cp "$(background)" "$2" ;;
+    -h|--help) sed -n '18,30p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *) lock ;;
 esac

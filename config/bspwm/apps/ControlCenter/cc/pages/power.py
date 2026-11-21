@@ -3,7 +3,7 @@
 import json
 import os
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 from ..common import BSPDIR, Page, group, launch, run, run_quiet, text_button, tool
 
@@ -15,6 +15,9 @@ def subprocess_running(name):
     return subprocess.run(["pgrep", "-f", f"bin/{name}$"], capture_output=True).returncode == 0
 DARK = [(0, "Never"), (2, "2 minutes"), (5, "5 minutes"), (10, "10 minutes"), (15, "15 minutes"), (30, "30 minutes")]
 LOCK = [(0, "Never"), (5, "5 minutes"), (10, "10 minutes"), (15, "15 minutes"), (30, "30 minutes"), (60, "1 hour")]
+LOCK_FILE = os.path.join(BSPDIR, "config", "lock.json")
+LOCK_BG = [("wallpaper", "Your wallpaper, blurred"), ("theme", "A wallpaper of this theme, blurred"),
+           ("screen", "The screen as it was, blurred")]
 EMPTY = [("none", "Only warn"), ("suspend", "Sleep"), ("poweroff", "Shut down")]
 
 
@@ -121,6 +124,24 @@ class PowerPage(Page):
         lockg.add(self.lock_sleep)
         self._load_settings()
 
+        # Lock screen look (bin/ScreenLocker, config/lock.json)
+        look = group(self, "Lock screen", "The clock, your picture and a ring that lights up as you type.")
+        self.lock_pic = Gtk.Picture(content_fit=Gtk.ContentFit.COVER, can_shrink=True, height_request=220,
+                                    margin_top=10, margin_bottom=10, margin_start=10, margin_end=10)
+        self.lock_pic.add_css_class("cc-tile-image")
+        self.lock_pic.set_overflow(Gtk.Overflow.HIDDEN)
+        look.add(Adw.PreferencesRow(activatable=False, child=self.lock_pic))
+        self.lock_bg = Adw.ComboRow(title="Background", model=Gtk.StringList.new([t for _v, t in LOCK_BG]))
+        self.lock_bg.connect("notify::selected", lambda r, _p: self._lock_set(background=LOCK_BG[r.get_selected()][0]))
+        look.add(self.lock_bg)
+        self.lock_face = Adw.SwitchRow(title="Show your picture and name")
+        self.lock_face.connect("notify::active", lambda r, _p: self._lock_set(picture=r.get_active()))
+        look.add(self.lock_face)
+        face = Adw.ActionRow(title="Your picture", subtitle="Also used by other apps (~/.face)")
+        face.add_suffix(text_button("Choose…", self._choose_face))
+        look.add(face)
+        self._lock_load()
+
         # Session
         session = group(self, "Session")
         for label, sub, icon, argv in [
@@ -135,6 +156,67 @@ class PowerPage(Page):
             row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
             row.connect("activated", lambda _r, l=label, a=argv: self._session(l, a))
             session.add(row)
+
+    # ----- lock screen -----
+
+    def _lock_load(self):
+        try:
+            with open(LOCK_FILE) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            c = {}
+        self.quietly(lambda: (
+            self.lock_bg.set_selected(next((i for i, (v, _t) in enumerate(LOCK_BG) if v == c.get("background", "wallpaper")), 0)),
+            self.lock_face.set_active(bool(c.get("picture", True)))))
+        self._lock_preview()
+
+    def _lock_set(self, **changes):
+        if self._updating:
+            return
+        try:
+            with open(LOCK_FILE) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            c = {}
+        c.update(changes)
+        with open(LOCK_FILE, "w") as f:
+            json.dump(c, f, indent=2)
+            f.write("\n")
+        self._lock_preview()
+
+    def _lock_preview(self):
+        """The background as it will look (made in the background; it's also kept for locking)."""
+        out = os.path.join(GLib.get_user_cache_dir(), "control-center", "lock-preview.png")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+
+        def done(ok, _o, _e):
+            if ok and os.path.exists(out):
+                self.lock_pic.set_file(Gio.File.new_for_path(out))
+        run([tool("ScreenLocker"), "--preview", out], done)
+
+    def _choose_face(self):
+        d = Gtk.FileDialog(title="Choose your picture", modal=True)
+        f = Gtk.FileFilter(name="Pictures")
+        f.add_mime_type("image/*")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(f)
+        d.set_filters(filters)
+
+        def done(dialog, result):
+            try:
+                file = dialog.open_finish(result)
+            except GLib.Error:
+                return
+            if file and file.get_path():
+                import shutil
+                try:
+                    shutil.copyfile(file.get_path(), os.path.join(os.path.expanduser("~"), ".face"))
+                except OSError as e:
+                    self.toast(f"Couldn't use it: {e.strerror}")
+                    return
+                self._lock_preview()
+                self.toast("Your picture is set")
+        d.open(self.window, None, done)
 
     # ----- settings (config/power.json) -----
 
