@@ -398,7 +398,12 @@ class BarPage(Page):
 
     # ----- loading -----
 
+    def bar_now(self):
+        return rice.theme_vars(current_rice()).get("main_bar", "")
+
     def load(self):
+        if self.bar_now():
+            rice.ensure_icons(self.bar_now())
         self.rice = current_rice()
         self.bar = rice.theme_vars(self.rice).get("main_bar", "")
         self.edits = {}
@@ -759,6 +764,7 @@ class BarPage(Page):
                 return
             mods = rice.restore_original(os.path.join(rice.BARS, self.bar, "modules.ini"))
             if rice.restore_original(rice.bar_config(self.bar)) or mods:
+                rice.ensure_icons(self.bar)
                 run_quiet(["polybar-msg", "cmd", "restart"], lambda _ok: (self.load(), self.toast(f"{self.bar} is reset")))
         d.connect("response", answered)
         d.present(self.window)

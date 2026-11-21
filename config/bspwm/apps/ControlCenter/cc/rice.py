@@ -406,3 +406,30 @@ def set_item_icon(where, char, font):
         return
     value = old.replace(where["icon"], char, 1) if old else char
     _set_keys(path, section, {key: value, where["font_key"]: str(font)})
+
+
+def ensure_icons(bar):
+    """Every bar needs an [icons] section for the shared items (config/system.ini).
+    Puts it back when it's missing (e.g. after a Reset to a copy from before it existed)."""
+    path = bar_config(bar)
+    try:
+        with open(path) as f:
+            text = f.read()
+    except OSError:
+        return False
+    if re.search(r"(?m)^\[icons\]", text):
+        return False
+    fonts = re.findall(r'(?m)^font-(\d+)\s*=\s*"?([^:";]+)', text)
+    ph = [int(n) for n, fam in fonts if fam.strip() == "Phosphor"]
+    single = len(re.findall(r"(?m)^\[bar/", text)) == 1
+    if ph and single:
+        icons, font = {"media": "", "clipboard": "", "capture": ""}, ph[0] + 1
+    else:
+        icons, font = {"media": "\U000F0F74", "clipboard": "\U000F014C", "capture": "\U000F0D5D"}, 0
+    block = ("\n; Icons of the shared bar items (config/system.ini); Control Center > Bar\n"
+             "; changes them. *-font: which font-N draws it, plus one (0 = any font)\n[icons]\n"
+             + "".join(f"{k} = {v}\n" for k, v in icons.items())
+             + "".join(f"{k}-font = {font}\n" for k in icons))
+    with open(path, "w") as f:
+        f.write(text.rstrip("\n") + "\n" + block)
+    return True
