@@ -39,7 +39,16 @@ class Window(Adw.ApplicationWindow):
         self.toasts = Adw.ToastOverlay(child=self.stack)
         content_view = Adw.ToolbarView()
         self.heading = Adw.WindowTitle()
-        content_view.add_top_bar(Adw.HeaderBar(title_widget=self.heading))
+        header = Adw.HeaderBar(title_widget=self.heading)
+        content_view.add_top_bar(header)
+        # A page's preview that stays on screen while its settings scroll
+        self.sticky = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self.sticky.add_css_class("cc-sticky")
+        content_view.add_top_bar(self.sticky)
+        self.sticky_toggle = Gtk.ToggleButton(icon_name="view-reveal-symbolic", active=True,
+                                              tooltip_text="Show or hide the preview")
+        self.sticky_toggle.connect("toggled", lambda *_: self._show_sticky())
+        header.pack_end(self.sticky_toggle)
         content_view.set_content(self.toasts)
 
         # "Unsaved changes · Discard · Apply" (pages that collect changes)
@@ -92,6 +101,12 @@ class Window(Adw.ApplicationWindow):
         self.connect("notify::visible-dialog", self._dialog_shown)
         self.connect("close-request", self._closing)
 
+
+    def _show_sticky(self):
+        page = self.page
+        has = page is not None and getattr(page, "sticky_widget", None) is not None
+        self.sticky_toggle.set_visible(has)
+        self.sticky.set_reveal_child(has and self.sticky_toggle.get_active())
 
     def _dialog_shown(self, *_):
         """A click outside an open dialog's card closes it. The dialog covers
@@ -150,6 +165,10 @@ class Window(Adw.ApplicationWindow):
         self.stack.set_visible_child(page)
         self.content.set_title(page.title)
         self.heading.set_title(page.title)
+        widget = getattr(page, "sticky_widget", None)
+        if widget is not None and self.sticky.get_child() is not widget:
+            self.sticky.set_child(widget)
+        self._show_sticky()
         self.split.set_show_content(True)
         page.refresh()
         self.update_pending()

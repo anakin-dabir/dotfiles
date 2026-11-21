@@ -1,10 +1,44 @@
 """Sample pictures for theme choices: a few icons from an icon theme and a
 few pointers from a cursor theme, shown before the theme is applied."""
 
+import hashlib
 import os
 import struct
+import subprocess
+import threading
 
 from gi.repository import Gdk, GLib, Gtk
+
+from .common import CACHE
+
+THEME_DIRS = ["~/.local/share/themes", "~/.themes", "/usr/share/themes"]
+
+
+def gtk_theme_preview(theme, done):
+    """A picture of a small window drawn with GTK3 theme `theme` (rendered
+    off-screen by gtk3sample.py, cached); done(path or None) in the main thread."""
+    stamp = ""
+    for base in THEME_DIRS:
+        p = os.path.join(os.path.expanduser(base), theme, "gtk-3.0")
+        if os.path.isdir(p):
+            stamp = str(os.stat(p).st_mtime_ns)
+            break
+    key = hashlib.sha1(f"{theme}:{stamp}".encode()).hexdigest()[:16]
+    out = os.path.join(CACHE, "gtk3", f"{key}.png")
+    if os.path.exists(out):
+        done(out)
+        return
+
+    def work():
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gtk3sample.py")
+        try:
+            subprocess.run(["python3", script, out], env={**os.environ, "GTK_THEME": theme},
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
+        GLib.idle_add(lambda: (done(out if os.path.exists(out) else None), False)[1])
+    threading.Thread(target=work, daemon=True).start()
 
 ICONS = ["folder", "user-home", "text-x-generic", "image-x-generic", "audio-x-generic",
          "utilities-terminal", "web-browser", "preferences-system", "user-trash"]

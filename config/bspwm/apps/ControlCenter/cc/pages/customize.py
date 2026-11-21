@@ -5,12 +5,12 @@ import glob
 import os
 import re
 
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 
 from .. import rice
 from ..pickers import ColorButton, FontButton
 from ..preview import DesktopPreview
-from ..samples import SampleStrip, cursor_samples, icon_samples
+from ..samples import SampleStrip, cursor_samples, gtk_theme_preview, icon_samples
 from ..common import Page, current_rice, group, read_file, run_quiet, text_button, tool
 
 COLORS = [
@@ -88,12 +88,12 @@ class CustomizePage(Page):
         self.reset_btn = text_button("Reset…", self._reset)
         self.intro_row.add_suffix(self.reset_btn)
         self.intro.add(self.intro_row)
+        # The preview stays on screen above the settings (the window shows
+        # sticky_widget under its title bar while this page is open)
         self.preview = DesktopPreview()
-        self.preview.set_margin_top(10)
-        self.preview.set_margin_bottom(10)
-        self.preview.set_margin_start(10)
-        self.preview.set_margin_end(10)
-        self.intro.add(Adw.PreferencesRow(activatable=False, child=self.preview))
+        self.preview.set_content_height(230)
+        self.sticky_widget = Adw.Clamp(child=self.preview, maximum_size=470, margin_top=10, margin_bottom=12,
+                                       margin_start=12, margin_end=12)
 
         colors = group(self, "Colors")
         for var, title, sub in COLORS:
@@ -127,6 +127,17 @@ class CustomizePage(Page):
         look = group(self, "Apps")
         themes, icons, cursors = gtk_themes(), icon_themes(), cursor_themes()
         look.add(self._combo("gtk_theme", "App theme (GTK)", themes, themes))
+        self.gtk_pic = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN, halign=Gtk.Align.START,
+                                   margin_top=10, margin_bottom=10, margin_start=14, margin_end=14)
+        self.gtk_pic.add_css_class("cc-tile-image")
+        self.gtk_pic.set_overflow(Gtk.Overflow.HIDDEN)
+        self.gtk_wait = Gtk.Label(label="Drawing a sample window…", margin_top=12, margin_bottom=12)
+        self.gtk_wait.add_css_class("dim-label")
+        gtk_box = Gtk.Stack()
+        gtk_box.add_named(self.gtk_wait, "wait")
+        gtk_box.add_named(self.gtk_pic, "pic")
+        self.gtk_box = gtk_box
+        look.add(Adw.PreferencesRow(activatable=False, child=gtk_box))
         look.add(self._combo("gtk_icons", "Icons", icons, icons))
         self.icon_strip = SampleStrip()
         look.add(Adw.PreferencesRow(activatable=False, child=self.icon_strip))
@@ -149,6 +160,22 @@ class CustomizePage(Page):
         self.window.update_pending()
 
     def _show_samples(self, v):
+        theme = v.get("gtk_theme", "")
+        if theme and theme != getattr(self, "_gtk_shown", None):
+            self._gtk_shown = theme
+            self.gtk_box.set_visible_child_name("wait")
+
+            def got(path, theme=theme):
+                if path and theme == self._gtk_shown:
+                    info = GdkPixbuf.Pixbuf.get_file_info(path)
+                    if info and info[0] is not None:
+                        w = min(360, info[1])
+                        self.gtk_pic.set_size_request(w, round(info[2] * w / info[1]))
+                    self.gtk_pic.set_filename(path)
+                    self.gtk_box.set_visible_child_name("pic")
+                elif not path:
+                    self.gtk_wait.set_label("No preview for this theme")
+            gtk_theme_preview(theme, got)
         if v.get("gtk_icons") != getattr(self, "_icons_shown", None):
             self._icons_shown = v.get("gtk_icons")
             self.icon_strip.show(icon_samples(v.get("gtk_icons", "")))

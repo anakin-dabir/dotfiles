@@ -8,7 +8,8 @@
 (defvar bp_open "")          ;; open dropdown (BarPanel sets it)
 (defvar bp_view "main")      ;; network dropdown: main | wifi | bt
 (defvar bp_scanning false)   ;; looking for Wi-Fi networks
-(defvar bp_connecting "")    ;; Wi-Fi name or Bluetooth address being connected
+(defvar bp_connecting "")
+(defvar bp_confirm "")       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
 ;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
 ;; Wi-Fi search each time: that takes seconds, the refresh button does it)
 (defpoll bp_wifi :interval "3s" :run-while {bp_open == "network" && bp_view == "wifi"}
@@ -39,7 +40,7 @@
 
 ;; Which sections each dropdown shows (Control Center > Dropdowns; BarPanel
 ;; loads config/dropdowns.json when a dropdown opens)
-(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_details":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true,"network_rows":true,"battery_toggles":true,"order":{"cpu":["cpu_graph","cpu_stats","cpu_apps","cpu_button"],"memory":["memory_graph","memory_apps","memory_button"],"disk":["disk_buttons"],"sound":["sound_volume","sound_output","sound_mic","sound_button"],"network":["network_speed","network_rows","network_button"],"network_rows":["network_airplane","network_wifi","network_bluetooth"],"battery":["battery_details","battery_mode","battery_brightness","battery_toggles","battery_buttons"],"battery_toggles":["battery_night","battery_awake"]},"first":{"network_rows":"network_airplane","battery_toggles":"battery_night"}}')
+(defvar bp_show '{"cpu_graph":true,"cpu_stats":true,"cpu_apps":true,"cpu_button":true,"memory_graph":true,"memory_apps":true,"memory_button":true,"disk_clean":true,"disk_buttons":true,"sound_volume":true,"sound_output":true,"sound_mic":true,"sound_button":true,"network_speed":true,"network_airplane":true,"network_wifi":true,"network_bluetooth":true,"network_button":true,"battery_details":true,"battery_mode":true,"battery_brightness":true,"battery_night":true,"battery_awake":true,"battery_buttons":true,"network_rows":true,"battery_toggles":true,"order":{"cpu":["cpu_graph","cpu_stats","cpu_apps","cpu_button"],"memory":["memory_graph","memory_apps","memory_button"],"disk":["disk_clean","disk_buttons"],"sound":["sound_volume","sound_output","sound_mic","sound_button"],"network":["network_speed","network_rows","network_button"],"network_rows":["network_airplane","network_wifi","network_bluetooth"],"battery":["battery_details","battery_mode","battery_brightness","battery_toggles","battery_buttons"],"battery_toggles":["battery_night","battery_awake"]},"first":{"network_rows":"network_airplane","battery_toggles":"battery_night"},"any":{"cpu":true,"memory":true,"disk":true,"sound":true,"network":true,"battery":true}}')
 
 ;; ================= building blocks =================
 
@@ -71,6 +72,14 @@
   (box :class "bp-row" :space-evenly false :spacing 8
     (label :class "bp-row-name" :halign "start" :hexpand true :xalign 0 :limit-width 28 :text name)
     (label :class "bp-row-value" :text value)))
+
+;; Close an app (two clicks: × then "Close?")
+(defwidget bp-close [proc id]
+  (eventbox :cursor "pointer"
+    (button :class "bp-x ${bp_confirm == id ? 'bp-x-sure' : ''}"
+            :tooltip {bp_confirm == id ? "Click again to close it" : "Close this app"}
+            :onclick "~/.config/bspwm/bin/BarPanelAction confirm '${id}' close '${proc}' &"
+      {bp_confirm == id ? "Close?" : "󰅖"})))
 
 (defwidget bp-app [name value pct]
   (box :class "bp-app" :orientation "v" :space-evenly false :spacing 5
@@ -158,7 +167,10 @@
     (label :class "bp-dim" :halign "start" :visible {arraylength(bp_cpu.procs) == 0} :text "Measuring…")
     (box :orientation "v" :space-evenly false :spacing 8
       (for p in {bp_cpu.procs}
-        (bp-row :name {p.name} :value "${p.pct}%")))))
+        (box :space-evenly false :spacing 6
+          (box :hexpand true (bp-row :name {p.name} :value "${p.pct}%"))
+          (box :visible {p.kill} (bp-close :proc {p.proc} :id "close:${p.proc}"))
+          (box :visible {!p.kill} :class "bp-x-space"))))))
 
 (defwidget bp-s-cpu_button []
   (bp-button :icon "󰍹" :text "System Monitor"
@@ -175,11 +187,36 @@
   (bp-card :title "Apps using the most memory"
     (box :orientation "v" :space-evenly false :spacing 10
       (for a in {bp_memory.apps}
-        (bp-app :name {a.name} :value {a.size} :pct {a.pct})))))
+        (box :space-evenly false :spacing 6
+          (box :hexpand true (bp-app :name {a.name} :value {a.size} :pct {a.pct}))
+          (box :visible {a.kill} :valign "center" (bp-close :proc {a.proc} :id "close:${a.proc}"))
+          (box :visible {!a.kill} :class "bp-x-space"))))))
 
 (defwidget bp-s-memory_button []
   (bp-button :icon "󰍹" :text "System Monitor"
              :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -p &"))
+
+(defwidget bp-clean [icon title sub id action label ?show]
+  (box :class "bp-item" :space-evenly false :spacing 12 :visible {show == "" ? true : show}
+    (label :class "bp-item-icon" :text icon)
+    (box :orientation "v" :space-evenly false :hexpand true :valign "center"
+      (label :class "bp-item-name" :halign "start" :text title)
+      (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 26 :text sub))
+    (eventbox :cursor "pointer"
+      (button :class "bp-chip ${bp_confirm == id ? 'bp-chip-sure' : ''}"
+              :onclick "~/.config/bspwm/bin/BarPanelAction confirm '${id}' ${action} &"
+        {bp_confirm == id ? "Sure?" : label}))))
+
+(defwidget bp-s-disk_clean []
+  (bp-card :title "Clean up"
+    (box :orientation "v" :space-evenly false :spacing 2
+      (bp-clean :icon "󰃢" :title "App caches" :sub "${bp_disk.cache} cached by apps"
+                :id "clean-cache" :action "clean-cache" :label "Clear")
+      (bp-clean :icon "󰏗" :title "Package cache" :sub "${bp_disk.pkgs} of old downloads"
+                :id "clean-packages" :action "clean-packages" :label "Clear")
+      (bp-clean :icon "󰆴" :title "Unused packages"
+                :sub "${bp_disk.orphans} that nothing needs"
+                :id "clean-orphans" :action "clean-orphans" :label "Remove" :show {bp_disk.orphans > 0}))))
 
 (defwidget bp-s-disk_buttons []
   (box :space-evenly true :spacing 8
@@ -307,7 +344,7 @@
           (box :visible {r == "battery_awake"} :orientation "v" :space-evenly false (bp-s-battery_awake))))))
 
 (defwidget bp-o-cpu []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.cpu} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.cpu}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
         (box :visible {k == "cpu_graph"} :orientation "v" :space-evenly false (bp-s-cpu_graph))
@@ -316,7 +353,7 @@
         (box :visible {k == "cpu_button"} :orientation "v" :space-evenly false (bp-s-cpu_button))))))
 
 (defwidget bp-o-memory []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.memory} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.memory}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
         (box :visible {k == "memory_graph"} :orientation "v" :space-evenly false (bp-s-memory_graph))
@@ -324,13 +361,14 @@
         (box :visible {k == "memory_button"} :orientation "v" :space-evenly false (bp-s-memory_button))))))
 
 (defwidget bp-o-disk []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.disk} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.disk}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "disk_clean"} :orientation "v" :space-evenly false (bp-s-disk_clean))
         (box :visible {k == "disk_buttons"} :orientation "v" :space-evenly false (bp-s-disk_buttons))))))
 
 (defwidget bp-o-sound []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.sound} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.sound}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
         (box :visible {k == "sound_volume"} :orientation "v" :space-evenly false (bp-s-sound_volume))
@@ -339,7 +377,7 @@
         (box :visible {k == "sound_button"} :orientation "v" :space-evenly false (bp-s-sound_button))))))
 
 (defwidget bp-o-network []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.network} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.network}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
         (box :visible {k == "network_speed"} :orientation "v" :space-evenly false (bp-s-network_speed))
@@ -347,7 +385,7 @@
         (box :visible {k == "network_button"} :orientation "v" :space-evenly false (bp-s-network_button))))))
 
 (defwidget bp-o-battery []
-  (box :orientation "v" :space-evenly false :spacing 12
+  (box :visible {bp_show.any.battery} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.battery}
       (box :visible {bp_show[k]} :orientation "v" :space-evenly false
         (box :visible {k == "battery_details"} :orientation "v" :space-evenly false (bp-s-battery_details))
@@ -378,12 +416,13 @@
     (bp-head :icon "󰋊" :title "Storage"
              :sub {arraylength(bp_disk.disks) > 0 ? "${bp_disk.disks[0].free} free on the system drive" : ""}
              :value {arraylength(bp_disk.disks) > 0 ? "${bp_disk.disks[0].pct}%" : ""})
-    (for d in {bp_disk.disks}
-      (bp-card :title {d.name}
-        (bp-meter :value {d.pct})
-        (box :space-evenly false
-          (label :class "bp-dim" :halign "start" :hexpand true :text "${d.used} of ${d.size}")
-          (label :class "bp-dim" :text "${d.free} free"))))
+    (box :orientation "v" :space-evenly false :spacing 12    ;; (own box: keeps the disks above the sections)
+      (for d in {bp_disk.disks}
+        (bp-card :title {d.name}
+          (bp-meter :value {d.pct})
+          (box :space-evenly false
+            (label :class "bp-dim" :halign "start" :hexpand true :text "${d.used} of ${d.size}")
+            (label :class "bp-dim" :text "${d.free} free")))))
     (bp-o-disk)))
 
 ;; ================= Sound =================

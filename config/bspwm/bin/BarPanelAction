@@ -5,6 +5,10 @@
 #   vol-set N | vol-mute | mic-set N | mic-mute | sink NAME
 #   bright N | night | night-temp K | night-restore (at login) | awake | power-mode NAME
 #   airplane
+#   confirm ID ACTION...    first click arms the button ("Sure?"), a second
+#                           click within 4 s does ACTION (close apps, clean up)
+#   close PROCESS           close an app (all its processes)
+#   clean-cache | clean-packages | clean-orphans
 #   wifi-toggle | bt-toggle | view main|wifi|bt | wifi-scan
 #   wifi-connect N (position in the list) | bt-connect MAC
 #   run COMMAND...          close the dropdown, then run COMMAND
@@ -120,6 +124,45 @@ case "$1" in
             flip bp_network bt_on true; bluetoothctl power on
         fi >/dev/null 2>&1
         settled; push network bt ;;
+
+    confirm)
+        id=$2; shift 2
+        if [ "$("${EWW[@]}" get bp_confirm 2>/dev/null)" = "$id" ]; then
+            upd bp_confirm=""
+            exec "$0" "$@"
+        fi
+        upd bp_confirm="$id"
+        sleep 4
+        [ "$("${EWW[@]}" get bp_confirm 2>/dev/null)" = "$id" ] && upd bp_confirm="" ;;
+
+    close)      # an app from the CPU/Memory dropdown (never the desktop's own processes)
+        [ "$("$BIN/BarPanelData" closable "$2" 2>/dev/null)" = false ] && exit 1
+        pkill -TERM -x -- "$2"
+        sleep 1.5; push memory; "$BIN/BarPanelData" cpu --fast --push ;;
+
+    clean-cache)    # ~/.cache: thumbnails, browser and app caches (apps rebuild them)
+        before=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
+        find "$HOME/.cache" -mindepth 1 -maxdepth 1 ! -name "control-center" -exec rm -rf {} + 2>/dev/null
+        after=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
+        notify-send -a "Storage" -i edit-clear "Caches cleared" \
+            "$(numfmt --to=iec --suffix=B $(( ${before:-0} - ${after:-0} ))) freed"
+        push disk ;;
+
+    clean-packages) # downloaded package files pacman keeps after installing
+        before=$(du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1)
+        pkexec sh -c 'paccache -rk0; paccache -ruk0' >/dev/null 2>&1 || { push disk; exit 0; }
+        after=$(du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1)
+        notify-send -a "Storage" -i edit-clear "Package cache cleared" \
+            "$(numfmt --to=iec --suffix=B $(( ${before:-0} - ${after:-0} ))) freed"
+        push disk ;;
+
+    clean-orphans)  # packages installed as dependencies that nothing needs any more
+        mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
+        [ "${#orphans[@]}" -gt 0 ] || exit 0
+        if pkexec pacman -Rns --noconfirm "${orphans[@]}" >/dev/null 2>&1; then
+            notify-send -a "Storage" -i edit-clear "Removed ${#orphans[@]} unused package(s)" "${orphans[*]}"
+        fi
+        push disk ;;
 
     view)
         # Fill the list before showing it (networks from the last scan), so

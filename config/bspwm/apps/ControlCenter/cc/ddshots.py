@@ -21,7 +21,7 @@ HEAD = 42           # height of a dropdown's header (bp-head)
 GAP = 12            # space between sections
 
 
-VERSION = "6"       # bump when the way pictures are cut changes
+VERSION = "7"       # bump when the way pictures are cut changes
 
 
 def cache_dir():
@@ -129,11 +129,10 @@ def capture(done_one=None):
             # Border + padding around the content, measured once on a dropdown
             # that's only its header with every section off (not Storage: its
             # disk cards always show)
-            # (the sections' box is there even when empty, with its gap)
             if edge is None:
-                edge = max(0, (h0 - HEAD - GAP) // 2)
+                edge = max(0, (h0 - HEAD) // 2)
             # Everything above the sections: the header (and Storage's disk cards)
-            top = h0 - 2 * edge - GAP
+            top = h0 - 2 * edge
             if top > 0:
                 head.new_subpixbuf(edge, edge, head.get_width() - 2 * edge, top).savev(
                     os.path.join(folder, f"head_{name}.png"), "png", [], [])
@@ -144,7 +143,7 @@ def capture(done_one=None):
                 if pix is None:
                     continue
                 h1, w = pix.get_height(), pix.get_width()
-                section = h1 - h0
+                section = h1 - h0 - GAP
                 if section <= 4:                       # (not shown on this computer, e.g. no power modes)
                     continue
                 part = pix.new_subpixbuf(edge, h1 - edge - section, w - 2 * edge, section)

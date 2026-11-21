@@ -441,3 +441,43 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-month:indeterminate {
   color: rgba($fg, 0.3);
 }
+
+// ----- close an app / clean up (second click confirms) ----- //
+
+.bp-panel .bp-x {
+  font-family: $bp-icons;
+  font-size: 13px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0 4px;
+  border-radius: $nc-pill-radius;
+  color: rgba($fg, 0.45);
+}
+
+.bp-panel .bp-x:hover {
+  color: $fg;
+  background-color: rgba($red, 0.18);
+}
+
+.bp-x-space {
+  min-width: 30px;       // same as the close button, so values line up
+}
+
+.bp-panel .bp-x-sure,
+.bp-panel .bp-x-sure:hover {
+  font-family: $nc-font;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 0 8px;
+  color: #ffffff;
+  background-color: $red;
+}
+
+.bp-panel .bp-chip-sure,
+.bp-panel .bp-chip-sure:hover {
+  background-color: $red;
+}
+
+.bp-panel .bp-chip-sure label {
+  color: #ffffff;
+}

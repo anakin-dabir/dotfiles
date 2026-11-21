@@ -6,8 +6,9 @@ Saved in config/dropdowns.json, which BarPanel hands to eww as bp_show:
                                                 connections, Battery's switches)
                                                 is shown if any row is
    "order": {"<dropdown>": [...], "<card>": [...]},
-   "first": {"<card>": "<row>"}}                the card's first shown row
+   "first": {"<card>": "<row>"},                the card's first shown row
                                                 (no divider line above it)
+   "any": {"<dropdown>": true/false}}           anything shown below the header
 """
 
 import json
@@ -31,6 +32,7 @@ DROPDOWNS = [
         ("memory_button", "System Monitor button"),
     ]),
     ("disk", "Storage", [
+        ("disk_clean", "Clean up (caches, unused packages)"),
         ("disk_buttons", "Files and Analyze buttons"),
     ]),
     ("sound", "Sound", [
@@ -80,7 +82,11 @@ def _fix_order(saved):
     out = {}
     for key, default in DEFAULT_ORDER.items():
         got = [x for x in (saved or {}).get(key, []) if x in default]
-        out[key] = got + [x for x in default if x not in got]
+        for x in default:                 # new sections go where they are by default
+            if x not in got:
+                later = [y for y in default[default.index(x) + 1:] if y in got]
+                got.insert(got.index(later[0]) if later else len(got), x)
+        out[key] = got
     return out
 
 
@@ -94,6 +100,8 @@ def build(shown, order):
         first[card] = next((r for r in order[card] if out[r]), "")
     out["order"] = order
     out["first"] = first
+    # Does a dropdown show anything below its header? (no empty gap if not)
+    out["any"] = {dd: any(out[u] for u in order[dd]) for dd, _t, _u in DROPDOWNS}
     return out
 
 

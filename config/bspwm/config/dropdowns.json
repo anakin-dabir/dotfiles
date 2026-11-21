@@ -6,6 +6,7 @@
   "memory_graph": false,
   "memory_apps": false,
   "memory_button": false,
+  "disk_clean": true,
   "disk_buttons": true,
   "sound_volume": true,
   "sound_output": true,
@@ -37,6 +38,7 @@
       "memory_button"
     ],
     "disk": [
+      "disk_clean",
       "disk_buttons"
     ],
     "sound": [
@@ -70,5 +72,13 @@
   "first": {
     "network_rows": "network_airplane",
     "battery_toggles": "battery_night"
+  },
+  "any": {
+    "cpu": true,
+    "memory": false,
+    "disk": true,
+    "sound": true,
+    "network": true,
+    "battery": true
   }
 }
