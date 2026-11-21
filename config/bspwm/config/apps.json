@@ -2,5 +2,12 @@
   "browser": "google-chrome-stable",
   "files": "thunar",
   "editor": "code dash/",
-  "text_editor": "geany"
+  "text_editor": "geany",
+  "chat": "telegram-desktop",
+  "whatsapp": "firefox -new-tab https://web.whatsapp.com/",
+  "mixer": "pavucontrol",
+  "monitor": "gnome-system-monitor",
+  "tui_files": "yazi",
+  "tui_editor": "nvim",
+  "tui_music": "ncmpcpp"
 }

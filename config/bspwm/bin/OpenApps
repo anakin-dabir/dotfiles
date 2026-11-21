@@ -79,13 +79,13 @@ case "$1" in
 		run_app text_editor geany
 		;;
 	--telegram)
-		telegram-desktop
+		run_app chat telegram-desktop
 		;;
 	--whats)
-		firefox -new-tab https://web.whatsapp.com/
+		run_app whatsapp "firefox -new-tab https://web.whatsapp.com/"
 		;;
 	--soundcontrol)
-		pavucontrol
+		run_app mixer pavucontrol
 		;;
 		# Eww Widgets
 	--KeyHelp)
@@ -116,7 +116,7 @@ case "$1" in
 		"$HOME"/.config/bspwm/bin/sandbox-menu-nvidia
 		;;
 	--monitor)
-		gnome-system-monitor
+		run_app monitor gnome-system-monitor
 		;;
 	*)
 		echo "Invalid Option"

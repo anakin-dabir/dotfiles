@@ -23,14 +23,38 @@ APPS = os.path.join(BSPDIR, "config", "apps.json")
 STARTUP = os.path.join(BSPDIR, "config", "startup.json")
 TERM = os.path.join(BSPDIR, "config", ".term")
 
-# (key in apps.json, title, what it's for, categories it can be, default command)
+# (key in apps.json, title, OpenApps option (for its shortcut), categories it can be, default command)
 KINDS = [
-    ("browser", "Web browser", "Super + W", ("WebBrowser",), "google-chrome-stable"),
-    ("files", "File manager", "Super + R and the dropdowns' Files buttons", ("FileManager",), "thunar"),
-    ("editor", "Code editor", "Super + E", ("IDE", "TextEditor"), "code dash/"),
-    ("text_editor", "Text editor", "Quick notes and files", ("TextEditor",), "geany"),
+    ("browser", "Web browser", "browser", ("WebBrowser",), "google-chrome-stable"),
+    ("files", "File manager", "filemanager", ("FileManager",), "thunar"),
+    ("editor", "Code editor", "code", ("IDE", "TextEditor"), "code dash/"),
+    ("text_editor", "Text editor", "editor", ("TextEditor",), "geany"),
+    ("chat", "Chat app", "telegram", ("InstantMessaging", "Chat"), "telegram-desktop"),
+    ("mixer", "Sound mixer", "soundcontrol", ("Mixer",), "pavucontrol"),
+    ("monitor", "System monitor", "monitor", ("Monitor",), "gnome-system-monitor"),
 ]
-TERMINALS = [("alacritty", "Alacritty"), ("kitty", "kitty"), ("st", "St")]   # (what bin/Term knows)
+# Apps that run inside the terminal: (key, title, OpenApps option, choices, default)
+TUIS = [
+    ("tui_files", "Files in the terminal", "yazi", ["yazi", "ranger", "lf", "nnn", "mc"], "yazi"),
+    ("tui_editor", "Editor in the terminal", "nvim", ["nvim", "vim", "hx", "helix", "micro", "nano", "emacs -nw"], "nvim"),
+    ("tui_music", "Music in the terminal", "music", ["ncmpcpp", "cmus", "termusic", "musikcube", "spotify_player"], "ncmpcpp"),
+]
+
+
+def shortcut_of(option):
+    """The keys that open it ("Super + W"), from your shortcuts."""
+    try:
+        from .. import shortcuts as sk
+        for a in sk.actions():
+            if a.on and not a.is_set and f"OpenApps --{option}" in a.command and \
+                    f"OpenApps --{option}-" not in a.command:
+                return sk.pretty(a.keys)
+    except Exception:                       # noqa: BLE001  (just no subtitle)
+        pass
+    return "No shortcut"
+
+
+TERMINALS = [("alacritty", "Alacritty"), ("kitty", "kitty"), ("st", "St"), ("ghostty", "Ghostty")]   # (bin/Term)
 
 
 def _load(path, default):
@@ -86,7 +110,7 @@ class AppsPage(Page):
 
         defaults = group(self, "Default apps", "What your shortcuts and the bar's buttons open. Saved right away.")
         self.terms = [(k, t) for k, t in TERMINALS if GLib.find_program_in_path(k)]
-        self.term = Adw.ComboRow(title="Terminal", subtitle="Super + Q", model=Gtk.StringList.new([t for _k, t in self.terms]))
+        self.term = Adw.ComboRow(title="Terminal", subtitle=shortcut_of("terminal"), model=Gtk.StringList.new([t for _k, t in self.terms]))
         cur = read_file(TERM, "alacritty").strip().lower()
         if cur in [k for k, _t in self.terms]:
             self.term.set_selected([k for k, _t in self.terms].index(cur))
@@ -95,7 +119,8 @@ class AppsPage(Page):
         defaults.add(self.term)
 
         self.kind_rows = {}
-        for key, title, sub, cats, default in KINDS:
+        for key, title, option, cats, default in KINDS:
+            sub = shortcut_of(option)
             choices = installed(cats)
             current = apps.get(key, default)
             # The current one, even if it isn't a listed app (e.g. "code dash/")
@@ -103,7 +128,8 @@ class AppsPage(Page):
             cmds = [command_of(a) for a in choices]
             idx = next((i for i, c in enumerate(cmds) if program(c) == program(current)), None)
             if idx is None:
-                names.append(current)
+                ok = bool(GLib.find_program_in_path(program(current) or current.split()[0]))
+                names.append(current + ("" if ok else " (not installed)"))
                 cmds.append(current)
                 idx = len(cmds) - 1
             else:
@@ -123,6 +149,27 @@ class AppsPage(Page):
                 self.folder.set_text(ed[1] if len(ed) > 1 else "")
                 self.folder.connect("apply", lambda r: self._folder(r.get_text().strip()))
                 defaults.add(self.folder)
+
+        # WhatsApp: any command (a web app in a browser, or an app)
+        self.whats = Adw.EntryRow(title=f"WhatsApp · {shortcut_of('whats')} (a command)", show_apply_button=True)
+        self.whats.set_text(apps.get("whatsapp", "firefox -new-tab https://web.whatsapp.com/"))
+        self.whats.connect("apply", lambda r: (self._set("whatsapp", r.get_text().strip()), self.toast("Saved")))
+        defaults.add(self.whats)
+
+        tui = group(self, "In the terminal", "Programs that open inside your terminal.")
+        for key, title, option, options, default in TUIS:
+            have_ = [o for o in options if GLib.find_program_in_path(o.split()[0])]
+            current = apps.get(key, default)
+            if current not in have_:
+                have_.append(current)
+            row = Adw.ComboRow(title=title, subtitle=shortcut_of(option), model=Gtk.StringList.new(
+                [o + ("" if GLib.find_program_in_path(o.split()[0]) else " (not installed)") for o in have_]))
+            row.set_selected(have_.index(current))
+            row.cmds = have_
+            row.add_prefix(Gtk.Image.new_from_icon_name("utilities-terminal-symbolic"))
+            row.connect("notify::selected", lambda r, _p, k=key, t=title: self._updating or (
+                self._set(k, r.cmds[r.get_selected()]), self.toast(f"{t}: {r.cmds[r.get_selected()]}")))
+            tui.add(row)
 
         self.start = group(self, "Startup apps", "Open by themselves when you log in. Add one with + at the top right.")
         # "+" at the top right of the window: add a startup app
