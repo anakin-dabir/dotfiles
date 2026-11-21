@@ -489,3 +489,45 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-chip-sure label {
   color: #ffffff;
 }
+
+// ----- clean up (Storage) ----- //
+
+.bp-panel .bp-clean-badge {
+  font-family: $bp-icons;
+  font-size: 16px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: $nc-pill-radius;
+  color: $red;
+  background-color: rgba($red, 0.14);
+}
+
+.bp-panel .bp-danger {
+  min-width: 52px;        // same width for Clear and Remove
+  padding: 5px 12px;
+  border-radius: $nc-pill-radius;
+  background-color: rgba($red, 0.16);
+}
+
+.bp-panel .bp-danger label {
+  font-size: 11px;
+  font-weight: bold;
+  color: $red;
+}
+
+.bp-panel .bp-danger:hover {
+  background-color: rgba($red, 0.28);
+}
+
+.bp-panel .bp-danger-sure,
+.bp-panel .bp-danger-sure:hover {
+  background-color: $red;
+}
+
+.bp-panel .bp-danger-sure label {
+  color: #ffffff;
+}
+
+.bp-sep-clean {
+  margin: 0 0 0 44px;     // lines start under the text, after the badge
+}

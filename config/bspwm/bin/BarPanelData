@@ -108,7 +108,8 @@ disk() {
     orphans=$(pacman -Qdtq 2>/dev/null | wc -l)
     jq -c --arg cache "$(human "${cache:-0}")" --argjson cache_b "${cache:-0}" \
         --arg pkgs "$(human "${pkgs:-0}")" --argjson pkgs_b "${pkgs:-0}" --argjson orphans "${orphans:-0}" \
-        '{disks: ., cache: $cache, cache_b: $cache_b, pkgs: $pkgs, pkgs_b: $pkgs_b, orphans: $orphans}' "$RUN/disks.json"
+        --arg total "$(human $(( ${cache:-0} + ${pkgs:-0} )))" \
+        '{disks: ., cache: $cache, cache_b: $cache_b, pkgs: $pkgs, pkgs_b: $pkgs_b, orphans: $orphans, total: $total}' "$RUN/disks.json"
 }
 
 sound() {

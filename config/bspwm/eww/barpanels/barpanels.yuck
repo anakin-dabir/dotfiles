@@ -197,27 +197,35 @@
   (bp-button :icon "󰍹" :text "System Monitor"
              :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -p &"))
 
-(defwidget bp-clean [icon title sub id action label ?show]
-  (box :class "bp-item" :space-evenly false :spacing 12 :visible {show == "" ? true : show}
-    (label :class "bp-item-icon" :text icon)
+;; One clean-up action: red badge, what it is, a red button (second click confirms)
+(defwidget bp-clean [icon title sub id action label]
+  (box :class "bp-clean" :space-evenly false :spacing 12
+    (label :class "bp-clean-badge" :valign "center" :text icon)
     (box :orientation "v" :space-evenly false :hexpand true :valign "center"
       (label :class "bp-item-name" :halign "start" :text title)
-      (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 26 :text sub))
-    (eventbox :cursor "pointer"
-      (button :class "bp-chip ${bp_confirm == id ? 'bp-chip-sure' : ''}"
+      (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 24 :text sub))
+    (eventbox :cursor "pointer" :valign "center"
+      (button :class "bp-danger ${bp_confirm == id ? 'bp-danger-sure' : ''}"
+              :tooltip {bp_confirm == id ? "Click again to do it" : ""}
               :onclick "~/.config/bspwm/bin/BarPanelAction confirm '${id}' ${action} &"
         {bp_confirm == id ? "Sure?" : label}))))
 
 (defwidget bp-s-disk_clean []
-  (bp-card :title "Clean up"
-    (box :orientation "v" :space-evenly false :spacing 2
-      (bp-clean :icon "󰃢" :title "App caches" :sub "${bp_disk.cache} cached by apps"
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 8
+    (box :space-evenly false
+      (label :class "bp-section" :halign "start" :hexpand true :text "Clean up")
+      (label :class "bp-dim" :text "up to ${bp_disk.total}"))
+    (box :orientation "v" :space-evenly false :spacing 8
+      (bp-clean :icon "󰃢" :title "App caches" :sub "${bp_disk.cache} · thumbnails, browsers"
                 :id "clean-cache" :action "clean-cache" :label "Clear")
-      (bp-clean :icon "󰏗" :title "Package cache" :sub "${bp_disk.pkgs} of old downloads"
+      (box :class "bp-sep bp-sep-clean")
+      (bp-clean :icon "󰏗" :title "Package cache" :sub "${bp_disk.pkgs} · old downloads"
                 :id "clean-packages" :action "clean-packages" :label "Clear")
-      (bp-clean :icon "󰆴" :title "Unused packages"
-                :sub "${bp_disk.orphans} that nothing needs"
-                :id "clean-orphans" :action "clean-orphans" :label "Remove" :show {bp_disk.orphans > 0}))))
+      (box :visible {bp_disk.orphans > 0} :orientation "v" :space-evenly false :spacing 8
+        (box :class "bp-sep bp-sep-clean")
+        (bp-clean :icon "󰆴" :title "Unused packages"
+                  :sub "${bp_disk.orphans} that nothing needs"
+                  :id "clean-orphans" :action "clean-orphans" :label "Remove")))))
 
 (defwidget bp-s-disk_buttons []
   (box :space-evenly true :spacing 8
