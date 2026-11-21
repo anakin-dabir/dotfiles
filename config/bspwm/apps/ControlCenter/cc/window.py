@@ -22,10 +22,11 @@ from .pages.notifications import NotificationsPage
 from .pages.power import PowerPage
 from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
+from .pages.typing import TypingPage
 from .pages.updates import UpdatesPage
 
 PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, DisplayPage, SoundPage, NetworkPage,
-         BluetoothPage, ShortcutsPage]
+         BluetoothPage, ShortcutsPage, TypingPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
 PAGES += [PowerPage, NotificationsPage, UpdatesPage, AboutPage]
@@ -50,6 +51,7 @@ KEYWORDS = {
     "about": "system version kernel computer",
     "shortcuts": "keys keybindings hotkeys sxhkd keyboard shortcuts",
     "updates": "upgrade pacman aur yay paru packages system update",
+    "typing": "keyboard layout language caps lock key repeat urdu arabic input",
     "apps": "default browser file manager editor terminal startup autostart login",
 }
 

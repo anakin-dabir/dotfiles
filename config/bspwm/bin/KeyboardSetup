@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Typing settings (Control Center > Typing): layouts, the key that switches
+# between them, Caps Lock, key repeat. From config/typing.json; run at login
+# by bspwmrc and by Control Center after a change.
+
+CFG="$HOME/.config/bspwm/config/typing.json"
+[ -s "$CFG" ] || exit 0
+layouts=$(jq -r '.layouts | map(split(":")[0]) | join(",")' "$CFG")
+variants=$(jq -r '.layouts | map(split(":")[1] // "") | join(",")' "$CFG")
+opts=$(jq -r '["terminate:ctrl_alt_bksp", .switch, .caps] | map(select(. != null and . != "")) | join(",")' "$CFG")
+args=(-layout "${layouts:-us}")
+[ -n "${variants//,/}" ] && args+=(-variant "$variants")
+setxkbmap "${args[@]}" -option "" -option "$opts"
+xset r rate "$(jq -r '.delay // 660' "$CFG")" "$(jq -r '.rate // 25' "$CFG")"
+# sxhkd's shortcuts need the keys again after a layout change
+pkill -USR1 -x sxhkd 2>/dev/null
+exit 0

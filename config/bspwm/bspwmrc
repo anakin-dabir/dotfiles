@@ -91,6 +91,9 @@ fi
 xset -dpms
 xset s off
 
+# Keyboard layouts, Caps Lock, key repeat (Control Center > Typing)
+KeyboardSetup &
+
 # Dark screen / lock when you're away, lock before sleep (Control Center > Power)
 IdleWatch &
 
