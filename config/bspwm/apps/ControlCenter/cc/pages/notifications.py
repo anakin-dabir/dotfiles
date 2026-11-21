@@ -7,7 +7,31 @@ import time
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..common import HOME, Page, group, launch, run, run_quiet, text_button, tool
+from ..common import BSPDIR, HOME, Page, group, launch, run, run_quiet, text_button, tool
+
+SETTINGS = os.path.join(BSPDIR, "config", "notifications.json")
+DUNST_MINE = os.path.join(HOME, ".config", "dunst", "dunstrc.d", "zz-yours.conf")
+STAY = [(3, "3 seconds"), (5, "5 seconds"), (8, "8 seconds"), (12, "12 seconds"), (0, "Until clicked")]
+LIMIT = [(1, "1"), (3, "3"), (5, "5"), (10, "10"), (20, "20")]
+
+
+def pop_settings():
+    try:
+        with open(SETTINGS) as f:
+            s = json.load(f)
+    except (OSError, ValueError):
+        s = {}
+    return {"stay": int(s.get("stay", 5)), "limit": int(s.get("limit", 20)), "sound": bool(s.get("sound", False))}
+
+
+def write_dunst(p):
+    """Your choices on top of the theme's (dunstrc.d is read in name order)."""
+    t = p["stay"]
+    with open(DUNST_MINE, "w") as f:
+        f.write("# Your choices from Control Center > Notifications (kept when the theme changes)\n\n"
+                f"[global]\nnotification_limit = {p['limit']}\n\n"
+                f"[urgency_low]\ntimeout = {min(t, 3) if t else 0}\n\n"
+                f"[urgency_normal]\ntimeout = {t}\n")
 
 STATE = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.join(HOME, ".local", "state")), "notifications")
 LOG = os.path.join(STATE, "log.jsonl")
@@ -57,8 +81,46 @@ class NotificationsPage(Page):
              "Hello there", "This is how notifications look in this theme."])))
         hist.add(test)
 
+        pops = group(self, "Pop-ups", "Your choices stay when you change the theme.")
+        self.stay = Adw.ComboRow(title="Pop-ups stay for", subtitle="Urgent ones stay until clicked",
+                                 model=Gtk.StringList.new([t for _v, t in STAY]))
+        self.stay.connect("notify::selected", lambda r, _p: self._pop(stay=STAY[r.get_selected()][0]))
+        pops.add(self.stay)
+        self.limit = Adw.ComboRow(title="At most on screen", subtitle="More wait their turn",
+                                  model=Gtk.StringList.new([t for _v, t in LIMIT]))
+        self.limit.connect("notify::selected", lambda r, _p: self._pop(limit=LIMIT[r.get_selected()][0]))
+        pops.add(self.limit)
+        self.sound = Adw.SwitchRow(title="Sound", subtitle="A short sound with each notification (not in Do not disturb)")
+        self.sound.connect("notify::active", lambda r, _p: self._pop(sound=r.get_active()))
+        pops.add(self.sound)
+        self._load_pops()
+
         self.recent = group(self, "Recent")
         self.recent_rows = []
+
+    def _load_pops(self):
+        p = pop_settings()
+
+        def put():
+            self.stay.set_selected(next((i for i, (v, _t) in enumerate(STAY) if v == p["stay"]), 1))
+            self.limit.set_selected(next((i for i, (v, _t) in enumerate(LIMIT) if v == p["limit"]), 4))
+            self.sound.set_active(p["sound"])
+        self.quietly(put)
+
+    def _pop(self, **changes):
+        if self._updating:
+            return
+        p = pop_settings()
+        p.update(changes)
+        try:
+            with open(SETTINGS, "w") as f:
+                json.dump(p, f, indent=2)
+                f.write("\n")
+            write_dunst(p)
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        run_quiet(["dunstctl", "reload"])
 
     def _dnd(self, row, _p):
         if self._updating or row.get_active() == self.dnd_on:

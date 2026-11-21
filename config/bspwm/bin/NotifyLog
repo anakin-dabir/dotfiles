@@ -15,6 +15,12 @@ KEEP=500
 
 mkdir -p "$(dirname "$LOG")" "$ICONS"
 
+# A short sound, if you chose it (Control Center > Notifications), not in Do not disturb
+if [ "$(jq -r '.sound // false' "$HOME/.config/bspwm/config/notifications.json" 2>/dev/null)" = true ] &&
+   [ "$(dunstctl is-paused 2>/dev/null)" != true ]; then
+    paplay /usr/share/sounds/freedesktop/stereo/message.oga >/dev/null 2>&1 &
+fi
+
 # Apps like browsers pass icons from temporary folders that vanish later;
 # keep a copy so the history still shows them.
 icon="$DUNST_ICON_PATH"
