@@ -5,10 +5,11 @@ import glob
 import os
 import re
 
-from gi.repository import Adw, Gdk, Gtk, Pango
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 from .. import rice
 from ..pickers import ColorButton, FontButton
+from ..preview import DesktopPreview
 from ..common import Page, current_rice, group, read_file, run_quiet, text_button, tool
 
 COLORS = [
@@ -86,6 +87,12 @@ class CustomizePage(Page):
         self.reset_btn = text_button("Reset…", self._reset)
         self.intro_row.add_suffix(self.reset_btn)
         self.intro.add(self.intro_row)
+        self.preview = DesktopPreview()
+        self.preview.set_margin_top(10)
+        self.preview.set_margin_bottom(10)
+        self.preview.set_margin_start(10)
+        self.preview.set_margin_end(10)
+        self.intro.add(Adw.PreferencesRow(activatable=False, child=self.preview))
 
         colors = group(self, "Colors")
         for var, title, sub in COLORS:
@@ -133,7 +140,18 @@ class CustomizePage(Page):
             self.changes.pop(var, None)
         else:
             self.changes[var] = value
+        self._show_preview()
         self.window.update_pending()
+
+    def _show_preview(self):
+        v = {**self.vals, **self.changes}
+        bar = v.get("main_bar", "")
+        if bar and rice.is_polybar(bar):
+            sections = rice.launched_sections(bar)
+            font = rice.bar_text_font(bar, sections[0]) if sections else None
+            if font:
+                v["_bar_font"] = f"{font[0]} {font[1]:g}"
+        self.preview.update(v)
 
     def _color_row(self, var, title, sub):
         row = Adw.ActionRow(title=title, subtitle=sub)
@@ -229,6 +247,7 @@ class CustomizePage(Page):
                     if val:
                         w.set_desc(Pango.FontDescription.from_string(val))
         self.quietly(put)
+        self._show_preview()
         self.window.update_pending()
 
     def refresh(self):
@@ -242,7 +261,7 @@ class CustomizePage(Page):
     def discard(self):
         self.load()
 
-    def apply(self):
+    def _changes_to_write(self):
         changes = dict(self.changes)
         # The bar's see-through background follows a new background colour
         if "bg" in changes and "bg_alpha_css" in self.vals:
@@ -251,14 +270,76 @@ class CustomizePage(Page):
                 h = changes["bg"].lstrip("#")
                 r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
                 changes["bg_alpha_css"] = f"rgba({r}, {g}, {b}, {m.group(1)})"
+        return changes
+
+    def apply(self):
         try:
-            rice.set_theme_vars(changes)
+            rice.set_theme_vars(self._changes_to_write())
         except OSError as e:
             self.toast(f"Couldn't save: {e.strerror}")
             return
         self.changes = {}
         self.window.update_pending()
         self._run_theme("Applying your changes…", "Changes applied")
+
+    def try_out(self):
+        """Use the changes on the real desktop, then keep them or go back
+        (automatically after 15 seconds)."""
+        path = rice.theme_file()
+        had_original = rice.has_original(path)
+        with open(path) as f:
+            before = f.read()
+        try:
+            rice.set_theme_vars(self._changes_to_write())
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self.set_sensitive(False)
+        self.window.pending_bar.set_sensitive(False)
+
+        def ask(_ok):
+            left = [15]
+            d = Adw.AlertDialog(heading="Keep these changes?", body=f"Going back in {left[0]} seconds…")
+            d.add_response("back", "Go Back")
+            d.add_response("keep", "Keep")
+            d.set_response_appearance("keep", Adw.ResponseAppearance.SUGGESTED)
+            d.set_default_response("keep")
+            d.set_close_response("back")
+
+            def tick():
+                left[0] -= 1
+                if left[0] <= 0:
+                    d.force_close()
+                    return False
+                d.set_body(f"Going back in {left[0]} seconds…")
+                return True
+            timer = GLib.timeout_add_seconds(1, tick)
+
+            def answered(_d, response):
+                if left[0] > 0:
+                    GLib.source_remove(timer)
+                self.window.pending_bar.set_sensitive(True)
+                if response == "keep":
+                    self.set_sensitive(True)
+                    self.changes = {}
+                    self.load()
+                    self.toast("Changes kept")
+                    return
+                # Back to how it was; the edits stay here to adjust or discard
+                if had_original:
+                    with open(path, "w") as f:
+                        f.write(before)
+                else:
+                    rice.restore_original(path)       # untouched again: no backup needed
+
+                def back(_ok):
+                    self.set_sensitive(True)
+                    self.toast("Went back. Your edits are still here.")
+                    self.window.update_pending()
+                run_quiet([tool("Theme.sh")], back)
+            d.connect("response", answered)
+            d.present(self.window)
+        run_quiet([tool("Theme.sh")], ask)
 
     def _run_theme(self, start, done):
         self.toast(start)

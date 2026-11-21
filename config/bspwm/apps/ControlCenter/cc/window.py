@@ -1,6 +1,9 @@
 """Main window: a sidebar of sections and the selected section's page."""
 
-from gi.repository import Adw, GLib, Gtk
+import gi
+
+gi.require_version("Graphene", "1.0")
+from gi.repository import Adw, GLib, Graphene, Gtk  # noqa: E402
 
 from .common import set_pointer_root, widgets_changed
 from .pages.about import AboutPage
@@ -46,8 +49,11 @@ class Window(Adw.ApplicationWindow):
         apply.add_css_class("suggested-action")
         apply.connect("clicked", lambda *_: self.page.apply())
         bar = Gtk.Box(spacing=8, margin_start=12, margin_end=12, margin_top=8, margin_bottom=8)
+        self.try_btn = Gtk.Button(label="Try It", tooltip_text="Use the changes for a moment, then keep them or go back")
+        self.try_btn.connect("clicked", lambda *_: self.page.try_out())
         bar.append(self.pending_label)
         bar.append(discard)
+        bar.append(self.try_btn)
         bar.append(apply)
         self.pending_bar = Gtk.Revealer(child=bar, transition_type=Gtk.RevealerTransitionType.SLIDE_UP)
         content_view.add_bottom_bar(self.pending_bar)
@@ -82,7 +88,50 @@ class Window(Adw.ApplicationWindow):
         set_pointer_root(lambda: self)
         # Dialogs (password, confirmations) appear inside the window
         self.connect("notify::visible-dialog", lambda *_: widgets_changed())
+        self.connect("notify::visible-dialog", self._dialog_shown)
         self.connect("close-request", self._closing)
+
+
+    def _dialog_shown(self, *_):
+        """A click outside an open dialog's card closes it. The dialog covers
+        the whole window and gets every click itself, so it listens."""
+        d = self.get_visible_dialog()
+        if d is None or getattr(d, "_outside_close", False):
+            return
+        d._outside_close = True
+        g = Gtk.GestureClick(button=0)
+        g.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        g.connect("pressed", lambda gesture, _n, x, y: self._dialog_click(d, gesture, x, y))
+        d.add_controller(g)
+
+    @staticmethod
+    def _card(d):
+        """The visible card inside a dialog: its biggest part that's smaller
+        than the dialog itself (which covers the whole window)."""
+        full = d.get_width() * d.get_height()
+        best, best_area, todo = None, 0, [d]
+        while todo:
+            w = todo.pop()
+            c = w.get_first_child()
+            while c is not None:
+                if c.get_mapped():
+                    area = c.get_width() * c.get_height()
+                    if area < full * 0.95:
+                        if area > best_area:
+                            best, best_area = c, area
+                    else:
+                        todo.append(c)
+                c = c.get_next_sibling()
+        return best
+
+    def _dialog_click(self, d, gesture, x, y):
+        card = self._card(d)
+        if card is None:
+            return
+        ok, bounds = card.compute_bounds(d)
+        if ok and not bounds.contains_point(Graphene.Point().init(x, y)):
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+            d.close()
 
     # ----- navigation -----
 
@@ -137,6 +186,7 @@ class Window(Adw.ApplicationWindow):
             return
         text = self.page.pending_text() if self.page else ""
         self.pending_label.set_label(text)
+        self.try_btn.set_visible(hasattr(self.page, "try_out"))
         self.pending_bar.set_reveal_child(bool(text))
         widgets_changed()
 
