@@ -26,7 +26,6 @@ window_of() { [ "$1" = notifcenter ] && echo notifcenter || echo "bp-$1"; }
 open_windows() { xdotool search --name '^Eww - (notifcenter|bp-(cpu|memory|disk|sound|network|battery|calendar))$' 2>/dev/null; }
 current() { cat "$STATE/open" 2>/dev/null; }
 
-ensure_eww() { "$BSPDIR/bin/EwwDaemon" 7>&-; }
 
 start_watcher() {
     stop_watcher
@@ -39,6 +38,14 @@ stop_watcher() {
     local pid; pid=$(cat "$STATE/watcher.pid" 2>/dev/null) || return
     rm -f "$STATE/watcher.pid"
     pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
+}
+
+# A window's x y width height, in G (one xdotool call, no sed)
+geometry() {
+    local out; out=$(xdotool getwindowgeometry --shell "$1" 2>/dev/null)
+    G=(0 0 0 0)
+    [[ $out =~ X=(-?[0-9]+).*Y=(-?[0-9]+).*WIDTH=([0-9]+).*HEIGHT=([0-9]+) ]] &&
+        G=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}")
 }
 
 # Where the dropdown goes. Prints: monitor-number panel-pos anchor closer-pos closer-size max-height
@@ -57,8 +64,7 @@ place() { # $1 = panel width
         local w g best=0 gx gw
         for w in $(xdotool search --onlyvisible --class 'Polybar' 2>/dev/null) \
                  $(xdotool search --onlyvisible --name '^Eww - bar$' 2>/dev/null); do
-            g=$(xdotool getwindowgeometry --shell "$w")
-            gx=$(sed -n 's/^X=//p' <<< "$g"); gw=$(sed -n 's/^WIDTH=//p' <<< "$g")
+            geometry "$w"; gx=${G[0]}; gw=${G[2]}
             (( gx < mx || gx >= mx + mw )) && continue
             (( gw > best )) && { best=$gw; bar=$w; }
         done
@@ -66,9 +72,8 @@ place() { # $1 = panel width
 
     local bx=0 by=0 bw=0 bh=0
     if [ -n "$bar" ]; then
-        local g; g=$(xdotool getwindowgeometry --shell "$bar")
-        bx=$(( $(sed -n 's/^X=//p' <<< "$g") - mx )); by=$(( $(sed -n 's/^Y=//p' <<< "$g") - my ))
-        bw=$(sed -n 's/^WIDTH=//p' <<< "$g"); bh=$(sed -n 's/^HEIGHT=//p' <<< "$g")
+        geometry "$bar"
+        bx=$(( G[0] - mx )); by=$(( G[1] - my )); bw=${G[2]}; bh=${G[3]}
     fi
 
     # The click-outside layer covers the screen except the bar, so clicking
@@ -127,7 +132,7 @@ close() {
 open() { # $1 = name
     local name=$1 win placement mon pos anchor rest cpos csize maxh
     win=$(window_of "$name")
-    ensure_eww || { notify-send -u low "Bar menu" "eww isn't responding"; return 1; }
+    # (no "is eww alive?" check first: if eww doesn't answer below, it's restarted then)
     # Load the data while working out the position (the notification panel
     # needs the position first: its height depends on the space left)
     local filler=""
@@ -140,15 +145,21 @@ open() { # $1 = name
     # Which sections the dropdowns show (Control Center > Dropdowns)
     local shown; shown=$(jq -c . "$BSPDIR/config/dropdowns.json" 2>/dev/null)
     show() {
+        # (the click-outside layer opens while the dropdown's state is set)
+        "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &
+        local closer=$!
         "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" \
             ${shown:+"bp_show=$shown"} >/dev/null 2>&1 &&
-        "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &&
         "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
+        local ok=$?
+        wait "$closer" && return $ok
     }
     # eww didn't answer, or an old copy left a window behind: start over
     # with one clean eww (the eww calls here never start a copy themselves)
     if ! show || [ "$(open_windows | wc -l)" -gt 1 ]; then
-        "$BSPDIR/bin/EwwDaemon" --restart 7>&-
+        "$BSPDIR/bin/EwwDaemon" 7>&- || "$BSPDIR/bin/EwwDaemon" --restart 7>&- ||
+            { notify-send -u low "Bar menu" "eww isn't responding"; return 1; }
+        "${EWW[@]}" close "$win" bp-closer >/dev/null 2>&1
         fill "$name" "$maxh"; show
     fi
     echo "$name" > "$STATE/open"

@@ -156,15 +156,15 @@ case "$1" in
         after=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
         notify-send -a "Storage" -i edit-clear "Caches cleared" \
             "$(numfmt --to=iec --suffix=B $(( ${before:-0} - ${after:-0} ))) freed"
-        push disk ;;
+        rm -f "$RUN/clean.txt"; push disk ;;
 
     clean-packages) # downloaded package files pacman keeps after installing
         before=$(du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1)
-        pkexec sh -c 'paccache -rk0; paccache -ruk0' >/dev/null 2>&1 || { push disk; exit 0; }
+        pkexec sh -c 'paccache -rk0; paccache -ruk0' >/dev/null 2>&1 || { rm -f "$RUN/clean.txt"; push disk; exit 0; }
         after=$(du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1)
         notify-send -a "Storage" -i edit-clear "Package cache cleared" \
             "$(numfmt --to=iec --suffix=B $(( ${before:-0} - ${after:-0} ))) freed"
-        push disk ;;
+        rm -f "$RUN/clean.txt"; push disk ;;
 
     clean-orphans)  # packages installed as dependencies that nothing needs any more
         mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
@@ -172,7 +172,7 @@ case "$1" in
         if pkexec pacman -Rns --noconfirm "${orphans[@]}" >/dev/null 2>&1; then
             notify-send -a "Storage" -i edit-clear "Removed ${#orphans[@]} unused package(s)" "${orphans[*]}"
         fi
-        push disk ;;
+        rm -f "$RUN/clean.txt"; push disk ;;
 
     view)
         # Fill the list before showing it (networks from the last scan), so

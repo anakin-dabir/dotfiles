@@ -65,7 +65,9 @@ cpu() {
         /^top -/ { frame++ } frame == 2 && /^ *[0-9]+ / { cpu[$12] += $9 }
         END { for (c in cpu) if (cpu[c] / n >= 0.1) printf "%s\t%.1f\n", c, cpu[c] / n }' |
         sort -t$'\t' -k2 -rn | head -5 |
-        while IFS=$'\t' read -r c p; do jq -nc --arg n "$(pretty "$c")" --arg c "$c" --argjson k "$(closable "$c")" --argjson p "$p" '{name: $n, proc: $c, kill: $k, pct: $p}'; done | jq -sc .)
+        while IFS=$'\t' read -r c p; do printf '%s\t%s\t%s\t%s\n' "$(pretty "$c")" "$c" "$(closable "$c")" "$p"; done |
+        jq -Rsc 'split("\n") | map(select(length > 0) | split("\t")
+                 | {name: .[0], proc: .[1], kill: (.[2] == "true"), pct: (.[3] | tonumber)})')
     jq -nc --argjson total "${total:-0}" --argjson cores "${cores:-[]}" --arg temp "${temp:+$temp°C}" \
         --arg load "$load" --arg model "$model" --argjson procs "${procs:-[]}" --argjson threads "$n" \
         '{total: $total, cores: $cores, temp: $temp, load: $load, model: $model, procs: $procs, threads: $threads}'
@@ -81,13 +83,36 @@ memory() {
     apps=$(ps -eo rss=,comm= | awk '{ m[$2] += $1 } END { for (c in m) printf "%s\t%d\n", c, m[c] * 1024 }' |
         sort -t$'\t' -k2 -rn | head -6 |
         while IFS=$'\t' read -r c b; do
-            jq -nc --arg n "$(pretty "$c")" --arg c "$c" --argjson k "$(closable "$c")" --arg s "$(human "$b")" --argjson p "$(( b * 100 / t ))" '{name: $n, proc: $c, kill: $k, size: $s, pct: $p}'
-        done | jq -sc .)
+            printf '%s\t%s\t%s\t%s\t%s\n' "$(pretty "$c")" "$c" "$(closable "$c")" "$(human "$b")" "$(( b * 100 / t ))"
+        done | jq -Rsc 'split("\n") | map(select(length > 0) | split("\t")
+                 | {name: .[0], proc: .[1], kill: (.[2] == "true"), size: .[3], pct: (.[4] | tonumber)})')
     jq -nc --arg used "$(human $used)" --arg total "$(human $t)" --arg free "$(human $a)" \
         --argjson pct "$(( used * 100 / t ))" \
         --arg sused "$(human $sused)" --arg stotal "$(human $st)" --argjson spct "$(( st > 0 ? sused * 100 / st : 0 ))" \
         --argjson apps "${apps:-[]}" \
         '{used: $used, total: $total, free: $free, pct: $pct, swap_used: $sused, swap_total: $stotal, swap_pct: $spct, apps: $apps}'
+}
+
+# "cache-bytes package-bytes orphan-count"
+measure_cleanable() {
+    local t="$RUN/clean.$$"
+    du -sb "$HOME/.cache" 2>/dev/null | cut -f1 > "$t.c" &
+    du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1 > "$t.p" &
+    pacman -Qdtq 2>/dev/null | wc -l > "$t.o" &
+    wait
+    echo "$(cat "$t.c") $(cat "$t.p") $(cat "$t.o")"
+    rm -f "$t.c" "$t.p" "$t.o"
+}
+cleanable() {
+    local f="$RUN/clean.txt"     # (BarPanelAction deletes it after a clean-up)
+    if [ -s "$f" ]; then
+        cat "$f"
+        if [ -z "$(find "$f" -mmin -1)" ]; then
+            ( measure_cleanable > "$f.new" && mv "$f.new" "$f" ) >/dev/null 2>&1 7>&- &
+        fi
+    else
+        measure_cleanable | tee "$f"
+    fi
 }
 
 disk() {
@@ -101,11 +126,10 @@ disk() {
                 --arg free "$(human "$avail")" --argjson pct "$(( used * 100 / size ))" \
                 '{name: $name, mount: $mount, used: $used, size: $size, free: $free, pct: $pct}'
         done | jq -sc 'sort_by(.mount != "/")' > "$RUN/disks.json"
-    # What can be cleaned up
+    # What can be cleaned up (slow to measure: remembered for a minute, then
+    # measured again in the background while the last numbers are shown)
     local cache pkgs orphans
-    cache=$(du -sb "$HOME/.cache" 2>/dev/null | cut -f1)
-    pkgs=$(du -sb /var/cache/pacman/pkg 2>/dev/null | cut -f1)
-    orphans=$(pacman -Qdtq 2>/dev/null | wc -l)
+    read -r cache pkgs orphans < <(cleanable)
     jq -c --arg cache "$(human "${cache:-0}")" --argjson cache_b "${cache:-0}" \
         --arg pkgs "$(human "${pkgs:-0}")" --argjson pkgs_b "${pkgs:-0}" --argjson orphans "${orphans:-0}" \
         --arg total "$(human $(( ${cache:-0} + ${pkgs:-0} )))" \
@@ -113,27 +137,33 @@ disk() {
 }
 
 sound() {
-    local def sinks vol muted mvol mmuted
-    def=$(pactl get-default-sink 2>/dev/null)
-    # Outputs with nothing plugged in (e.g. unused HDMI ports) are left out
-    sinks=$(pactl -f json list sinks 2>/dev/null | jq -c --arg d "$def" '[.[]
-        | select((.name == $d) or (([.ports[]? | .availability] | all(. == "not available")) | not))
-        | {name, default: (.name == $d),
-        desc: (.description | sub("^Raptor Lake-P/U/H cAVS "; "") | sub(" Output \\(Stereo\\)$"; "")),
-        kind: (if (.description | test("HDMI|DisplayPort")) then "hdmi"
-               elif (.description | test("Headphone|Headset"; "i")) then "headphones"
-               elif (.name | test("bluez")) then "bluetooth" else "speaker" end)}]')
-    vol=$(pamixer --get-volume 2>/dev/null || echo 0)
-    muted=$(pamixer --get-mute 2>/dev/null || echo false)
-    mvol=$(pamixer --default-source --get-volume 2>/dev/null || echo 0)
-    mmuted=$(pamixer --default-source --get-mute 2>/dev/null || echo false)
-    # The microphone's short name (its port, e.g. "Stereo Microphone")
-    local mic src; src=$(pactl get-default-source 2>/dev/null)
-    mic=$(pactl -f json list sources 2>/dev/null | jq -r --arg s "$src" \
-        '.[] | select(.name == $s) | . as $d | ((($d.ports // [])[] | select(.name == $d.active_port)) // ($d.ports // [])[0] // $d) | .description' 2>/dev/null | head -1)
-    jq -nc --argjson vol "$vol" --argjson muted "$muted" --argjson mvol "$mvol" --argjson mmuted "$mmuted" \
-        --argjson sinks "${sinks:-[]}" --arg mic "${mic:-Microphone}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks,
-          output: ([$sinks[] | select(.default) | .desc][0] // "No output"), mic: $mic}'
+    # Everything from three pactl calls (volumes, mute, devices)
+    local info def src
+    info=$(LC_ALL=C pactl info 2>/dev/null)
+    def=$(sed -n 's/^Default Sink: //p' <<< "$info")
+    src=$(sed -n 's/^Default Source: //p' <<< "$info")
+    jq -nc --arg d "$def" --arg s "$src" \
+        --argjson sinks "$(pactl -f json list sinks 2>/dev/null || echo '[]')" \
+        --argjson sources "$(pactl -f json list sources 2>/dev/null || echo '[]')" '
+        def pct: [(.volume // {})[] | .value_percent | rtrimstr("%") | tonumber]
+                 | if length > 0 then (add / length | round) else 0 end;
+        ([$sinks[] | select(.name == $d)][0]) as $out
+        | ([$sources[] | select(.name == $s)][0]) as $in
+        # Outputs with nothing plugged in (e.g. unused HDMI ports) are left out
+        | [$sinks[]
+           | select((.name == $d) or (([.ports[]? | .availability] | all(. == "not available")) | not))
+           | {name, default: (.name == $d),
+              desc: (.description | sub("^Raptor Lake-P/U/H cAVS "; "") | sub(" Output \\(Stereo\\)$"; "")),
+              kind: (if (.description | test("HDMI|DisplayPort")) then "hdmi"
+                     elif (.description | test("Headphone|Headset"; "i")) then "headphones"
+                     elif (.name | test("bluez")) then "bluetooth" else "speaker" end)}] as $list
+        # The microphone short name: its port, e.g. "Stereo Microphone"
+        | (($in // {}) as $m | [(($m.ports // [])[] | select(.name == $m.active_port)), ($m.ports // [])[0], $m]
+           | map(select(. != null) | .description) | first) as $mic
+        | {vol: (if $out then ($out | pct) else 0 end), muted: ($out.mute // false),
+           mic_vol: (if $in then ($in | pct) else 0 end), mic_muted: ($in.mute // false),
+           sinks: $list, output: ([$list[] | select(.default) | .desc][0] // "No output"),
+           mic: ($mic // "Microphone")}'
 }
 
 network() {
@@ -144,7 +174,9 @@ network() {
         if [ -d "/sys/class/net/$iface/wireless" ]; then
             kind=wifi
             # (nmcli's wifi list can take seconds; these are instant)
-            name=$(nmcli -t -f GENERAL.CONNECTION dev show "$iface" 2>/dev/null | cut -d: -f2-)
+            name=$(iw dev "$iface" link 2>/dev/null | sed -n 's/^[[:space:]]*SSID: //p')
+            # (iw escapes non-ASCII names as \\xNN: ask nmcli for those)
+            [ -n "$name" ] && [[ "$name" != *\\x* ]] || name=$(nmcli -t -f GENERAL.CONNECTION dev show "$iface" 2>/dev/null | cut -d: -f2-)
             signal=$(awk -v i="$iface:" '$1 == i { q = $3 + 0; print int(q * 100 / 70 > 100 ? 100 : q * 100 / 70) }' /proc/net/wireless)
         else
             kind=ethernet; name=$(nmcli -t -f GENERAL.CONNECTION dev show "$iface" 2>/dev/null | cut -d: -f2)
@@ -161,7 +193,12 @@ network() {
         echo "$iface $rx $tx $now" > "$prev"
     fi
     local wifi_on bt_on bt_dev
-    wifi_on=$([ "$(nmcli radio wifi 2>/dev/null)" = enabled ] && echo true || echo false)
+    # Wi-Fi on: a wlan radio that isn't switched off (rfkill, instant; nmcli takes ~50 ms)
+    wifi_on=false
+    local r
+    for r in /sys/class/rfkill/rfkill*; do
+        [ "$(cat "$r/type" 2>/dev/null)" = wlan ] && [ "$(cat "$r/soft" "$r/hard" 2>/dev/null | tr -d '\n')" = 00 ] && wifi_on=true
+    done
     bt_on=$(bluetoothctl show 2>/dev/null | grep -q 'Powered: yes' && echo true || echo false)
     bt_dev=$(bluetoothctl devices Connected 2>/dev/null | cut -d' ' -f3- | head -1)
     # Airplane mode: every radio (Wi-Fi, Bluetooth...) switched off by rfkill
