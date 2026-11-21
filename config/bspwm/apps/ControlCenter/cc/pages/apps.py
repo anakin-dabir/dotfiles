@@ -124,11 +124,10 @@ class AppsPage(Page):
                 self.folder.connect("apply", lambda r: self._folder(r.get_text().strip()))
                 defaults.add(self.folder)
 
-        self.start = group(self, "Startup apps", "Open by themselves when you log in.")
-        add = Gtk.MenuButton(label="Add…", valign=Gtk.Align.CENTER)
-        add.add_css_class("suggested-action")
-        add.set_popover(self._app_popover())
-        self.start.set_header_suffix(add)
+        self.start = group(self, "Startup apps", "Open by themselves when you log in. Add one with + at the top right.")
+        # "+" at the top right of the window: add a startup app
+        self.header_widget = Gtk.MenuButton(icon_name="list-add-symbolic", tooltip_text="Add a startup app")
+        self.header_widget.set_popover(self._app_popover())
         self.start_rows = []
         self._fill_startup()
 

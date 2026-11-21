@@ -1,12 +1,15 @@
 """Control Center for this bspwm rice.
 
-    ControlCenter [SECTION]   open (or bring to front) at SECTION:
-                              appearance customize bar dropdowns display sound
-                              network bluetooth keyboard fans power
-                              notifications about
+    ControlCenter [SECTION]   open (or bring here) at SECTION:
+                              appearance customize bar dropdowns apps display
+                              sound network bluetooth shortcuts typing keyboard
+                              fans power notifications phones updates about
 """
 
+import subprocess
 import sys
+
+import gi
 
 from gi.repository import Adw, Gio, GLib
 
@@ -48,10 +51,25 @@ class App(Adw.Application):
             self.window = Window(self)
             self.window.connect("destroy", lambda *_: setattr(self, "window", None))
             self.window.show_page(section or "appearance")
-        elif section:
-            self.window.show_page(section)
+        else:
+            if section:
+                self.window.show_page(section)
+            self._to_this_workspace()
         self.window.present()
         return 0
+
+    def _to_this_workspace(self):
+        """Already open on another workspace: bring it here (bspwm doesn't on its own)."""
+        try:
+            gi.require_version("GdkX11", "4.0")
+            from gi.repository import GdkX11
+            surface = self.window.get_surface()
+            if isinstance(surface, GdkX11.X11Surface):
+                xid = hex(surface.get_xid())
+                subprocess.run(["bspc", "node", xid, "-d", "focused"], timeout=2, check=False)
+                subprocess.run(["bspc", "node", xid, "-f"], timeout=2, check=False)
+        except (ValueError, ImportError, OSError, subprocess.TimeoutExpired):
+            pass
 
 
 def main():
