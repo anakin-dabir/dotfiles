@@ -11,6 +11,7 @@ from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 from .. import rice
 from ..common import CACHE, Page, current_rice, group, icon_button, run_quiet, text_button, tool, widgets_changed
 from ..common import _pool
+from ..pickers import FontButton
 from .appearance import grid, tile
 
 SIDES = [("left", "Left"), ("center", "Center"), ("right", "Right")]
@@ -247,9 +248,7 @@ class BarPage(Page):
         # Font and reset
         self.extra = group(self, "Text")
         self.font_row = Adw.ActionRow(title="Bar font", subtitle="Used for the bar's text. Icons keep their own fonts.")
-        self.font_btn = Gtk.FontDialogButton(dialog=Gtk.FontDialog(title="Bar font"), level=Gtk.FontLevel.FONT,
-                                             valign=Gtk.Align.CENTER, use_font=True)
-        self.font_btn.connect("notify::font-desc", self._font)
+        self.font_btn = FontButton("Bar font", self._font)
         self.font_row.add_suffix(self.font_btn)
         self.font_row.set_activatable_widget(self.font_btn)
         self.extra.add(self.font_row)
@@ -293,7 +292,7 @@ class BarPage(Page):
         font = rice.bar_text_font(self.bar, self.section) if self.section else None
         self.font_row.set_visible(font is not None)
         if font:
-            self.quietly(lambda: self.font_btn.set_font_desc(Pango.FontDescription.from_string(f"{font[0]} {font[1]:g}")))
+            self.font_btn.set_desc(Pango.FontDescription.from_string(f"{font[0]} {font[1]:g}"))
         self.reset_row.set_sensitive(rice.has_original(rice.bar_config(self.bar)))
         self.side_groups["left"].set_description(f"What {self.bar} shows, from left to right")
         self._fill_items()
@@ -441,10 +440,7 @@ class BarPage(Page):
     def _add(self, side, name):
         self._edit(lambda lay: lay[side].append(name))
 
-    def _font(self, btn, _p):
-        if self._updating:
-            return
-        desc = btn.get_font_desc()
+    def _font(self, desc):
         if desc:
             size = desc.get_size() / Pango.SCALE if desc.get_size() else 10
             self.font_change = (desc.get_family(), size)

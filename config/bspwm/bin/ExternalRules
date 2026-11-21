@@ -36,7 +36,12 @@ case "$class" in
 		result "state=floating focus=on center=on"
 		;;
 	ControlCenter)
-		result "state=floating focus=on center=on rectangle=1000x720+0+0"
+		# Only the main window gets its size (not any dialog window it opens)
+		if xprop -id "$wid" _NET_WM_WINDOW_TYPE 2>/dev/null | grep -q _NET_WM_WINDOW_TYPE_DIALOG; then
+			result "state=floating focus=on center=on"
+		else
+			result "state=floating focus=on center=on rectangle=1000x720+0+0"
+		fi
 		;;
     mpv)
 		result "state=floating focus=on center=on rectangle=723x407+0+0"

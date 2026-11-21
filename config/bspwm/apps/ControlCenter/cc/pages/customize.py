@@ -8,6 +8,7 @@ import re
 from gi.repository import Adw, Gdk, Gtk, Pango
 
 from .. import rice
+from ..pickers import ColorButton, FontButton
 from ..common import Page, current_rice, group, read_file, run_quiet, text_button, tool
 
 COLORS = [
@@ -29,9 +30,6 @@ def _hex(v):
         v = "#" + v[3:]
     return v if re.fullmatch(r"#[0-9A-Fa-f]{6}", v) else None
 
-
-def _rgba_hex(rgba):
-    return "#%02X%02X%02X" % (round(rgba.red * 255), round(rgba.green * 255), round(rgba.blue * 255))
 
 
 def _dirs(paths, test):
@@ -67,10 +65,6 @@ def current_app_font():
             return m.group(1).strip()
     return "Adwaita Sans 10"
 
-
-def _monospace(item):
-    fam = item if isinstance(item, Pango.FontFamily) else item.get_family()
-    return fam.is_monospace()
 
 
 class CustomizePage(Page):
@@ -111,13 +105,12 @@ class CustomizePage(Page):
         win.add(self._spin("P_TERM_OPACITY", "Terminal opacity", "1 is solid", 0.5, 1.0, 0.05, digits=2))
 
         fonts = group(self, "Fonts", "The bar's own font is on the Bar page.")
-        fonts.add(self._font("gtk_font", "Apps", "Text in apps like this one, file manager and settings",
-                             Gtk.FontLevel.FONT))
-        fonts.add(self._font("term_font_name", "Terminal", "", Gtk.FontLevel.FAMILY, monospace=True))
+        fonts.add(self._font("gtk_font", "Apps", "Text in apps like this one, file manager and settings"))
+        fonts.add(self._font("term_font_name", "Terminal", "", family_only=True, monospace=True))
         fonts.add(self._spin("term_font_size", "Terminal font size", "", 6, 24, 1))
         fonts.add(self._font("dunst_font", "Notifications and menus",
-                             "Pop-ups, notification center and bar dropdowns", Gtk.FontLevel.FONT))
-        fonts.add(self._font("rofi_font", "App launcher and pickers", "", Gtk.FontLevel.FONT))
+                             "Pop-ups, notification center and bar dropdowns"))
+        fonts.add(self._font("rofi_font", "App launcher and pickers", ""))
 
         notif = group(self, "Notification pop-ups")
         notif.add(self._combo("dunst_origin", "Position", [o for o, _ in ORIGINS], [t for _, t in ORIGINS]))
@@ -144,8 +137,7 @@ class CustomizePage(Page):
 
     def _color_row(self, var, title, sub):
         row = Adw.ActionRow(title=title, subtitle=sub)
-        btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog(with_alpha=False, title=title), valign=Gtk.Align.CENTER)
-        btn.connect("notify::rgba", lambda b, _p: self._changed(var, _rgba_hex(b.get_rgba())))
+        btn = ColorButton(title, lambda value: self._changed(var, value))
         row.add_suffix(btn)
         row.set_activatable_widget(btn)
         self.widgets[var] = ("color", btn, row)
@@ -179,24 +171,18 @@ class CustomizePage(Page):
         self.widgets[var] = ("combo", row, None)
         return row
 
-    def _font(self, var, title, sub, level, monospace=False):
+    def _font(self, var, title, sub, family_only=False, monospace=False):
         row = Adw.ActionRow(title=title, subtitle=sub)
-        dialog = Gtk.FontDialog(title=title)
-        if monospace:
-            dialog.set_filter(Gtk.CustomFilter.new(_monospace))
-        btn = Gtk.FontDialogButton(dialog=dialog, level=level, valign=Gtk.Align.CENTER, use_font=True)
-        btn.connect("notify::font-desc", lambda b, _p: self._changed(var, self._font_value(b, level)))
+        btn = FontButton(title, lambda desc: self._changed(var, self._font_value(desc, family_only)),
+                         family_only=family_only, monospace=monospace)
         row.add_suffix(btn)
         row.set_activatable_widget(btn)
-        self.widgets[var] = ("font", btn, level)
+        self.widgets[var] = ("font", btn, family_only)
         return row
 
     @staticmethod
-    def _font_value(btn, level):
-        desc = btn.get_font_desc()
-        if desc is None:
-            return ""
-        if level == Gtk.FontLevel.FAMILY:
+    def _font_value(desc, family_only):
+        if family_only:
             return desc.get_family() or ""
         size = desc.get_size() / Pango.SCALE if desc.get_size() else 10
         d = Pango.FontDescription.from_string(desc.to_string())
@@ -225,7 +211,7 @@ class CustomizePage(Page):
                 if kind == "color":
                     c = Gdk.RGBA()
                     if _hex(val) and c.parse(_hex(val)):
-                        w.set_rgba(c)
+                        w.set_hex(_hex(val))
                 elif kind == "spin":
                     try:
                         w.set_value(float(val))
@@ -241,7 +227,7 @@ class CustomizePage(Page):
                         w.set_selected(w.values.index(val))
                 elif kind == "font":
                     if val:
-                        w.set_font_desc(Pango.FontDescription.from_string(val))
+                        w.set_desc(Pango.FontDescription.from_string(val))
         self.quietly(put)
         self.window.update_pending()
 
