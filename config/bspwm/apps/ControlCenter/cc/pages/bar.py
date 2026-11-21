@@ -9,7 +9,7 @@ import re
 
 from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 
-from .. import rice
+from .. import glyphs, rice
 from ..common import BSPDIR, CACHE, Page, current_rice, group, icon_button, read_file, run, run_quiet, text_button, tool, widgets_changed
 from ..common import _pool
 from ..pickers import FontButton
@@ -483,7 +483,7 @@ class BarPage(Page):
                 sub = "Spacing or decoration between items" if deco else explain(name, info)
                 r = Adw.ActionRow(title=title, subtitle=GLib.markup_escape_text(sub), tooltip_text=f"Bar item: {name}")
                 r.set_subtitle_lines(2)
-                img = Gtk.Image.new_from_icon_name(icon)
+                img = self._icon_widget(name) or Gtk.Image.new_from_icon_name(icon)
                 if deco:
                     r.add_css_class("dim-label")
                     img.set_opacity(0.5)
@@ -494,17 +494,22 @@ class BarPage(Page):
                 down.set_sensitive(i < len(items) - 1)
                 r.add_suffix(up)
                 r.add_suffix(down)
-                r.add_suffix(self._move_menu(side, i))
+                r.add_suffix(self._move_menu(side, i, name))
                 r.add_suffix(icon_button("list-remove-symbolic", "Remove from the bar", lambda s=side, i=i: self._remove(s, i)))
                 g.add(r)
                 self.item_rows.append((g, r))
 
-    def _move_menu(self, side, i):
-        btn = Gtk.MenuButton(icon_name="view-more-symbolic", tooltip_text="Move to another part", valign=Gtk.Align.CENTER)
+    def _move_menu(self, side, i, name=None):
+        btn = Gtk.MenuButton(icon_name="view-more-symbolic", tooltip_text="More: move, change icon", valign=Gtk.Align.CENTER)
         btn.add_css_class("flat")
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, margin_top=4, margin_bottom=4,
                       margin_start=4, margin_end=4)
         pop = Gtk.Popover(child=box)
+        if name and rice.item_icon(self.bar, name):
+            b = Gtk.Button(label="Change icon…")
+            b.add_css_class("flat")
+            b.connect("clicked", lambda _b: (pop.popdown(), self._icon_picker(name)))
+            box.append(b)
         for other, title in SIDES:
             if other == side:
                 continue
@@ -514,6 +519,97 @@ class BarPage(Page):
             box.append(b)
         btn.set_popover(pop)
         return btn
+
+    # ----- icons -----
+
+    def _icon_widget(self, name):
+        """The item's own icon, drawn with its font (None if it isn't one icon)."""
+        where = rice.item_icon(self.bar, name)
+        family = where and glyphs.family_of(where["icon"][0])
+        if not family:
+            return None
+        label = Gtk.Label(width_request=20)
+        label.set_markup(f'<span font_family="{family}" size="14pt">{GLib.markup_escape_text(where["icon"])}</span>')
+        return label
+
+    def _icon_picker(self, name):
+        where = rice.item_icon(self.bar, name)
+        if not where:
+            return
+        fonts = rice.bar_fonts(self.bar, self.section)
+        sets = [st for st in glyphs.SETS if st[2] in fonts and glyphs.icon_set(st[0])]
+        if not sets:
+            self.toast("This bar has no icon font to pick from")
+            return
+        title = describe(name, self.modules.get(name, {}))[0]
+        state = re.fullmatch(r"format-([a-z]+)-prefix", where["key"])
+        d = Adw.Dialog(title=f"Icon for {title}", content_width=560, content_height=560)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_start=14, margin_end=14,
+                      margin_bottom=14)
+        if state:
+            note = Gtk.Label(label=f"The icon shown when it's {state.group(1)}.", xalign=0)
+            note.add_css_class("dim-label")
+            box.append(note)
+        kinds = Adw.ToggleGroup(homogeneous=True)
+        for sid, stitle, _f, _w in sets:
+            kinds.add(Adw.Toggle(name=sid, label=stitle))
+        # start on the set the current icon is from
+        cur_family = glyphs.family_of(where["icon"][0])
+        start = next((st[0] for st in sets if st[2] == cur_family), sets[0][0])
+        kinds.set_active_name(start)
+        box.append(kinds)
+        search = Gtk.SearchEntry(placeholder_text="Search icons (music, camera, wifi…)")
+        box.append(search)
+        grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, max_children_per_line=10,
+                           min_children_per_line=6, column_spacing=4, row_spacing=4, valign=Gtk.Align.START)
+        scroll = Gtk.ScrolledWindow(child=grid, vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER)
+        box.append(scroll)
+        count = Gtk.Label(xalign=0)
+        count.add_css_class("dim-label")
+        box.append(count)
+        view.set_content(box)
+        d.set_child(view)
+
+        def pick(char, family):
+            idx = fonts.index(family) + 1
+            font = 0 if family == glyphs.MDI else idx       # (Material icons are found in any font order)
+            try:
+                rice.set_item_icon(where, char, font)
+            except OSError as e:
+                self.toast(f"Couldn't save: {e.strerror}")
+                return
+            d.close()
+            run_quiet(["polybar-msg", "cmd", "restart"])
+            self.toast(f"New icon for {title}")
+            self._fill_items()
+
+        def fill(*_):
+            while (c := grid.get_first_child()) is not None:
+                grid.remove(c)
+            sid = kinds.get_active_name() or start
+            family = next(st[2] for st in sets if st[0] == sid)
+            words = search.get_text().strip().lower().replace(" ", "-").split("-")
+            found = [(n, c) for n, c in glyphs.icon_set(sid) if all(w in n for w in words if w)]
+            for n, c in found[:300]:
+                b = Gtk.Button(tooltip_text=n.replace("-", " "))
+                b.add_css_class("flat")
+                lab = Gtk.Label()
+                lab.set_markup(f'<span font_family="{family}" size="18pt">{GLib.markup_escape_text(c)}</span>')
+                b.set_child(lab)
+                if c == where["icon"]:
+                    b.add_css_class("suggested-action")
+                b.connect("clicked", lambda _b, c=c, f=family: pick(c, f))
+                grid.append(b)
+            more = f" (first 300 — search to narrow)" if len(found) > 300 else ""
+            count.set_label(f"{len(found)} icons{more}")
+            widgets_changed()
+        kinds.connect("notify::active-name", fill)
+        search.connect("search-changed", fill)
+        fill()
+        d.present(self.window)
+        search.grab_focus()
 
     def _add_popover(self, side, button):
         listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
@@ -625,13 +721,16 @@ class BarPage(Page):
         self.window.update_pending()
 
     def _reset(self):
-        d = Adw.AlertDialog(heading=f"Reset {self.bar}?", body="Its items and font go back to how they were.")
+        d = Adw.AlertDialog(heading=f"Reset {self.bar}?", body="Its items, icons and font go back to how they were.")
         d.add_response("cancel", "Cancel")
         d.add_response("reset", "Reset")
         d.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
 
         def answered(_d, r):
-            if r == "reset" and rice.restore_original(rice.bar_config(self.bar)):
+            if r != "reset":
+                return
+            mods = rice.restore_original(os.path.join(rice.BARS, self.bar, "modules.ini"))
+            if rice.restore_original(rice.bar_config(self.bar)) or mods:
                 run_quiet(["polybar-msg", "cmd", "restart"], lambda _ok: (self.load(), self.toast(f"{self.bar} is reset")))
         d.connect("response", answered)
         d.present(self.window)

@@ -248,3 +248,105 @@ def set_bar_text_font(bar, family, size):
     text = re.sub(r"(?m)^font-\d+\s*=.*$", fix, text)
     with open(path, "w") as f:
         f.write(text)
+
+
+# ----- bar item icons (Control Center > Bar > ... > Change icon) -----
+
+ICON_KEYS = ("format-prefix", "label")   # where an item keeps its icon (also format-<state>-prefix)
+SHARED_ICONS = ("media", "clipboard", "capture")      # config/system.ini items, icon in the bar's [icons]
+
+
+def _section_body(text, name):
+    for sec, start, end in _sections(text):
+        if sec == name:
+            return start, end
+    return None
+
+
+def bar_fonts(bar, section):
+    """Font families of one [bar/section], in font-0, font-1... order."""
+    with open(bar_config(bar)) as f:
+        text = f.read()
+    span = _section_body(text, f"bar/{section}")
+    if not span:
+        return []
+    fonts = {}
+    for n, fam in re.findall(r'(?m)^font-(\d+)\s*=\s*"?([^:";]+)', text[span[0]:span[1]]):
+        fonts[int(n)] = fam.strip()
+    return [fonts[k] for k in sorted(fonts)]
+
+
+def _icon_only(value):
+    """The icon in a value that is only an icon (tags and spaces aside), or None."""
+    v = re.sub(r"%\{[^}]*\}", "", value).strip().strip('"').strip()
+    return v if v and len(v) <= 2 and all(ord(c) >= 0xE000 for c in v) else None
+
+
+def item_icon(bar, name):
+    """Where an item's icon is, if it's one changeable icon:
+    {"path", "section", "key", "font_key", "icon"}, else None."""
+    if name in SHARED_ICONS:
+        path = bar_config(bar)
+        with open(path) as f:
+            text = f.read()
+        span = _section_body(text, "icons")
+        if not span:
+            return None
+        m = re.search(rf"(?m)^{name}\s*=\s*(.*)$", text[span[0]:span[1]])
+        return m and {"path": path, "section": "icons", "key": name, "font_key": f"{name}-font",
+                      "icon": m.group(1).strip()}
+    for fname in ("modules.ini", "config.ini"):
+        path = os.path.join(BARS, bar, fname)
+        try:
+            with open(path) as f:
+                text = f.read()
+        except OSError:
+            continue
+        span = _section_body(text, f"module/{name}")
+        if not span:
+            continue
+        body = text[span[0]:span[1]]
+        keys = dict(re.findall(r"(?m)^([\w-]+)\s*=\s*(.*)$", body))
+        if any(k.startswith("ramp-") for k in keys):
+            return None                 # (an icon per level, like the battery's: not one icon)
+        # format-prefix, then format-<state>-prefix (connected, mounted...), then label
+        order = ["format-prefix"] + sorted(k for k in keys if re.fullmatch(r"format-[a-z]+-prefix", k)) + ["label"]
+        for key in order:
+            icon = _icon_only(keys.get(key, ""))
+            if icon:
+                return {"path": path, "section": f"module/{name}", "key": key, "font_key": f"{key}-font", "icon": icon}
+        return None
+    return None
+
+
+def _set_keys(path, section, values):
+    """Set keys in one [section] of an ini file (added at its end if missing)."""
+    keep_original(path)
+    with open(path) as f:
+        text = f.read()
+    span = _section_body(text, section)
+    if not span:
+        return
+    body = text[span[0]:span[1]]
+    for key, value in values.items():
+        line = f"{key} = {value}"
+        if re.search(rf"(?m)^{re.escape(key)}\s*=", body):
+            body = re.sub(rf"(?m)^{re.escape(key)}\s*=.*$", lambda _m: line, body, count=1)
+        else:
+            body = body.rstrip("\n") + "\n" + line + "\n\n"
+    with open(path, "w") as f:
+        f.write(text[:span[0]] + body + text[span[1]:])
+
+
+def set_item_icon(where, char, font):
+    """Put a new icon in (font: which font-N draws it, plus one; 0 = any)."""
+    path, section, key = where["path"], where["section"], where["key"]
+    if section == "icons":
+        _set_keys(path, section, {key: char, where["font_key"]: str(font)})
+        return
+    with open(path) as f:
+        text = f.read()
+    span = _section_body(text, section)
+    m = re.search(rf"(?m)^{re.escape(key)}\s*=\s*(.*)$", text[span[0]:span[1]])
+    value = m.group(1).replace(where["icon"], char, 1) if m else char
+    _set_keys(path, section, {key: value, where["font_key"]: str(font)})
