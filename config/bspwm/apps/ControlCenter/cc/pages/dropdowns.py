@@ -5,7 +5,7 @@ import json
 import os
 import threading
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
 from .. import ddshots
 from ..common import BSPDIR, Page, group, run_quiet, widgets_changed
@@ -63,36 +63,62 @@ def load():
 
 
 class Section(Gtk.Box):
-    """A picture of one dropdown section with a tick box. Clicking anywhere
-    on it ticks or unticks it; unticked sections are faded."""
+    """One dropdown section: its picture, its name, and a tick box on the
+    right. Clicking anywhere on the row ticks or unticks it; unticked
+    sections are faded."""
+
+    PICTURE_W = 230
 
     def __init__(self, key, name, on_toggle):
-        super().__init__(spacing=12, margin_top=6, margin_bottom=6, margin_start=10, margin_end=10)
+        super().__init__(spacing=16, margin_top=8, margin_bottom=8, margin_start=12, margin_end=14)
         self.key = key
-        self.check = Gtk.CheckButton(valign=Gtk.Align.CENTER, tooltip_text=name)
-        self.check.connect("toggled", lambda c: on_toggle(key, c.get_active()))
-        self.append(self.check)
-        self.stack = Gtk.Stack(hexpand=True, halign=Gtk.Align.START)
-        self.picture = Gtk.Picture(can_shrink=False, halign=Gtk.Align.START, tooltip_text=name)
+        # Picture (scaled to one width so every row lines up)
+        self.picture = Gtk.Picture(can_shrink=True, content_fit=Gtk.ContentFit.CONTAIN, valign=Gtk.Align.CENTER)
         self.picture.add_css_class("cc-tile-image")
         self.picture.set_overflow(Gtk.Overflow.HIDDEN)
-        self.label = Gtk.Label(label=name, xalign=0)
-        self.stack.add_named(self.label, "text")
-        self.stack.add_named(self.picture, "picture")
-        self.append(self.stack)
+        self.placeholder = Gtk.Label(label="…", height_request=40)
+        self.placeholder.add_css_class("dim-label")
+        self.frame = Gtk.Stack(valign=Gtk.Align.CENTER)
+        self.frame.add_named(self.placeholder, "wait")
+        self.frame.add_named(self.picture, "picture")
+        clamp = Adw.Clamp(child=self.frame, maximum_size=self.PICTURE_W, tightening_threshold=self.PICTURE_W,
+                          halign=Gtk.Align.START)
+        clamp.set_size_request(self.PICTURE_W, -1)
+        self.append(clamp)
+        # Name
+        self.label = Gtk.Label(label=name, xalign=0, hexpand=True, wrap=True, valign=Gtk.Align.CENTER)
+        self.append(self.label)
+        # Tick box
+        self.check = Gtk.CheckButton(valign=Gtk.Align.CENTER, tooltip_text="Show in the dropdown")
+        self.check.connect("toggled", lambda c: on_toggle(key, c.get_active()))
+        self.append(self.check)
         click = Gtk.GestureClick()
-        click.connect("released", lambda *_: self.check.set_active(not self.check.get_active()))
-        self.stack.add_controller(click)
-        self.stack.set_cursor_from_name("pointer")
+        click.connect("released", self._clicked)
+        self.add_controller(click)
+        self.set_cursor_from_name("pointer")
+
+    def _clicked(self, gesture, _n, x, y):
+        picked = self.pick(x, y, Gtk.PickFlags.DEFAULT)
+        if picked is not None and (picked is self.check or picked.is_ancestor(self.check)):
+            return                           # the tick box handles its own clicks
+        self.check.set_active(not self.check.get_active())
 
     def set_picture(self, path):
-        if os.path.exists(path):
-            self.picture.set_filename(path)
-            self.stack.set_visible_child_name("picture")
+        if not os.path.exists(path):
+            return
+        info = GdkPixbuf.Pixbuf.get_file_info(path)
+        if info and info[0] is not None and info[1] > 0:       # (format, width, height)
+            self.picture.set_size_request(self.PICTURE_W, round(info[2] * self.PICTURE_W / info[1]))
+        self.picture.set_filename(path)
+        self.frame.set_visible_child_name("picture")
 
     def set_on(self, on):
         self.check.set_active(on)
-        self.stack.set_opacity(1.0 if on else 0.35)
+        self.show_state(on)
+
+    def show_state(self, on):
+        self.frame.set_opacity(1.0 if on else 0.35)
+        self.label.set_opacity(1.0 if on else 0.55)
 
 
 class DropdownsPage(Page):
@@ -119,7 +145,7 @@ class DropdownsPage(Page):
             box.add_css_class("boxed-list")
             for key, name in parts:
                 sec = Section(key, name, self._toggle)
-                box.append(Gtk.ListBoxRow(child=sec, activatable=False))
+                box.append(Gtk.ListBoxRow(child=sec, activatable=False, focusable=False))
                 self.sections[key] = sec
             g.add(box)
 
@@ -161,7 +187,7 @@ class DropdownsPage(Page):
         threading.Thread(target=work, daemon=True).start()
 
     def _toggle(self, key, on):
-        self.sections[key].stack.set_opacity(1.0 if on else 0.35)
+        self.sections[key].show_state(on)
         if self._updating:
             return
         self.shown[key] = on
