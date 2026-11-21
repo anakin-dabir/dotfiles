@@ -73,6 +73,10 @@ super + alt + c
 super + alt + i
     NotifyCenter
 
+# Control Center (themes, wallpapers, display, sound, network, power...)
+super + comma
+    ControlCenter
+
 # Screenshot
 Print
 	OpenApps --screenshot

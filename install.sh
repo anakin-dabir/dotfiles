@@ -98,6 +98,9 @@ for i in "$DOTS"/misc/icons/*; do link "$i" "$HOME/.local/share/icons/$(basename
 cp -rn "$DOTS"/misc/fonts/* "$HOME/.local/share/fonts/"
 fc-cache -f >/dev/null
 for b in "$DOTS"/misc/bin/*; do link "$b" "$HOME/.local/bin/$(basename "$b")"; done
+# App launcher entries (Control Center...)
+mkdir -p "$HOME/.local/share/applications"
+for a in "$DOTS"/misc/applications/*.desktop; do link "$a" "$HOME/.local/share/applications/$(basename "$a")"; done
 
 # Personal wallpaper folder used by the cupertino rice
 if [ ! -d "$HOME/Pictures/wallpapers" ]; then

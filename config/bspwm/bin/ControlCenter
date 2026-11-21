@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Control Center: settings for this rice (themes, wallpapers, display, sound,
+# network, Bluetooth, power, notifications).
+#   ControlCenter [SECTION]    e.g. ControlCenter network
+# Only one window: running it again brings that window to the front.
+exec python3 "$HOME/.config/bspwm/apps/ControlCenter/main.py" "$@"

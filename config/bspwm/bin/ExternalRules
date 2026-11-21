@@ -35,6 +35,9 @@ case "$class" in
 	RiceEditor)
 		result "state=floating focus=on center=on"
 		;;
+	ControlCenter)
+		result "state=floating focus=on center=on rectangle=1000x720+0+0"
+		;;
     mpv)
 		result "state=floating focus=on center=on rectangle=723x407+0+0"
         ;;

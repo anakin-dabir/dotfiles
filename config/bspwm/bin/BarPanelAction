@@ -3,7 +3,7 @@
 # Every action updates the dropdown right away instead of waiting for its poll.
 #
 #   vol-set N | vol-mute | mic-set N | mic-mute | sink NAME
-#   bright N | night | night-restore (at login) | awake | power-mode NAME
+#   bright N | night | night-temp K | night-restore (at login) | awake | power-mode NAME
 #   airplane
 #   wifi-toggle | bt-toggle | view main|wifi|bt | wifi-scan
 #   wifi-connect N (position in the list) | bt-connect MAC
@@ -12,7 +12,8 @@
 BIN="$HOME/.config/bspwm/bin"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
 SAVED="$HOME/.cache/barpanel"     # kept across restarts
-NIGHT_TEMP=4000                   # night light colour temperature (K; daylight is 6500)
+# Night light colour temperature in K (daylight is 6500); Control Center can change it
+NIGHT_TEMP=$(cat "$SAVED/nightlight-temp" 2>/dev/null); [[ "$NIGHT_TEMP" =~ ^[0-9]+$ ]] || NIGHT_TEMP=4000
 # --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
 EWW=(timeout 3 eww --no-daemonize -c "$HOME/.config/bspwm/eww")
 upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }
@@ -57,6 +58,10 @@ case "$1" in
             mkdir -p "$SAVED"; touch "$SAVED/nightlight"; redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1
         fi
         settled ;;
+    night-temp)   # how warm (K); applied right away if night light is on
+        t=$(int "$2"); (( t < 1000 )) && t=1000; (( t > 6500 )) && t=6500
+        mkdir -p "$SAVED"; echo "$t" > "$SAVED/nightlight-temp"
+        [ -f "$SAVED/nightlight" ] && redshift -P -O "$t" >/dev/null 2>&1 ;;
     night-restore)
         [ -f "$SAVED/nightlight" ] && redshift -P -O "$NIGHT_TEMP" >/dev/null 2>&1 ;;
 

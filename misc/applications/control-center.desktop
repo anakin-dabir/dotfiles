@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Control Center
+GenericName=Settings
+Comment=Themes, wallpapers, display, sound, network, Bluetooth, power and notifications
+Exec=ControlCenter
+Icon=preferences-system
+Terminal=false
+StartupWMClass=ControlCenter
+Categories=Settings;GTK;
+Keywords=settings;preferences;theme;rice;wallpaper;display;sound;wifi;network;bluetooth;battery;power;notifications;

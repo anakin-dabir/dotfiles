@@ -23,3 +23,4 @@ config/systemd/user/*.wants/
 *.atomic-write-*
 .goutputstream-*
 config/bspwm/bars/*/workspaces.yuck
+__pycache__/

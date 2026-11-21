@@ -213,7 +213,7 @@
     (bp-card :title "Microphone"
       (bp-slider :icon {bp_sound.mic_muted ? "󰍭" : "󰍬"} :value {bp_sound.mic_vol}
                  :onchange "~/.config/bspwm/bin/BarPanelAction mic-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction mic-mute &"))
-    (bp-button :icon "󰒓" :text "Sound Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run pavucontrol &")))
+    (bp-button :icon "󰒓" :text "Sound Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter sound &")))
 
 ;; ================= Network =================
 
@@ -238,7 +238,7 @@
       (bp-nav :icon {bp_network.bt_on ? "󰂯" : "󰂲"} :title "Bluetooth" :on {bp_network.bt_on}
               :sub {bp_network.bt_on ? (bp_network.bt_dev != "" ? bp_network.bt_dev : "On") : "Off"}
               :toggle "~/.config/bspwm/bin/BarPanelAction bt-toggle &" :open "~/.config/bspwm/bin/BarPanelAction view bt &"))
-    (bp-button :icon "󰒓" :text "Network Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run nm-connection-editor &")))
+    (bp-button :icon "󰒓" :text "Network Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &")))
 
 (defwidget bp-wifi-list []
   (box :orientation "v" :space-evenly false :spacing 12
@@ -274,7 +274,7 @@
                   (label :class "bp-check" :visible {n.active} :text "󰄬")))))))))
     (box :space-evenly true :spacing 8
       (bp-button :icon "󰐕" :text "Other Network…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --netmanager &")
-      (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run nm-connection-editor &"))))
+      (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &"))))
 
 (defwidget bp-bt-list []
   (box :orientation "v" :space-evenly false :spacing 12
@@ -295,7 +295,7 @@
                 (label :class "bp-item-sub" :halign "start"
                        :text {bp_connecting == d.mac ? "Connecting…" : d.connected ? (d.battery != "" ? "Connected · ${d.battery}%" : "Connected") : "Not connected"}))
               (label :class "bp-check" :visible {d.connected} :text "󰄬"))))))
-    (bp-button :icon "󰐕" :text "Pair New Device…" :onclick "~/.config/bspwm/bin/BarPanelAction run blueman-manager &")))
+    (bp-button :icon "󰐕" :text "Pair New Device…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter bluetooth &")))
 
 (defwidget bp-network-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false
@@ -356,7 +356,9 @@
                  :sub {bp_battery.awake ? "Won't sleep, even with the lid closed" : "Off"}
                  :toggle "~/.config/bspwm/bin/BarPanelAction awake &"))
 
-    (bp-button :icon "󰐥" :text "Power Options…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --powermenu &")))
+    (box :space-evenly true :spacing 8
+      (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter power &")
+      (bp-button :icon "󰐥" :text "Power Off…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --powermenu &"))))
 
 ;; ================= Calendar =================
 
