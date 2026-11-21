@@ -218,6 +218,29 @@ battery() {
           night: $night, awake: $awake}'
 }
 
+# A month as six weeks of days (calendar dropdown). $CAL_OFFSET months from now.
+calendar() {
+    local first; first=$(locale -k LC_TIME 2>/dev/null | sed -n 's/^first_weekday=//p')
+    python3 - "${CAL_OFFSET:-0}" "${first:-1}" <<'PY'
+import calendar, datetime, json, locale, sys
+locale.setlocale(locale.LC_TIME, "")
+offset, first = int(sys.argv[1]), int(sys.argv[2])
+today = datetime.date.today()
+m = today.month - 1 + offset
+year, month = today.year + m // 12, m % 12 + 1
+start = (first + 5) % 7                     # locale: 1 = Sunday -> python 6, 2 = Monday -> 0
+cal = calendar.Calendar(firstweekday=start)
+days = list(cal.itermonthdates(year, month))
+while len(days) < 42:                       # always 6 rows: the dropdown keeps its height
+    days.append(days[-1] + datetime.timedelta(days=1))
+weeks = [[{"d": d.day, "in": d.month == month, "today": d == today} for d in days[i:i + 7]]
+         for i in range(0, 42, 7)]
+names = [datetime.date(2024, 1, 1 + (start + i) % 7).strftime("%a")[:2] for i in range(7)]
+print(json.dumps({"title": datetime.date(year, month, 1).strftime("%B %Y"), "offset": offset,
+                  "weekdays": names, "weeks": weeks}, separators=(",", ":")))
+PY
+}
+
 # Wi-Fi networks in range. --rescan asks the card to search again (takes a
 # few seconds); without it the last results are returned at once.
 wifi() {
@@ -265,7 +288,7 @@ for a in "${@:2}"; do
 done
 case "$1" in
     closable) closable "$2"; exit ;;
-    cpu|memory|disk|sound|network|battery|wifi|bt)
+    cpu|memory|disk|sound|network|battery|wifi|bt|calendar)
         out=$("$1" | holds "bp_$1")
         if [ "$PUSH" = 1 ]; then
             # Send straight to the open dropdown instead of waiting for its next poll

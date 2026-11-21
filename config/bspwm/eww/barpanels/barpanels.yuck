@@ -9,7 +9,8 @@
 (defvar bp_view "main")      ;; network dropdown: main | wifi | bt
 (defvar bp_scanning false)   ;; looking for Wi-Fi networks
 (defvar bp_connecting "")
-(defvar bp_confirm "")       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
+(defvar bp_confirm "")
+(defvar bp_calendar '{"title":"","offset":0,"weekdays":[],"weeks":[]}')   ;; the month shown (BarPanelData calendar)       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
 ;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
 ;; Wi-Fi search each time: that takes seconds, the refresh button does it)
 (defpoll bp_wifi :interval "3s" :run-while {bp_open == "network" && bp_view == "wifi"}
@@ -523,9 +524,27 @@
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰃭" :title {formattime(EWW_TIME, "%A")}
              :sub {formattime(EWW_TIME, "%B %-d, %Y")} :value {formattime(EWW_TIME, "%H:%M")})
-    (box :class "bp-card"
-      (eventbox :cursor "pointer"
-        (calendar :class "bp-month" :hexpand true :show-week-numbers false)))))
+    ;; (scroll over the month to go back and forward)
+    (eventbox :onscroll "~/.config/bspwm/bin/BarPanelAction cal {} &"
+      (box :class "bp-card bp-cal" :orientation "v" :space-evenly false :spacing 2
+        (box :class "bp-cal-head" :space-evenly false :spacing 4
+          (label :class "bp-cal-title" :halign "start" :hexpand true :text {bp_calendar.title})
+          (box :visible {bp_calendar.offset != 0}
+            (eventbox :cursor "pointer"
+              (button :class "bp-chip" :onclick "~/.config/bspwm/bin/BarPanelAction cal today &" "Today")))
+          (eventbox :cursor "pointer"
+            (button :class "bp-mini" :tooltip "Previous month" :onclick "~/.config/bspwm/bin/BarPanelAction cal prev &" "󰅁"))
+          (eventbox :cursor "pointer"
+            (button :class "bp-mini" :tooltip "Next month" :onclick "~/.config/bspwm/bin/BarPanelAction cal next &" "󰅂")))
+        (box :class "bp-cal-row" :space-evenly true
+          (for w in {bp_calendar.weekdays}
+            (label :class "bp-cal-wd" :text w)))
+        (for week in {bp_calendar.weeks}
+          (box :class "bp-cal-row" :space-evenly true
+            (for d in week
+              (box :halign "center"
+                (label :class "bp-cal-day ${d.in ? '' : 'bp-cal-out'} ${d.today ? 'bp-cal-today' : ''}"
+                       :text {d.d})))))))))
 
 ;; ================= windows =================
 

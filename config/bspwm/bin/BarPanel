@@ -107,7 +107,6 @@ place() { # $1 = panel width
 fill() { # $1 = name, $2 = max height
     case "$1" in
         notifcenter) "$BSPDIR/bin/NotifyCenter" --data "$2" 7>&- ;;
-        calendar)    ;;
         cpu)         "${EWW[@]}" update bp_cpu="$("$BSPDIR/bin/BarPanelData" cpu --fast)" ;;
         *)           "${EWW[@]}" update "bp_$1=$("$BSPDIR/bin/BarPanelData" "$1")" ;;
     esac >/dev/null 2>&1

@@ -406,40 +406,48 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 // ----- calendar ----- //
-// (class bp-month, not bp-calendar: eww gives each window a class with its
-// own name, so .bp-calendar would also style the whole calendar window)
 
-.bp-month {
-  font-family: $nc-font;
+.bp-cal {
+  padding: 10px 10px 12px 10px;
+}
+
+.bp-cal-head {
+  padding: 2px 2px 8px 6px;
+  min-height: 26px;        // same height with or without the Today button
+}
+
+.bp-cal-head .bp-chip {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.bp-panel .bp-cal-title {
   font-size: 13px;
-  color: $fg;
-  background-color: transparent;
-  padding: 2px 4px;
-  -GtkCalendar-vertical-separation: 10;
-  -GtkCalendar-horizontal-separation: 8;
-  -GtkCalendar-inner-border: 4;
-}
-
-.bp-month:selected {
-  background-color: $nc-accent;
-  color: $nc-on-accent;
-  border-radius: $nc-pill-radius;
-}
-
-.bp-month.header {
   font-weight: bold;
 }
 
-.bp-month.button {
-  color: rgba($fg, 0.6);
+.bp-panel .bp-cal-wd {
+  font-size: 10px;
+  font-weight: bold;
+  color: rgba($fg, 0.45);
+  padding-bottom: 4px;
 }
 
-.bp-month.button:hover {
-  color: $fg;
+.bp-panel .bp-cal-day {
+  font-size: 12px;
+  min-width: 30px;         // a circle, so today is round
+  min-height: 30px;
+  border-radius: 999px;
 }
 
-.bp-month:indeterminate {
-  color: rgba($fg, 0.3);
+.bp-panel .bp-cal-out {
+  color: rgba($fg, 0.28);
+}
+
+.bp-panel .bp-cal-today {
+  background-color: $nc-accent;
+  color: $nc-on-accent;
+  font-weight: bold;
 }
 
 // ----- close an app / clean up (second click confirms) ----- //
