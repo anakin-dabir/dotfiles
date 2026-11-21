@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 import gi
 
@@ -102,6 +103,7 @@ class Watch:
         self.dark_from = None        # brightness before going dark
         self.locked_now = False
         self.was_discharging = True        # (first check closes a warning left from before)
+        self.period = None                 # day or night, for the day/night themes
         self.fd = None
         self.bus = None
         try:
@@ -177,7 +179,54 @@ class Watch:
                 pass
         self.was_discharging = status == "Discharging"
 
+    # ----- day and night themes (config/daynight.json) -----
+
+    def _daynight(self):
+        """The day / night theme: at login, when switched on, and at sunrise / sunset
+        (or the fixed times). A theme picked by hand stays until the next change."""
+        try:
+            with open(os.path.join(HOME, ".config", "bspwm", "config", "daynight.json")) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            return
+        if not c.get("on"):
+            self.period = None
+            return
+        day_at, night_at = c.get("day_at", "07:00"), c.get("night_at", "19:00")
+        if c.get("times", "sun") == "sun":
+            try:
+                cache = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")),
+                                     "barpanel-weather", "forecast.json")
+                with open(cache) as f:
+                    daily = json.load(f).get("daily", {})
+                day_at, night_at = daily["sunrise"][0][11:16], daily["sunset"][0][11:16]
+            except (OSError, ValueError, KeyError, IndexError):
+                pass
+        now = time.strftime("%H:%M")
+        period = "day" if day_at <= now < night_at else "night"
+        if period == self.period:
+            return
+        self.period = period
+        want = c.get(period, "")
+        try:
+            with open(os.path.join(HOME, ".config", "bspwm", ".rice")) as f:
+                current = f.read().strip()
+        except OSError:
+            current = ""
+        if not want or want == current or not os.path.isdir(os.path.join(HOME, ".config", "bspwm", "rices", want)):
+            return
+        with open(os.path.join(HOME, ".config", "bspwm", ".rice"), "w") as f:
+            f.write(want + "\n")
+        subprocess.Popen([os.path.join(HOME, ".config", "bspwm", "bin", "Theme.sh")], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(["notify-send", "-a", "Control Center", "-i", "weather-clear" if period == "day"
+                          else "weather-clear-night", "Good morning" if period == "day" else "Good evening",
+                          f"{want.capitalize()} theme for the {period}"])
+
     def tick(self):
+        self.ticks = getattr(self, "ticks", 0) + 1
+        if self.ticks % 60 == 1:
+            self._daynight()
         self._plugged_in()
         s = settings()
         if s["lock_on_sleep"] and self.fd is None:

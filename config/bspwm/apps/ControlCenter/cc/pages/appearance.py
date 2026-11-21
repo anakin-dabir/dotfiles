@@ -1,5 +1,6 @@
 """Appearance: pick the theme (rice) and the wallpaper."""
 
+import json
 import os
 import re
 
@@ -10,6 +11,17 @@ from ..common import BSPDIR, HOME, Page, current_rice, group, have, run_quiet, t
 from ..preview import current_wallpaper
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
+DAYNIGHT = os.path.join(BSPDIR, "config", "daynight.json")
+
+
+def is_light(name):
+    """A theme with a light background."""
+    m = re.search(r'(?m)^bg="?#?([0-9A-Fa-f]{6})', open(os.path.join(BSPDIR, "rices", name, "theme-config.bash")).read()) \
+        if os.path.exists(os.path.join(BSPDIR, "rices", name, "theme-config.bash")) else None
+    if not m:
+        return False
+    r, g, b = (int(m.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.5
 
 
 def tile(name, width, height):
@@ -65,6 +77,34 @@ class AppearancePage(Page):
             self.theme_tiles[name] = t
             thumbnail(os.path.join(rices_dir, name, "preview.webp"), 260, 344,
                       lambda tex, t=t: tex and t.picture.set_paintable(tex))
+
+        # Day and night themes (bin/IdleWatch switches them)
+        dn = group(self, "Day and night", "A light theme by day and a dark one at night, switched by themselves.")
+        self.dn_on = Adw.SwitchRow(title="Change the theme with the time of day")
+        self.dn_on.add_prefix(Gtk.Image.new_from_icon_name("weather-clear-night-symbolic"))
+        self.dn_on.connect("notify::active", lambda r, _p: self._dn_set(on=r.get_active()))
+        dn.add(self.dn_on)
+        names = sorted(d for d in os.listdir(rices_dir) if os.path.isdir(os.path.join(rices_dir, d)))
+        light = [n for n in names if is_light(n)]
+        self.dn_names = light + [n for n in names if n not in light]
+        labels = [n.capitalize() + (" (light)" if n in light else "") for n in self.dn_names]
+        self.dn_day = Adw.ComboRow(title="Day theme", model=Gtk.StringList.new(labels))
+        self.dn_day.connect("notify::selected", lambda r, _p: self._dn_set(day=self.dn_names[r.get_selected()]))
+        dn.add(self.dn_day)
+        self.dn_night = Adw.ComboRow(title="Night theme", model=Gtk.StringList.new(labels))
+        self.dn_night.connect("notify::selected", lambda r, _p: self._dn_set(night=self.dn_names[r.get_selected()]))
+        dn.add(self.dn_night)
+        self.dn_times = Adw.ComboRow(title="Switch at", model=Gtk.StringList.new(
+            ["Sunrise and sunset (from the weather)", "Fixed times"]))
+        self.dn_times.connect("notify::selected", lambda r, _p: self._dn_set(times="sun" if r.get_selected() == 0 else "fixed"))
+        dn.add(self.dn_times)
+        self.dn_day_at = Adw.EntryRow(title="Day starts at (HH:MM)", show_apply_button=True)
+        self.dn_day_at.connect("apply", lambda r: self._dn_time("day_at", r.get_text()))
+        dn.add(self.dn_day_at)
+        self.dn_night_at = Adw.EntryRow(title="Night starts at (HH:MM)", show_apply_button=True)
+        self.dn_night_at.connect("apply", lambda r: self._dn_time("night_at", r.get_text()))
+        dn.add(self.dn_night_at)
+        self._dn_load()
 
         # How the wallpaper is chosen (the theme's ENGINE)
         modes = group(self, "Wallpaper mode")
@@ -205,6 +245,59 @@ class AppearancePage(Page):
         run_quiet([tool("WallApply")], lambda _ok: self.mark())   # also stops a slideshow / video
         self.load_mode()
         self.mark()
+
+    # ----- day and night -----
+
+    def _dn(self):
+        try:
+            with open(DAYNIGHT) as f:
+                c = json.load(f)
+        except (OSError, ValueError):
+            c = {}
+        return {"on": bool(c.get("on", False)), "day": c.get("day", "aline"), "night": c.get("night", "cupertino"),
+                "times": c.get("times", "sun"), "day_at": c.get("day_at", "07:00"), "night_at": c.get("night_at", "19:00")}
+
+    def _dn_load(self):
+        c = self._dn()
+
+        def put():
+            self.dn_on.set_active(c["on"])
+            if c["day"] in self.dn_names:
+                self.dn_day.set_selected(self.dn_names.index(c["day"]))
+            if c["night"] in self.dn_names:
+                self.dn_night.set_selected(self.dn_names.index(c["night"]))
+            self.dn_times.set_selected(0 if c["times"] == "sun" else 1)
+            self.dn_day_at.set_text(c["day_at"])
+            self.dn_night_at.set_text(c["night_at"])
+        self.quietly(put)
+        for w in (self.dn_day, self.dn_night, self.dn_times):
+            w.set_sensitive(c["on"])
+        for w in (self.dn_day_at, self.dn_night_at):
+            w.set_visible(c["on"] and c["times"] == "fixed")
+
+    def _dn_set(self, **changes):
+        if self._updating:
+            return
+        c = self._dn()
+        c.update(changes)
+        try:
+            with open(DAYNIGHT, "w") as f:
+                json.dump(c, f, indent=2)
+                f.write("\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self._dn_load()
+        if "on" in changes and changes["on"]:
+            self.toast("The right theme for now comes within a minute")
+
+    def _dn_time(self, key, text):
+        text = text.strip()
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", text):
+            self.toast("Write the time like 07:30")
+            return
+        self._dn_set(**{key: text})
+        self.toast("Saved")
 
     # ----- wallpaper mode -----
 
