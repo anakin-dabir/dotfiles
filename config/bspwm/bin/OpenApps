@@ -8,6 +8,11 @@
 
 WIDGET_DIR="$HOME/.config/bspwm/eww"
 
+# Your default apps (Control Center > Apps): config/apps.json
+APPS="$HOME/.config/bspwm/config/apps.json"
+app() { local c; c=$(jq -r --arg k "$1" '.[$k] // empty' "$APPS" 2>/dev/null); echo "${c:-$2}"; }
+run_app() { cd "$HOME" && eval "setsid $(app "$1" "$2") >/dev/null 2>&1 &"; }
+
 case "$1" in
 	--menu)
 		RofiLauncher --launcher
@@ -65,13 +70,13 @@ case "$1" in
 		;;
 		# Apps
 	--filemanager)
-		thunar
+		run_app files thunar
 		;;
 	--browser)
-		google-chrome-stable
+		run_app browser google-chrome-stable
 		;;
 	--editor)
-		geany
+		run_app text_editor geany
 		;;
 	--telegram)
 		telegram-desktop
@@ -96,7 +101,7 @@ case "$1" in
 		EwwDaemon && eww --no-daemonize -c "$WIDGET_DIR" open --toggle date
 		;;
 	--code)
-		code dash/
+		run_app editor "code dash/"
 		;;
 	--warp)
 		warp-cloudflare-gui

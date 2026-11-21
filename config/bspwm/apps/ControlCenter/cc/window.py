@@ -10,6 +10,7 @@ from gi.repository import Adw, GLib, Graphene, Gtk  # noqa: E402
 from .common import set_pointer_root, widgets_changed
 from .pages.about import AboutPage
 from .pages.appearance import AppearancePage
+from .pages.apps import AppsPage
 from .pages.bar import BarPage
 from .pages.bluetooth import BluetoothPage
 from .pages.customize import CustomizePage
@@ -22,7 +23,7 @@ from .pages.power import PowerPage
 from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
 
-PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, DisplayPage, SoundPage, NetworkPage,
+PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, DisplayPage, SoundPage, NetworkPage,
          BluetoothPage, ShortcutsPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
@@ -47,6 +48,7 @@ KEYWORDS = {
     "notifications": "do not disturb dunst popups",
     "about": "system version kernel computer",
     "shortcuts": "keys keybindings hotkeys sxhkd keyboard shortcuts",
+    "apps": "default browser file manager editor terminal startup autostart login",
 }
 
 

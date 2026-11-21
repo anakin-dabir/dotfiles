@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Start the apps you chose for login (Control Center > Apps > Startup apps).
+# config/startup.json: [{"name": "...", "exec": "..."}, ...]. Run by bspwmrc.
+
+LIST="$HOME/.config/bspwm/config/startup.json"
+[ -s "$LIST" ] || exit 0
+sleep "${1:-3}"                 # (the desktop first)
+jq -r '.[] | select(.on != false) | .exec' "$LIST" 2>/dev/null | while IFS= read -r cmd; do
+    [ -n "$cmd" ] && (cd "$HOME" && eval "setsid $cmd" >/dev/null 2>&1 < /dev/null &)
+done

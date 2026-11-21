@@ -226,7 +226,7 @@
 
 (defwidget bp-s-disk_buttons []
   (box :space-evenly true :spacing 8
-    (bp-button :icon "󰉋" :text "Files" :onclick "~/.config/bspwm/bin/BarPanelAction run thunar &")
+    (bp-button :icon "󰉋" :text "Files" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --filemanager &")
     (bp-button :icon "󰄨" :text "Analyze" :onclick "~/.config/bspwm/bin/BarPanelAction run kitty -e ncdu ~ &")))
 
 (defwidget bp-s-sound_volume []

@@ -1,0 +1,6 @@
+{
+  "browser": "google-chrome-stable",
+  "files": "thunar",
+  "editor": "code dash/",
+  "text_editor": "geany"
+}
