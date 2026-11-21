@@ -114,7 +114,7 @@ class KeyboardPreview(Gtk.DrawingArea):
 
 class KeyboardPage(Page):
     name = "keyboard"
-    title = "Keyboard"
+    title = "Keyboard lighting"
     icon = "input-keyboard-symbolic"
     interval = 0
 

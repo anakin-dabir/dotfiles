@@ -67,11 +67,10 @@ class TypingPage(Page):
 
     def __init__(self, window):
         super().__init__(window)
-        self.layouts = group(self, "Layouts", "The first one is used when you log in. Saved right away.")
-        add = Gtk.MenuButton(label="Add…", valign=Gtk.Align.CENTER)
-        add.add_css_class("suggested-action")
-        add.set_popover(self._add_popover())
-        self.layouts.set_header_suffix(add)
+        self.layouts = group(self, "Layouts", "The first one is used when you log in. Add one with + at the top right.")
+        # "+" at the top right of the window: add a layout
+        self.header_widget = Gtk.MenuButton(icon_name="list-add-symbolic", tooltip_text="Add a keyboard layout")
+        self.header_widget.set_popover(self._add_popover())
         self.layout_rows = []
         self.switch = Adw.ComboRow(title="Switch layouts with", model=Gtk.StringList.new([t for _v, t in SWITCH]))
         self.switch.connect("notify::selected", lambda r, _p: self._set(switch=SWITCH[r.get_selected()][0]))

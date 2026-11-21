@@ -581,3 +581,14 @@ def default_keys(a):
         if " ".join(b.command.split()) == " ".join(a.command.split()) and not b.is_set:
             return None if b.keys == a.keys else b.keys
     return None
+
+
+def remove_action(a):
+    """Delete a shortcut from the file (a set: the whole line). Reset brings it back."""
+    if a.index is not None:
+        _split(a.sc)
+        sc = _find(a.command, a.keys) or _find(a.command)
+    else:
+        sc = a.sc
+    if sc:
+        remove(sc)

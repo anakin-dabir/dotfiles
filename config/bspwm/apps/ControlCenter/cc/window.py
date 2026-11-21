@@ -32,6 +32,11 @@ PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, Displa
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
 PAGES += [PowerPage, NotificationsPage, PhonesPage, UpdatesPage, AboutPage]
 
+# Pages shown as one sidebar entry, with tabs in the title bar:
+# (id, title, icon, [page names]) - pages that aren't on this computer are left out
+FAMILIES = [("keyboard-all", "Keyboard", "input-keyboard-symbolic", ["shortcuts", "typing", "keyboard"])]
+TABS = {"keyboard": "Lighting"}       # tab names that differ from the page title
+
 # Other words people may search for, besides the names on each page
 KEYWORDS = {
     "appearance": "theme rice wallpaper background picture slideshow",
@@ -81,6 +86,7 @@ class Window(Adw.ApplicationWindow):
         content_view = Adw.ToolbarView()
         self.heading = Adw.WindowTitle()
         header = Adw.HeaderBar(title_widget=self.heading)
+        self.header = header
         content_view.add_top_bar(header)
         # A page's preview that stays on screen while its settings scroll
         # (a plain box, shown or hidden at once: an animated strip moved the
@@ -118,18 +124,39 @@ class Window(Adw.ApplicationWindow):
         # Sidebar
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.list.add_css_class("navigation-sidebar")
+        self.family_of = {}           # page name -> (family title, [pages])
+        self.switchers = {}           # family id -> Adw.ToggleGroup (the tabs)
+        done = set()
         for p in self.pages:
+            if p.name in done:
+                continue
+            fam = next((f for f in FAMILIES if p.name in f[3]), None)
+            members = [self.by_name[n] for n in fam[3] if n in self.by_name] if fam else [p]
+            done.update(m.name for m in members)
+            title, icon = (fam[1], fam[2]) if fam and len(members) > 1 else (p.title, p.icon)
             box = Gtk.Box(spacing=12, margin_top=2, margin_bottom=2)
-            box.append(Gtk.Image.new_from_icon_name(p.icon))
+            box.append(Gtk.Image.new_from_icon_name(icon))
             text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
-            text.append(Gtk.Label(label=p.title, xalign=0))
+            text.append(Gtk.Label(label=title, xalign=0))
             hit = Gtk.Label(xalign=0, ellipsize=3, visible=False)
             hit.add_css_class("dim-label")
             hit.add_css_class("caption")
             text.append(hit)
             box.append(text)
             row = Gtk.ListBoxRow(child=box)
-            row.page, row.hit_label, row.match = p, hit, None
+            row.page, row.pages, row.title = members[0], members, title
+            row.hit_label, row.match = hit, None
+            if len(members) > 1:
+                tabs = Adw.ToggleGroup()
+                for m in members:
+                    tabs.add(Adw.Toggle(name=m.name, label=TABS.get(m.name, m.title)))
+                tabs.connect("notify::active-name", lambda t, _p, r=row: self._tab(r, t.get_active_name()))
+                self.switchers[fam[0]] = tabs
+                row.tabs = tabs
+                for m in members:
+                    self.family_of[m.name] = row
+            else:
+                row.tabs = None
             self.list.append(row)
         self.list.connect("row-selected", self._selected)
         self.list.connect("row-activated", lambda _l, row: self._go_to_match(row))
@@ -248,17 +275,19 @@ class Window(Adw.ApplicationWindow):
         row = self.list.get_first_child()
         while row is not None:
             if isinstance(row, Gtk.ListBoxRow):
-                p = row.page
                 row.match, row.shown = None, not words
                 if words:
-                    if all(w in _plain(p.title + " " + KEYWORDS.get(p.name, "")) for w in words):
-                        row.shown = True
-                    for name, widget in self._settings_of(p):
-                        if all(w in _plain(name) for w in words):
-                            row.match, row.shown = (name, widget), True
+                    for p in row.pages:
+                        if all(w in _plain(row.title + " " + p.title + " " + KEYWORDS.get(p.name, "")) for w in words):
+                            row.shown = True
+                            if row.match is None and len(row.pages) > 1:
+                                row.match = (p.title, None, p)
+                        found = next(((n, w) for n, w in self._settings_of(p) if all(x in _plain(n) for x in words)), None)
+                        if found:
+                            row.match, row.shown = (found[0], found[1], p), True
                             break
                 row.hit_label.set_label(row.match[0] if row.match else "")
-                row.hit_label.set_visible(row.match is not None and row.match[0] != p.title)
+                row.hit_label.set_visible(row.match is not None and row.match[0] != row.title)
             row = row.get_next_sibling()
         self.list.invalidate_filter()
 
@@ -278,7 +307,11 @@ class Window(Adw.ApplicationWindow):
         """Scroll the page to the setting the search found."""
         if row.match is None:
             return
-        widget = row.match[1]
+        name, widget, page = row.match
+        if page is not row.page or self.page is not page:
+            self.show_page(page.name)
+        if widget is None:
+            return
 
         tries = [20]
 
@@ -321,12 +354,32 @@ class Window(Adw.ApplicationWindow):
 
     def show_page(self, name):
         page = self.by_name.get(name) or self.pages[0]
-        row = self.list.get_row_at_index(self.pages.index(page))
-        self.list.select_row(row)   # -> _selected
+        row = self._row_of(page)
+        row.page = page
+        if self.list.get_selected_row() is row:
+            self._show(row)
+        else:
+            self.list.select_row(row)   # -> _selected -> _show
+
+    def _row_of(self, page):
+        row = self.list.get_first_child()
+        while row is not None:
+            if isinstance(row, Gtk.ListBoxRow) and page in row.pages:
+                return row
+            row = row.get_next_sibling()
+        return self.list.get_row_at_index(0)
+
+    def _tab(self, row, name):
+        page = self.by_name.get(name)
+        if page is not None and page is not row.page:
+            row.page = page
+            self._show(row)
 
     def _selected(self, _list, row):
-        if row is None:
-            return
+        if row is not None:
+            self._show(row)
+
+    def _show(self, row):
         page = row.page
         if self.page is not None and self.page is not page:
             self.page.leave()
@@ -334,8 +387,15 @@ class Window(Adw.ApplicationWindow):
         # slide from their old position and lists don't fill in visibly
         page.refresh()
         self.stack.set_visible_child(page)
-        self.content.set_title(page.title)
+        self.content.set_title(row.title)
         self.heading.set_title(page.title)
+        # A family's tabs take the title's place
+        if row.tabs is not None:
+            if row.tabs.get_active_name() != page.name:
+                row.tabs.set_active_name(page.name)
+            self.header.set_title_widget(row.tabs)
+        else:
+            self.header.set_title_widget(self.heading)
         widget = getattr(page, "sticky_widget", None)
         current = self.sticky.get_first_child()
         if widget is not None and current is not widget:

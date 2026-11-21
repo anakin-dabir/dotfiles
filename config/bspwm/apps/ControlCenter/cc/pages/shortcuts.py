@@ -88,6 +88,11 @@ class ShortcutDialog(Adw.Dialog):
         onoff = Gtk.Button(label="Turn off" if action.on else "Turn on")
         onoff.connect("clicked", lambda *_: (self.close(), self.page._on(action, not action.on)))
         btns.append(onoff)
+        rm = Gtk.Button(label="Remove")
+        rm.add_css_class("destructive-action")
+        rm.set_tooltip_text("Delete this shortcut (Reset all shortcuts brings it back)")
+        rm.connect("clicked", lambda *_: (self.close(), self.page._remove(action)))
+        btns.append(rm)
         self.default = None if action.is_set else sk.default_keys(action)
         if self.default:
             back = Gtk.Button(label=f"Back to {sk.pretty(self.default)}")
@@ -245,6 +250,14 @@ class ShortcutsPage(Page):
             self.toast(f"Couldn't save: {e.strerror}")
             return
         self._done(f"{a.name}: {'on' if on else 'off'}")
+
+    def _remove(self, a):
+        try:
+            sk.remove_action(a)
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        self._done(f"Removed {a.name}")
 
     def _add(self):
         d = Adw.AlertDialog(heading="Your own shortcut", body="What it's called, its keys and the command it runs.")
