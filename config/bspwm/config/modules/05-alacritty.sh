@@ -13,7 +13,7 @@ foreground = "${fg}"
 
 # Cursor colors
 [colors.cursor]
-cursor = "${fg}"
+cursor = "$(printf '%s' "${FOCUSED_BC:-$blue}" | sed 's/^#..\([0-9A-Fa-f]\{6\}\)$/#\1/')"
 text = "${bg}"
 
 # Normal colors

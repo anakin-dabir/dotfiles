@@ -5,7 +5,7 @@ foreground = "#F5F5F7"
 
 # Cursor colors
 [colors.cursor]
-cursor = "#F5F5F7"
+cursor = "#0A84FF"
 text = "#1C1C1E"
 
 # Normal colors

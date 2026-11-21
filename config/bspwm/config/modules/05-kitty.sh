@@ -2,6 +2,9 @@
 
 sed -i "s|^background_opacity .*|background_opacity ${P_TERM_OPACITY}|" "$HOME/.config/kitty/kitty.conf"
 
+# The theme's accent (#AARRGGBB -> #RRGGBB): cursor, selection, links, active border
+_term_accent=$(printf '%s' "${FOCUSED_BC:-$blue}" | sed 's/^#..\([0-9A-Fa-f]\{6\}\)$/#\1/')
+
 _write "$HOME/.config/kitty/current-theme.conf" << EOF
 # Colors generated for ${RICE} theme.
 
@@ -9,17 +12,17 @@ _write "$HOME/.config/kitty/current-theme.conf" << EOF
 foreground              ${fg}
 background              ${bg}
 selection_foreground    ${bg}
-selection_background    ${magenta}
+selection_background    ${_term_accent}
 
 # Cursor colors
-cursor                  ${fg}
+cursor                  ${_term_accent}
 cursor_text_color       ${bg}
 
 # URL underline color when hovering with mouse
-url_color               ${blue}
+url_color               ${_term_accent}
 
 # Kitty window border colors
-active_border_color     ${magenta}
+active_border_color     ${_term_accent}
 inactive_border_color   ${blackb}
 bell_border_color       ${yellow}
 

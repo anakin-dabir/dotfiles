@@ -25,6 +25,8 @@ _write() { local t=$1 tmp; tmp=$(mktemp "$(dirname "$t")/.tmp.XXXXXX") && cat > 
 . "$MODULE_DIR/01-bspwm.sh"
 _theme_blue=$blue; [ -n "$new" ] && blue=$new; . "$MODULE_DIR/02-bar.sh"; blue=$_theme_blue
 . "$MODULE_DIR/04-rofi.sh"
+. "$MODULE_DIR/05-kitty.sh"
+. "$MODULE_DIR/05-alacritty.sh"
 . "$MODULE_DIR/06-eww.sh" >/dev/null 2>&1
 [ -f "$MODULE_DIR/06-jgmenu.sh" ] && . "$MODULE_DIR/06-jgmenu.sh"
 # the theme's own additions (e.g. Cupertino's rounded menus, added to shared.rasi)
