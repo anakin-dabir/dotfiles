@@ -247,12 +247,17 @@ def reset():
 # While new keys are being recorded, sxhkd must not catch them
 def pause():
     subprocess.run(["pkill", "-x", "sxhkd"], check=False)
+    # Safety net: whatever happens to this window, the shortcuts come back
+    subprocess.Popen(["sh", "-c", 'sleep 90; pgrep -x sxhkd >/dev/null || exec sxhkd -c "$0"', FILE],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                     start_new_session=True, cwd=os.path.expanduser("~"))
 
 
 def resume():
     if subprocess.run(["pgrep", "-x", "sxhkd"], capture_output=True).returncode != 0:
+        env = {k: v for k, v in os.environ.items() if k not in ("GDK_BACKEND", "BROADWAY_DISPLAY")}
         subprocess.Popen(["sxhkd", "-c", FILE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL, start_new_session=True)
+                         stdin=subprocess.DEVNULL, start_new_session=True, env=env, cwd=os.path.expanduser("~"))
 
 
 # ===================== actions: what the Shortcuts page shows =====================
