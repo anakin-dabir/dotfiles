@@ -1,0 +1,154 @@
+#!/bin/bash
+# Keyboard backlight (HP RGB keyboard): colour and effects.
+#
+#   kbd-effect static RRGGBB        one colour (saved: restored at boot too)
+#   kbd-effect rainbow              cross-fade through the palette (kbd-colors.conf)
+#   kbd-effect breathing RRGGBB     the colour slowly fading in and out
+#   kbd-effect preview RRGGBB       show a colour now without saving anything
+#   kbd-effect restore              start the saved effect again (at login)
+#   kbd-effect power MODE           colour for a power mode, if that's switched on
+#   options: --speed 1-10  --brightness 10-100
+#
+# Settings live in ~/.config/bspwm/config/keyboard.json (Control Center >
+# Keyboard edits them). No sudo: the zone files are group-writable (wheel)
+# by the kbd-backlight service / udev rule.
+
+ZONES=(/sys/devices/platform/hp-wmi/rgb_zones/zone0*)
+CONF=/etc/kbd-backlight.conf                       # colour restored at boot
+SETTINGS="$HOME/.config/bspwm/config/keyboard.json"
+PIDFILE="${XDG_RUNTIME_DIR:-/tmp}/kbd-effect.pid"
+COLORFILE="$HOME/.config/bspwm/kbd-colors.conf"
+
+[ -e "${ZONES[0]}" ] || { echo "No RGB keyboard here" >&2; exit 1; }
+
+get() { jq -r "$1 // empty" "$SETTINGS" 2>/dev/null; }
+save() { # jq-filter
+    mkdir -p "${SETTINGS%/*}"
+    local cur; cur=$(cat "$SETTINGS" 2>/dev/null); [ -n "$cur" ] || cur='{}'
+    jq "$1" <<< "$cur" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+}
+
+stop_loop() {
+    local pid; pid=$(cat "$PIDFILE" 2>/dev/null)
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null
+    rm -f "$PIDFILE"
+    # (the old rainbow toggle had its own loop)
+    pid=$(cat /tmp/kbd-rainbow.pid 2>/dev/null); [ -n "$pid" ] && kill "$pid" 2>/dev/null; rm -f /tmp/kbd-rainbow.pid
+}
+
+dim() { # RRGGBB brightness% -> RRGGBB
+    local h=$1 b=${2:-100}
+    printf '%02X%02X%02X' $(( 0x${h:0:2} * b / 100 )) $(( 0x${h:2:2} * b / 100 )) $(( 0x${h:4:2} * b / 100 ))
+}
+
+write_all() { for z in "${ZONES[@]}"; do printf '%s' "$1" > "$z" 2>/dev/null; done; }
+
+# ----- animation frames -----
+
+rainbow_frames() { # brightness
+    local palette; palette=$(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$COLORFILE" | awk '{print $1}' | paste -sd' ')
+    awk -v pal="$palette" -v b="$1" 'BEGIN{
+        m = split(pal, C, " ")
+        # visit colours in a contrasting order (big hue jumps), every one once
+        stride = int(m * 2 / 5); if (stride < 2) stride = 2
+        while (1) { a = stride; c = m; while (c) { t = a % c; a = c; c = t }; if (a == 1) break; stride++ }
+        for (i = 0; i < m; i++) O[i] = C[(i * stride) % m + 1]
+        hold = 15; steps = 55
+        for (i = 0; i < m; i++) {
+            c1 = O[i]; c2 = O[(i + 1) % m]
+            r1 = strtonum("0x" substr(c1,1,2)); g1 = strtonum("0x" substr(c1,3,2)); b1 = strtonum("0x" substr(c1,5,2))
+            r2 = strtonum("0x" substr(c2,1,2)); g2 = strtonum("0x" substr(c2,3,2)); b2 = strtonum("0x" substr(c2,5,2))
+            for (s = 0; s < hold + steps; s++) {
+                t = (s < hold) ? 0 : (s - hold) / steps
+                printf "%02X%02X%02X\n", (r1 + (r2-r1)*t) * b / 100, (g1 + (g2-g1)*t) * b / 100, (b1 + (b2-b1)*t) * b / 100
+            }
+        }
+    }'
+}
+
+breathing_frames() { # RRGGBB brightness
+    awk -v h="$1" -v b="$2" 'BEGIN{
+        r = strtonum("0x" substr(h,1,2)); g = strtonum("0x" substr(h,3,2)); bl = strtonum("0x" substr(h,5,2))
+        n = 90
+        for (i = 0; i < n; i++) {
+            k = (0.12 + 0.88 * (0.5 - 0.5 * cos(2 * 3.14159265 * i / n))) * b / 100
+            printf "%02X%02X%02X\n", r * k, g * k, bl * k
+        }
+    }'
+}
+
+loop() { # delay, frames on stdin
+    echo $$ > "$PIDFILE"
+    trap 'rm -f "$PIDFILE"' EXIT
+    # in-process sub-second sleep (read -t on a fifo): no process per frame
+    local fifo; fifo=$(mktemp -u); mkfifo "$fifo"; exec {sfd}<>"$fifo"; rm -f "$fifo"
+    mapfile -t FR
+    local n=${#FR[@]} i=0 zone="${ZONES[0]}"     # all zones drive one light: write one
+    [ "$n" -gt 0 ] || exit 1
+    while true; do
+        printf '%s' "${FR[i]}" > "$zone" 2>/dev/null
+        i=$(( (i + 1) % n ))
+        read -t "$1" -u "$sfd" _ 2>/dev/null
+    done
+}
+
+delay_for() { # speed 1 (slow) .. 10 (fast) -> seconds per frame
+    awk -v s="${1:-5}" 'BEGIN { if (s < 1) s = 1; if (s > 10) s = 10; printf "%.3f", 0.09 - (s - 1) * 0.008 }'
+}
+
+# ----- arguments -----
+
+cmd=$1; shift
+arg=$1                                   # (as typed: a power mode name keeps its case)
+color="" speed="" bright=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --speed) speed=$2; shift 2 ;;
+        --brightness) bright=$2; shift 2 ;;
+        *) color=${1#\#}; shift ;;
+    esac
+done
+color=${color^^}
+[ -n "$speed" ] || speed=$(get .speed); speed=${speed:-5}
+[ -n "$bright" ] || bright=$(get .brightness); bright=${bright:-100}
+
+start() { # effect colour
+    stop_loop
+    case "$1" in
+        static)
+            local c; c=$(dim "$2" "$bright")
+            write_all "$c"
+            printf '%s\n' "$c" > "$CONF" 2>/dev/null ;;
+        rainbow)
+            rainbow_frames "$bright" | setsid -f "$0" --loop "$(delay_for "$speed")" >/dev/null 2>&1 ;;
+        breathing)
+            breathing_frames "$2" "$bright" | setsid -f "$0" --loop "$(delay_for "$speed")" >/dev/null 2>&1 ;;
+    esac
+}
+
+case "$cmd" in
+    --loop) loop "$1" ;;      # (internal)
+    static|breathing)
+        [[ "$color" =~ ^[0-9A-F]{6}$ ]] || color=$(get .color)
+        [[ "$color" =~ ^[0-9A-F]{6}$ ]] || { echo "usage: kbd-effect $cmd RRGGBB" >&2; exit 1; }
+        save ".effect = \"$cmd\" | .color = \"$color\" | .speed = $speed | .brightness = $bright"
+        start "$cmd" "$color" ;;
+    rainbow)
+        save ".effect = \"rainbow\" | .speed = $speed | .brightness = $bright"
+        start rainbow ;;
+    preview)
+        [[ "$color" =~ ^[0-9A-F]{6}$ ]] || exit 1
+        stop_loop; write_all "$(dim "$color" "$bright")" ;;
+    restore)
+        e=$(get .effect); c=$(get .color)
+        [ -n "$e" ] || exit 0
+        [[ "$c" =~ ^[0-9A-F]{6}$ ]] || c=$(cat "$CONF" 2>/dev/null)
+        start "$e" "$c" ;;
+    power)
+        [ "$(get .follow_power)" = true ] || exit 0
+        c=$(get ".power_colors[\"$arg\"]"); c=${c^^}
+        [[ "$c" =~ ^[0-9A-F]{6}$ ]] || exit 0
+        save ".effect = \"static\" | .color = \"$c\""
+        start static "$c" ;;
+    *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

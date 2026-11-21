@@ -125,11 +125,14 @@ install_system_dir() { # copies misc/system/<name>/ into / , filling in @USER@ a
 
 say "Installing system tweaks (pacman hook, journal size cap, iPhone auto-mount)"
 install_system_dir common
+# Permissions now, not only after a reboot (power mode, and fans on HP laptops)
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/platform-profile.conf 2>/dev/null || true
 sudo udevadm control --reload-rules
 
 if [ "$HARDWARE" = 1 ]; then
     say "Installing HP Victus fixes"
     install_system_dir hp-victus
+    sudo systemd-tmpfiles --create /etc/tmpfiles.d/hp-fans.conf 2>/dev/null || true
     sudo systemctl enable kbd-backlight.service disable-wakeups.service
     warn "Kernel parameters are not changed automatically. For the eDP black-screen fix add"
     warn "  i915.enable_psr=0 i915.enable_dc=0 i915.enable_fbc=0  to GRUB_CMDLINE_LINUX_DEFAULT"

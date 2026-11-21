@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# One-time: let your user (the wheel group) change the power mode and, on HP
+# laptops, the fan mode, without a password. Asks for the password once.
+# install.sh does the same on new installs (misc/system/*/etc/tmpfiles.d).
+[ "$(id -u)" -eq 0 ] || exec pkexec "$(realpath "$0")"
+DOTS=$(cd "$(dirname "$(realpath "$0")")/../../.." && pwd)
+for rule in common/etc/tmpfiles.d/platform-profile.conf hp-victus/etc/tmpfiles.d/hp-fans.conf; do
+    src="$DOTS/misc/system/$rule"
+    dst="/${rule#*/}"
+    [ -f "$src" ] || continue
+    install -Dm644 "$src" "$dst" && systemd-tmpfiles --create "$dst"
+done
+exit 0

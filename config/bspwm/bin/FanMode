@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# HP laptops (hp-wmi): fans automatic or at full speed.
+#   FanMode           print auto or max (or nothing if not supported)
+#   FanMode auto|max  switch (needs the one-time permission: AllowHardware)
+F=$(ls /sys/devices/platform/hp-wmi/hwmon/hwmon*/pwm1_enable 2>/dev/null | head -1)
+[ -n "$F" ] || exit 2
+case "$1" in
+    "")   [ "$(cat "$F")" = 0 ] && echo max || echo auto ;;
+    max)  [ -w "$F" ] || { echo "Not allowed yet: run AllowHardware once" >&2; exit 3; }; echo 0 > "$F" ;;
+    auto) [ -w "$F" ] || { echo "Not allowed yet: run AllowHardware once" >&2; exit 3; }; echo 2 > "$F" ;;
+    *)    echo "usage: FanMode [auto|max]" >&2; exit 1 ;;
+esac

@@ -12,6 +12,7 @@ from .pages.bar import BarPage
 from .pages.bluetooth import BluetoothPage
 from .pages.customize import CustomizePage
 from .pages.display import DisplayPage
+from .pages import fans, keyboard
 from .pages.dropdowns import DropdownsPage
 from .pages.network import NetworkPage
 from .pages.notifications import NotificationsPage
@@ -19,7 +20,10 @@ from .pages.power import PowerPage
 from .pages.sound import SoundPage
 
 PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, DisplayPage, SoundPage, NetworkPage,
-         BluetoothPage, PowerPage, NotificationsPage, AboutPage]
+         BluetoothPage]
+# Hardware pages, only on laptops that have the hardware
+PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
+PAGES += [PowerPage, NotificationsPage, AboutPage]
 
 
 class Window(Adw.ApplicationWindow):
@@ -42,8 +46,9 @@ class Window(Adw.ApplicationWindow):
         header = Adw.HeaderBar(title_widget=self.heading)
         content_view.add_top_bar(header)
         # A page's preview that stays on screen while its settings scroll
-        # (no animation: sliding moved the whole page for a quarter second)
-        self.sticky = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.NONE)
+        # (a plain box, shown or hidden at once: an animated strip moved the
+        # whole page for a moment, and a revealer kept its space when hidden)
+        self.sticky = Gtk.Box()
         self.sticky.add_css_class("cc-sticky")
         content_view.add_top_bar(self.sticky)
         self.sticky_toggle = Gtk.ToggleButton(icon_name="view-reveal-symbolic", active=True,
@@ -107,7 +112,7 @@ class Window(Adw.ApplicationWindow):
         page = self.page
         has = page is not None and getattr(page, "sticky_widget", None) is not None
         self.sticky_toggle.set_visible(has)
-        self.sticky.set_reveal_child(has and self.sticky_toggle.get_active())
+        self.sticky.set_visible(has and self.sticky_toggle.get_active())
 
     def _dialog_shown(self, *_):
         """A click outside an open dialog's card closes it. The dialog covers
@@ -167,8 +172,12 @@ class Window(Adw.ApplicationWindow):
         self.content.set_title(page.title)
         self.heading.set_title(page.title)
         widget = getattr(page, "sticky_widget", None)
-        if widget is not None and self.sticky.get_child() is not widget:
-            self.sticky.set_child(widget)
+        current = self.sticky.get_first_child()
+        if widget is not None and current is not widget:
+            if current is not None:
+                self.sticky.remove(current)
+            widget.set_hexpand(True)
+            self.sticky.append(widget)
         self._show_sticky()
         self.split.set_show_content(True)
         page.refresh()

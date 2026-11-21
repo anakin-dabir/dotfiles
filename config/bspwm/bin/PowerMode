@@ -11,18 +11,16 @@
 # Note: TLP sets its own mode when the charger is plugged in or out.
 
 F=/sys/firmware/acpi/platform_profile
-DOTS=$(cd "$(dirname "$(realpath "$0")")/../../.." && pwd)
-RULE=etc/tmpfiles.d/platform-profile.conf
 
 case "$1" in
     "")      cat "$F" 2>/dev/null ;;
     --list)  cat "${F}_choices" 2>/dev/null ;;
-    --setup)
-        [ "$(id -u)" -eq 0 ] || exec pkexec "$(realpath "$0")" --setup
-        install -Dm644 "$DOTS/misc/system/common/$RULE" "/$RULE" &&
-            systemd-tmpfiles --create "/$RULE" ;;
+    --setup) exec "$(dirname "$(realpath "$0")")/AllowHardware" ;;   # (power mode + fans)
     *)
         grep -qw -- "$1" "${F}_choices" 2>/dev/null || { echo "No power mode \"$1\"" >&2; exit 2; }
         [ -w "$F" ] || { echo "Not allowed yet: run PowerMode --setup once" >&2; exit 3; }
-        echo "$1" > "$F" ;;
+        echo "$1" > "$F"
+        # Keyboard colour for this mode (if switched on in Control Center > Keyboard)
+        [ -x "$(dirname "$(realpath "$0")")/kbd-effect" ] && "$(dirname "$(realpath "$0")")/kbd-effect" power "$1" >/dev/null 2>&1 &
+        ;;
 esac

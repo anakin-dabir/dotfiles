@@ -1,8 +1,9 @@
 """Control Center for this bspwm rice.
 
     ControlCenter [SECTION]   open (or bring to front) at SECTION:
-                              appearance display sound network bluetooth
-                              power notifications about
+                              appearance customize bar dropdowns display sound
+                              network bluetooth keyboard fans power
+                              notifications about
 """
 
 import sys
@@ -31,7 +32,7 @@ class App(Adw.Application):
         close = Gio.SimpleAction.new("close", None)
         close.connect("activate", lambda *_: self.window and self.window.close())
         self.add_action(close)
-        self.set_accels_for_action("app.close", ["<Control>w", "Escape"])
+        self.set_accels_for_action("app.close", ["<Control>w"])   # (not Escape: too easy to lose changes)
 
     def do_command_line(self, command_line):
         args = command_line.get_arguments()[1:]

@@ -96,9 +96,9 @@ super + alt + l
 super + alt + k
     OpenApps --keyboard
 
-# Keyboard backlight color picker (fzf live-preview, floating terminal)
+# Keyboard lighting: colour and effects (Control Center > Keyboard)
 super + alt + j
-    kitty --class kbd-picker -o initial_window_width=560 -o initial_window_height=640 -e kbd-color-picker
+    ControlCenter keyboard
 
 # Keyboard backlight rainbow cycle toggle
 super + alt + g

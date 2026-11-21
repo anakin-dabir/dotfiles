@@ -94,6 +94,9 @@ xset s off
 # Night light stays on after a restart if it was on (battery menu on the bar)
 BarPanelAction night-restore &
 
+# Keyboard backlight effect (rainbow, breathing...) starts again after login
+[ -d /sys/devices/platform/hp-wmi/rgb_zones ] && kbd-effect restore &
+
 # The event to make Layouts work with polybar
 bspc subscribe desktop_focus monitor_focus | while read -r _; do
     polybar-msg action "#layout.hook.0" >/dev/null 2>&1
