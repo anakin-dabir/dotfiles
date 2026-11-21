@@ -33,6 +33,10 @@ class App(Adw.Application):
         close.connect("activate", lambda *_: self.window and self.window.close())
         self.add_action(close)
         self.set_accels_for_action("app.close", ["<Control>w"])   # (not Escape: too easy to lose changes)
+        find = Gio.SimpleAction.new("find", None)
+        find.connect("activate", lambda *_: self.window and self.window.focus_search())
+        self.add_action(find)
+        self.set_accels_for_action("app.find", ["<Control>f"])
 
     def do_command_line(self, command_line):
         args = command_line.get_arguments()[1:]

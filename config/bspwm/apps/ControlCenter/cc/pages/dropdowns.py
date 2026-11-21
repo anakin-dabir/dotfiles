@@ -9,7 +9,7 @@ import os
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
 from .. import ddconfig, ddshots
-from ..common import BSPDIR, Page, group, icon_button, launch, run_quiet, widgets_changed
+from ..common import BSPDIR, Page, group, icon_button, launch, quick, run_quiet, widgets_changed
 
 MOCK_W = 262          # width of the mock dropdown's pictures
 GAP = 10              # space between its sections
@@ -38,6 +38,8 @@ class DropdownsPage(Page):
         self.shown, self.order = ddconfig.load()
         self.capturing = False
         self.current = ddconfig.DROPDOWNS[0][0]
+        self.many_outputs = self._outputs()
+        self.missing = set()
 
         top = group(self, description="The panels that open when you click an item on the bar. Pick one, "
                                       "then switch its sections on or off and change their order. Saved right away.")
@@ -47,11 +49,6 @@ class DropdownsPage(Page):
         self.tabs.set_active_name(self.current)
         self.tabs.connect("notify::active-name", self._pick)
         top.add(self.tabs)
-        self.status = Adw.ActionRow(title="Preparing previews for this theme…",
-                                    subtitle="About 30 seconds, once per theme. You can close this window meanwhile.")
-        self.status.add_prefix(Adw.Spinner())
-        self.status.set_visible(False)
-        top.add(self.status)
 
         body = group(self)
         row = Gtk.Box(spacing=20)
@@ -98,13 +95,31 @@ class DropdownsPage(Page):
             self.current = name
             self.build()
 
+    def _missing(self):
+        """Sections this computer never shows (no picture of them in a full
+        set, e.g. no power modes), and Output devices with only one output."""
+        folder = ddshots.shown_dir()
+        out = set()
+        if ddshots.is_complete(folder):
+            out = {k for k in ddconfig.SECTIONS if not os.path.exists(os.path.join(folder, k + ".png"))}
+        out.discard("sound_output")
+        if not self.many_outputs:
+            out.add("sound_output")
+        return out
+
+    def _visible(self, unit):
+        rows = self.order[unit] if unit in ddconfig.CARDS else [unit]
+        return any(r not in self.missing for r in rows)
+
     def _units(self):
-        """[(section, card or None, can_up, can_down)] top to bottom."""
-        units = self.order[self.current]
+        """[(section, card or None, can_up, can_down)] top to bottom,
+        without the sections that never show here."""
+        self.missing = self._missing()
+        units = [u for u in self.order[self.current] if self._visible(u)]
         out = []
         for i, u in enumerate(units):
             if u in ddconfig.CARDS:
-                rows = self.order[u]
+                rows = [r for r in self.order[u] if r not in self.missing]
                 for j, r in enumerate(rows):
                     out.append((r, u, j > 0, j < len(rows) - 1))
             else:
@@ -112,7 +127,7 @@ class DropdownsPage(Page):
         return out
 
     def build(self):
-        folder = ddshots.cache_dir()
+        folder = ddshots.shown_dir()
         units = self._units()
 
         # The mock: header, then the shown sections in order (a card's
@@ -167,8 +182,28 @@ class DropdownsPage(Page):
 
     def refresh(self):
         self.shown, self.order = ddconfig.load()
+        self.many_outputs = self._outputs()
         self.build()
-        if not os.path.exists(os.path.join(ddshots.cache_dir(), ".complete")):
+        self.prepare()
+
+    @staticmethod
+    def _outputs():
+        """More than one sound output to choose from (the dropdown's Output
+        devices section only shows then)?"""
+        default = quick(["pactl", "get-default-sink"]).strip()
+        try:
+            sinks = json.loads(quick(["pactl", "-f", "json", "list", "sinks"]) or "[]")
+        except ValueError:
+            return True
+        # (like the dropdown: outputs with nothing plugged in don't count)
+        usable = [x for x in sinks if x.get("name") == default or
+                  not all(p.get("availability") == "not available" for p in x.get("ports") or [])]
+        return len(usable) > 1
+
+    def prepare(self):
+        """Take new pictures if the theme or the dropdowns changed. Quietly:
+        the previous pictures stay until the new ones are all there."""
+        if not ddshots.is_complete(ddshots.cache_dir()):
             self._capture()
 
     # ----- changes -----
@@ -187,6 +222,8 @@ class DropdownsPage(Page):
         lst = self.order[card] if card else self.order[self.current]
         i = lst.index(key)
         j = i + step
+        while 0 <= j < len(lst) and not self._visible(lst[j]):     # (past the ones not shown here)
+            j += step
         if 0 <= j < len(lst):
             lst[i], lst[j] = lst[j], lst[i]
             self._save()
@@ -210,21 +247,20 @@ class DropdownsPage(Page):
         if self.capturing:
             return
         if ddshots.dropdown_open():          # don't disturb an open dropdown; try again shortly
-            GLib.timeout_add_seconds(3, lambda: (self.window.page is self and self.refresh(), False)[1])
+            GLib.timeout_add_seconds(3, lambda: (self.prepare(), False)[1])
             return
         self.capturing = True
-        self.status.set_visible(True)
+        first = ddshots.shown_dir() == ddshots.cache_dir()     # nothing to show meanwhile
         launch(["python3", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                                         "take-dropdown-pictures.py")])
         folder = ddshots.cache_dir()
 
         def check():
-            done = os.path.exists(os.path.join(folder, ".complete"))
-            if self.window.page is self:
-                self.build()                  # show the pictures taken so far
+            done = ddshots.is_complete(folder)
+            if self.window.page is self and (first or done):
+                self.build()                  # the new pictures (or the first ones as they come)
             if done:
                 self.capturing = False
-                self.status.set_visible(False)
                 return False
             return True
         GLib.timeout_add_seconds(2, check)

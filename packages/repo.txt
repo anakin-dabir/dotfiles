@@ -189,3 +189,5 @@ libnotify
 xorg-xprop
 lm_sensors
 libpulse
+xdg-desktop-portal
+xdg-desktop-portal-gtk

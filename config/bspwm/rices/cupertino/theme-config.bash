@@ -117,5 +117,5 @@ gtk_cursor="WhiteSur-cursors"
 # Wallpaper
 ENGINE="CustomDir"
 CUSTOM_DIR="$HOME/Pictures/wallpapers"
-DEFAULT_WALL="$HOME/.config/bspwm/wallpapers/vaporwave-wall-01.png"
+DEFAULT_WALL="$HOME/Pictures/wallpapers/japan-artistic-5120x2880-25406.jpg"
 ANIMATED_WALL="$HOME/.config/bspwm/config/assets/animated_wall.mp4"

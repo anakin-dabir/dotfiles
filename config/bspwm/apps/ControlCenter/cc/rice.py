@@ -80,7 +80,12 @@ def theme_vars(rice=None):
 
 
 def _quote(value):
-    return '"' + re.sub(r'(["\\$`])', r"\\\1", str(value)) + '"'
+    value = str(value)
+    home = os.path.expanduser("~") + "/"
+    lead = ""
+    if value.startswith(home):            # $HOME/..., like the theme files (and no user name in the repo)
+        lead, value = "$HOME/", value[len(home):]
+    return '"' + lead + re.sub(r'(["\\$`])', r"\\\1", value) + '"'
 
 
 def set_theme_vars(changes, rice=None):

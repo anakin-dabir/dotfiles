@@ -25,16 +25,35 @@ VERSION = "9"       # bump when the dropdowns' layout or the way pictures are cu
 
 
 def cache_dir():
-    """Pictures depend on the theme (colours, corners, fonts), so they're kept
-    per theme: they're retaken only after switching theme (or a VERSION bump)."""
+    """Pictures depend on the theme (colours, corners, fonts) and on how the
+    dropdowns are designed, so they're retaken only after switching theme or
+    after the dropdowns' design files change (or a VERSION bump)."""
     h = hashlib.sha1(VERSION.encode())
-    for p in (os.path.join(BSPDIR, "eww", "colors.scss"),):
+    for p in (os.path.join(BSPDIR, "eww", "colors.scss"),
+              os.path.join(BSPDIR, "eww", "barpanels", "barpanels.yuck"),
+              os.path.join(BSPDIR, "eww", "barpanels", "barpanels.scss")):
         try:
             with open(p, "rb") as f:
                 h.update(f.read())
         except OSError:
             pass
     return os.path.join(CACHE, "dropdowns", h.hexdigest()[:16])
+
+
+def is_complete(folder):
+    return os.path.exists(os.path.join(folder, ".complete"))
+
+
+def shown_dir():
+    """The picture set to show: the current one once it's complete, until
+    then the last complete set (the new one replaces it quietly)."""
+    cur = cache_dir()
+    if is_complete(cur):
+        return cur
+    base = os.path.dirname(cur)
+    old = [os.path.join(base, d) for d in os.listdir(base)] if os.path.isdir(base) else []
+    old = [d for d in old if d != cur and is_complete(d)]
+    return max(old, key=lambda d: os.path.getmtime(os.path.join(d, ".complete"))) if old else cur
 
 
 def forget_old(keep):

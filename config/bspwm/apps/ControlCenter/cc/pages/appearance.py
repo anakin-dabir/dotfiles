@@ -3,10 +3,10 @@
 import os
 import re
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import rice
-from ..common import BSPDIR, HOME, Page, current_rice, group, have, launch, run_quiet, thumbnail, tool
+from ..common import BSPDIR, HOME, Page, current_rice, group, have, run_quiet, thumbnail, tool
 from ..preview import current_wallpaper
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
@@ -36,6 +36,10 @@ def grid(per_line):
     return Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, column_spacing=4,
                        row_spacing=4, min_children_per_line=per_line, max_children_per_line=per_line,
                        valign=Gtk.Align.START)
+
+
+def v_video(name):
+    return rice.theme_vars(name).get("ANIMATED_WALL", "")
 
 
 class AppearancePage(Page):
@@ -73,11 +77,9 @@ class AppearancePage(Page):
         self.mode_row = Adw.ComboRow(title="Mode", model=Gtk.StringList.new([m[1] for m in self.modes]))
         self.mode_row.connect("notify::selected", self._mode)
         modes.add(self.mode_row)
-        self.folder_row = Adw.EntryRow(title="Folder with your wallpapers", show_apply_button=True)
-        self.folder_row.connect("apply", lambda r: self._path("CUSTOM_DIR", r.get_text()))
+        self.folder_row = self._chooser_row("Your wallpaper folder", "folder-symbolic", "CUSTOM_DIR")
         modes.add(self.folder_row)
-        self.video_row = Adw.EntryRow(title="Video file (mp4, mkv, gif)", show_apply_button=True)
-        self.video_row.connect("apply", lambda r: self._path("ANIMATED_WALL", r.get_text()))
+        self.video_row = self._chooser_row("Video", "video-x-generic-symbolic", "ANIMATED_WALL")
         modes.add(self.video_row)
 
         self.walls = group(self, "Wallpaper")
@@ -90,10 +92,6 @@ class AppearancePage(Page):
         self.sources.add(Adw.Toggle(name="folder", label="Folder"))
         self.sources.connect("notify::active-name", self._source)
         more.append(self.sources)
-        b = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open the wallpaper folder")
-        b.add_css_class("flat")
-        b.connect("clicked", lambda *_: launch(["xdg-open", self.wall_dir()]))
-        more.append(b)
         self.walls.set_header_suffix(more)
         self.wall_grid = grid(3)
         self.walls.add(self.wall_grid)
@@ -210,6 +208,49 @@ class AppearancePage(Page):
 
     # ----- wallpaper mode -----
 
+    def _chooser_row(self, title, icon, var):
+        row = Adw.ActionRow(title=title, activatable=True)
+        row.add_prefix(Gtk.Image.new_from_icon_name(icon))
+        b = Gtk.Button(label="Choose…", valign=Gtk.Align.CENTER)
+        b.connect("clicked", lambda *_: self.choose(row))
+        row.add_suffix(b)
+        row.set_activatable_widget(b)
+        row.var = var
+        return row
+
+    @staticmethod
+    def _show_path(row, path, empty):
+        path = os.path.expanduser(path)
+        ok = os.path.isdir(path) if row.var == "CUSTOM_DIR" else os.path.isfile(path)
+        row.set_subtitle(path.replace(HOME, "~", 1) if path and ok else empty)
+
+    def choose(self, row):
+        """A file picker for the wallpaper folder or the video."""
+        folder = row.var == "CUSTOM_DIR"
+        d = Gtk.FileDialog(title="Choose your wallpaper folder" if folder else "Choose a video", modal=True)
+        current = os.path.expanduser(rice.theme_vars(self.rice).get(row.var, ""))
+        start = current if folder else os.path.dirname(current)
+        if not os.path.isdir(start):
+            start = os.path.join(HOME, "Pictures") if folder else os.path.join(HOME, "Videos")
+        if os.path.isdir(start):
+            d.set_initial_folder(Gio.File.new_for_path(start))
+        if not folder:
+            f = Gtk.FileFilter(name="Videos")
+            f.add_mime_type("video/*")
+            f.add_mime_type("image/gif")
+            filters = Gio.ListStore.new(Gtk.FileFilter)
+            filters.append(f)
+            d.set_filters(filters)
+
+        def done(dialog, result):
+            try:
+                file = (dialog.select_folder_finish if folder else dialog.open_finish)(result)
+            except GLib.Error:
+                return                               # cancelled
+            if file is not None and file.get_path():
+                self._path(row.var, file.get_path())
+        (d.select_folder if folder else d.open)(self.window, None, done)
+
     def load_mode(self):
         v = rice.theme_vars(self.rice)
         engine = v.get("ENGINE", "Default")
@@ -219,8 +260,8 @@ class AppearancePage(Page):
             if engine in names:
                 self.mode_row.set_selected(names.index(engine))
             self.mode_row.set_subtitle(dict((m[0], m[2]) for m in self.modes).get(engine, ""))
-            self.folder_row.set_text(v.get("CUSTOM_DIR", "").replace(HOME, "~"))
-            self.video_row.set_text(v.get("ANIMATED_WALL", "").replace(HOME, "~"))
+            self._show_path(self.folder_row, v.get("CUSTOM_DIR", ""), "No folder chosen")
+            self._show_path(self.video_row, v.get("ANIMATED_WALL", ""), "No video chosen")
         self.quietly(put)
         self.folder_row.set_visible(engine == "CustomDir")
         self.video_row.set_visible(engine == "Animated")
@@ -236,8 +277,11 @@ class AppearancePage(Page):
             return
         self.load_mode()
         self.follow_mode()
-        if engine == "CustomDir" and not os.path.isdir(os.path.expanduser(self.folder_row.get_text())):
-            self.toast("Type the folder with your wallpapers, then press ✓")
+        if engine == "CustomDir" and not self.custom_dir():
+            self.choose(self.folder_row)
+            return
+        if engine == "Animated" and not os.path.isfile(os.path.expanduser(v_video(self.rice))):
+            self.choose(self.video_row)
             return
         run_quiet([tool("WallApply")], lambda _ok: self.mark())
 
@@ -252,6 +296,7 @@ class AppearancePage(Page):
         except OSError as e:
             self.toast(f"Couldn't save: {e.strerror}")
             return
+        self.load_mode()
         self.follow_mode()
         run_quiet([tool("WallApply")], lambda _ok: (self.mark(), self.toast("Wallpaper updated")))
 

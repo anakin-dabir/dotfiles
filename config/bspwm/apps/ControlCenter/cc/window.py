@@ -1,5 +1,7 @@
 """Main window: a sidebar of sections and the selected section's page."""
 
+import re
+
 import gi
 
 gi.require_version("Graphene", "1.0")
@@ -24,6 +26,29 @@ PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, DisplayPage, Sou
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
 PAGES += [PowerPage, NotificationsPage, AboutPage]
+
+# Other words people may search for, besides the names on each page
+KEYWORDS = {
+    "appearance": "theme rice wallpaper background picture slideshow",
+    "customize": "colours colors accent font size border gap corners rounded shadow blur fade "
+                 "animations transparency opacity terminal gtk icons cursor picom vsync",
+    "bar": "polybar modules items widgets panel top bar",
+    "dropdowns": "panels menus processor cpu memory ram storage disk sound network battery",
+    "display": "screen brightness night light redshift resolution refresh rate monitor",
+    "sound": "audio volume speakers headphones microphone mic output input",
+    "network": "wifi wi-fi internet ethernet airplane vpn hidden",
+    "bluetooth": "pair devices headphones",
+    "keyboard": "backlight rgb lights colour color rainbow breathing",
+    "fans": "temperature cooling performance gpu nvidia graphics",
+    "power": "battery sleep suspend lock power mode saver performance lid",
+    "notifications": "do not disturb dunst popups",
+    "about": "system version kernel computer",
+}
+
+
+def _plain(text):
+    """For matching: lower case, no dashes or dots ("wifi" finds "Wi-Fi")."""
+    return re.sub(r"[-_.·]", "", text.lower()).strip()
 
 
 class Window(Adw.ApplicationWindow):
@@ -81,13 +106,34 @@ class Window(Adw.ApplicationWindow):
         for p in self.pages:
             box = Gtk.Box(spacing=12, margin_top=2, margin_bottom=2)
             box.append(Gtk.Image.new_from_icon_name(p.icon))
-            box.append(Gtk.Label(label=p.title, xalign=0))
+            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+            text.append(Gtk.Label(label=p.title, xalign=0))
+            hit = Gtk.Label(xalign=0, ellipsize=3, visible=False)
+            hit.add_css_class("dim-label")
+            hit.add_css_class("caption")
+            text.append(hit)
+            box.append(text)
             row = Gtk.ListBoxRow(child=box)
-            row.page = p
+            row.page, row.hit_label, row.match = p, hit, None
             self.list.append(row)
         self.list.connect("row-selected", self._selected)
+        self.list.connect("row-activated", lambda _l, row: self._go_to_match(row))
+        self.list.set_filter_func(self._row_shown)
+        nothing = Gtk.Label(label="No settings match", margin_top=24, wrap=True)
+        nothing.add_css_class("dim-label")
+        self.list.set_placeholder(nothing)
+
+        # Search: every setting's name, not just the page names
+        self.query = ""
+        self.search = Gtk.SearchEntry(placeholder_text="Search settings", margin_start=8, margin_end=8,
+                                      margin_bottom=6)
+        self.search.connect("search-changed", self._search_changed)
+        self.search.connect("activate", lambda *_: self._open_first())
+        self.search.connect("stop-search", lambda e: e.set_text(""))
+        self.search.set_key_capture_widget(self)        # typing anywhere starts a search
         side_view = Adw.ToolbarView()
         side_view.add_top_bar(Adw.HeaderBar(show_title=True))
+        side_view.add_top_bar(self.search)
         side_view.set_content(Gtk.ScrolledWindow(child=self.list, hscrollbar_policy=Gtk.PolicyType.NEVER))
         sidebar = Adw.NavigationPage(title="Control Center", child=side_view)
 
@@ -106,6 +152,9 @@ class Window(Adw.ApplicationWindow):
         self.connect("notify::visible-dialog", lambda *_: widgets_changed())
         self.connect("notify::visible-dialog", self._dialog_shown)
         self.connect("close-request", self._closing)
+        dd = self.by_name.get("dropdowns")
+        if dd is not None:
+            GLib.timeout_add_seconds(3, lambda: (dd.prepare(), False)[1])
 
 
     def _show_sticky(self):
@@ -154,6 +203,89 @@ class Window(Adw.ApplicationWindow):
         if ok and not bounds.contains_point(Graphene.Point().init(x, y)):
             gesture.set_state(Gtk.EventSequenceState.CLAIMED)
             d.close()
+
+    # ----- search -----
+
+    def focus_search(self):
+        self.split.set_show_content(False)
+        self.search.grab_focus()
+
+    @staticmethod
+    def _settings_of(page):
+        """(name, widget) of each setting on a page: group and row titles."""
+        out, todo = [], [page]
+        while todo:
+            w = todo.pop(0)
+            title = None
+            if isinstance(w, (Adw.PreferencesGroup, Adw.PreferencesRow)) and w.is_visible():
+                title = w.get_title()
+            if title:
+                out.append((title.replace("&amp;", "&"), w))
+            c = w.get_first_child()
+            while c is not None:
+                todo.append(c)
+                c = c.get_next_sibling()
+        return out
+
+    def _search_changed(self, entry):
+        self.query = _plain(entry.get_text())
+        words = self.query.split()
+        row = self.list.get_first_child()
+        while row is not None:
+            if isinstance(row, Gtk.ListBoxRow):
+                p = row.page
+                row.match, row.shown = None, not words
+                if words:
+                    if all(w in _plain(p.title + " " + KEYWORDS.get(p.name, "")) for w in words):
+                        row.shown = True
+                    for name, widget in self._settings_of(p):
+                        if all(w in _plain(name) for w in words):
+                            row.match, row.shown = (name, widget), True
+                            break
+                row.hit_label.set_label(row.match[0] if row.match else "")
+                row.hit_label.set_visible(row.match is not None and row.match[0] != p.title)
+            row = row.get_next_sibling()
+        self.list.invalidate_filter()
+
+    @staticmethod
+    def _row_shown(row):
+        return getattr(row, "shown", True)
+
+    def _open_first(self):
+        row = self.list.get_first_child()
+        while row is not None and not (isinstance(row, Gtk.ListBoxRow) and row.get_child_visible()):
+            row = row.get_next_sibling()
+        if row is not None:
+            self.list.select_row(row)
+            self._go_to_match(row)
+
+    def _go_to_match(self, row):
+        """Scroll the page to the setting the search found."""
+        if row.match is None:
+            return
+        widget = row.match[1]
+
+        def focus():
+            target = widget
+            if isinstance(widget, Adw.PreferencesGroup):       # a heading: its first row
+                target = self._first_focusable(widget) or widget
+            self.set_focus_visible(True)
+            target.grab_focus()
+            return False
+        GLib.idle_add(focus)
+
+    @staticmethod
+    def _first_focusable(w):
+        todo = [w]
+        while todo:
+            x = todo.pop(0)
+            if x is not w and x.get_focusable() and x.is_visible():
+                return x
+            c = x.get_first_child()
+            while c is not None:
+                todo.append(c)
+                c = c.get_next_sibling()
+        return None
 
     # ----- navigation -----
 
