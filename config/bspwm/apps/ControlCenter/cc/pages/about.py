@@ -4,7 +4,7 @@ import os
 import platform
 import re
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 
 from ..common import BSPDIR, HOME, Page, current_rice, group, launch, read_file, run, text_button, thumbnail
 
@@ -95,10 +95,19 @@ class AboutPage(Page):
         run(["lspci"], gpu)
 
     def _row(self, g, title):
+        """A "property" row: the label small on top, the value under it,
+        using the row's full width (long values wrap neatly, short ones
+        stay on one line). row.value.set_label(text) sets the value."""
         row = Adw.ActionRow(title=title)
-        row.value = Gtk.Label(selectable=True, wrap=True, xalign=1, justify=Gtk.Justification.RIGHT, max_width_chars=40)
-        row.value.add_css_class("dim-label")
-        row.add_suffix(row.value)
+        row.add_css_class("property")
+        row.set_subtitle_selectable(True)
+        row.set_subtitle_lines(0)
+
+        class Value:
+            @staticmethod
+            def set_label(text):
+                row.set_subtitle(GLib.markup_escape_text(text or "–"))
+        row.value = Value
         g.add(row)
         return row
 
