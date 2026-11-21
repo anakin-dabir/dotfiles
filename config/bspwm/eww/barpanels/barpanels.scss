@@ -698,8 +698,7 @@ $bp-icons: "Material Design Icons Desktop";
 // The scale gets room above and below so the knob is never cut off, and the
 // knob keeps its size (only its colour changes), so nothing moves on hover.
 .bp-panel scale.bp-seek {
-  padding: 6px 0;
-  margin: -6px 0;
+  padding: 6px 0;         // (real room: the eventbox around it cuts off anything outside)
 }
 .bp-panel scale.bp-seek trough {
   min-height: 4px;
