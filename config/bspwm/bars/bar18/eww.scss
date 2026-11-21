@@ -167,8 +167,12 @@ scale trough {
   padding: 0;
 }
 
+.notif-unread {
+  color: $accent;
+}
+
 .notif-bell {
-  font-family: "Material Design Icons Desktop";
-  font-size: 20px;
+  font-family: "Symbols Nerd Font";
+  font-size: 18px;
   margin: 0.2rem 0 0.4rem 0;
 }

@@ -17,6 +17,7 @@ fi
 _nc_accent=${FOCUSED_BC:-$blue}
 _nc_hex=$(printf '%s' "$_nc_accent" | sed 's/^#//; s/^\(..\)\(......\)$/\2/')   # drop alpha of #AARRGGBB
 if printf '%s' "$_nc_hex" | grep -qE '^[0-9A-Fa-f]{6}$'; then
+    _nc_accent="#$_nc_hex"
     _nc_lum=$(printf '%s' "$_nc_hex" | awk '{ printf "%d", (299 * strtonum("0x" substr($0, 1, 2)) + 587 * strtonum("0x" substr($0, 3, 2)) + 114 * strtonum("0x" substr($0, 5, 2))) / 1000 }')
 else
     _nc_accent=$blue; _nc_lum=0

@@ -17,7 +17,7 @@
 
 ;; Updates vars
 ;; Notification bell (pushed by NotifyCenter on every change)
-(defpoll notif_bell :interval "60s" :initial "󰂜" `~/.config/bspwm/bin/NotifyCenter --bar`)
+(defpoll notif_bell :interval "60s" :initial "" `~/.config/bspwm/bin/NotifyCenter --bell`)
 (defpoll UPDATES :interval "15m" `cat $HOME/.cache/Updates.txt 2>/dev/null`)
 
 ;; Battery vars
@@ -95,7 +95,7 @@
 ;; Notification bell ;;
 (defwidget notifbell []
 	(eventbox :cursor "pointer"
-	(button	:class "notif-bell"
+	(button	:class "notif-bell ${notif_bell == '' ? 'notif-unread' : ''}"
 			:tooltip "Notifications (right-click: Do Not Disturb)"
 			:onclick "~/.config/bspwm/bin/NotifyCenter &"
 			:onrightclick "~/.config/bspwm/bin/NotifyCenter --dnd &"

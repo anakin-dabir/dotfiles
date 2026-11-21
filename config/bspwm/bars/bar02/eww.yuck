@@ -16,7 +16,7 @@
 
 ;; Updates vars
 ;; Notification bell (pushed by NotifyCenter on every change)
-(defpoll notif_bell :interval "60s" :initial "󰂜" `~/.config/bspwm/bin/NotifyCenter --bar`)
+(defpoll notif_bell :interval "60s" :initial "" `~/.config/bspwm/bin/NotifyCenter --bell`)
 (defpoll UPDATES :interval "15m" `cat $HOME/.cache/Updates.txt 2>/dev/null`)
 
 ;; Volume vars
@@ -226,7 +226,7 @@
 		 (button :onclick "~/.config/bspwm/bin/NotifyCenter &"
 				 :onrightclick "~/.config/bspwm/bin/NotifyCenter --dnd &"
 				 :tooltip "Notifications (right-click: Do Not Disturb)"
-				 (label :class "notif-bell" :text notif_bell)))
+				 (label :class "notif-bell ${notif_bell == '' ? 'notif-unread' : ''}" :text notif_bell)))
 
 		 (eventbox :cursor "pointer"
 		 (button :onclick "OpenApps --powermenu"

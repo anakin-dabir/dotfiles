@@ -146,7 +146,11 @@ tooltip {
   min-width: 120px;
 }
 
+.notif-unread {
+  color: $accent;
+}
+
 .notif-bell {
-  font-family: "Material Design Icons Desktop";
-  font-size: 19px;
+  font-family: "Symbols Nerd Font";
+  font-size: 17px;
 }

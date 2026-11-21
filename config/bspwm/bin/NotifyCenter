@@ -20,9 +20,12 @@ EWW=(timeout 3 eww --no-daemonize -c "$BSPDIR/eww")
 
 SHOWN=500     # notifications listed in the panel (scrollable); NotifyLog keeps 500
 
-BELL=$'\U000F009C'      # nf-md-bell_outline
-BELL_DOT=$'\U000F0178'  # nf-md-bell_badge_outline
-BELL_OFF=$'\U000F0A91'  # nf-md-bell_off_outline
+# Bell on the bar (Font Awesome bells from "Symbols Nerd Font", which every
+# bar loads for it): outline, solid in the theme's accent when there's
+# something unread, crossed out for do not disturb
+BELL=$'\uF0A2'       # nf-fa-bell_o
+BELL_DOT=$'\uF0F3'   # nf-fa-bell
+BELL_OFF=$'\uF1F7'   # nf-fa-bell_slash_o
 
 mkdir -p "$DIR"; touch "$LOG"
 
@@ -45,6 +48,15 @@ bell() {
     if is_paused; then echo "$BELL_OFF"
     elif [ "$(unread_count)" -gt 0 ]; then echo "$BELL_DOT"
     else echo "$BELL"; fi
+}
+
+# The theme's accent (written by config/modules/06-eww.sh when a rice is applied)
+accent() { sed -n 's/^\$nc-accent: *\(#[0-9A-Fa-f]*\);.*/\1/p' "$BSPDIR/eww/colors.scss" 2>/dev/null | head -1; }
+
+# Polybar's bell: unread in the accent colour
+bar_bell() {
+    local b a; b=$(bell); a=$(accent)
+    if [ "$b" = "$BELL_DOT" ] && [ -n "$a" ]; then echo "%{F$a}$b%{F-}"; else echo "$b"; fi
 }
 
 current_bar() {
@@ -185,7 +197,8 @@ case "$1" in --dnd|--open|--delete|--clear)
 esac
 
 case "$1" in
-    --bar)     bell ;;
+    --bar)     bar_bell ;;     # polybar
+    --bell)    bell ;;         # eww bars (they colour it with CSS)
     --dnd)     toggle_dnd ;;
     --open)    open_entry "$2" ;;
     --delete)  delete_entry "$2" ;;

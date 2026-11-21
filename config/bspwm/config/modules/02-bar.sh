@@ -37,8 +37,13 @@ blue-gray = $bluegray
 blue-arch = $arch_icon
 EOF
 
+# The rice's accent: its focused-window border colour (#AARRGGBB -> #RRGGBB).
+# The eww bars colour the notification bell with it when there's something unread.
+_bar_accent=$(printf '%s' "${FOCUSED_BC:-$blue}" | sed 's/^#..\([0-9A-Fa-f]\{6\}\)$/#\1/')
+
 _write "$HOME/.config/bspwm/bars/colors.scss" << EOF
 \$bg: ${bg_alpha_css:-$bg};
+\$accent: ${_bar_accent};
 \$bg-alt: $bg_alt;
 \$fg: $fg;
 \$pill: $accent_color;
