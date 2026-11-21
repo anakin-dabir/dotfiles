@@ -693,28 +693,42 @@ $bp-icons: "Material Design Icons Desktop";
   background-position: center;
 }
 
-// Media progress: a thin line; the knob shows when you point at it (click to jump)
-.bp-seek trough {
+// Media progress: a thin line; the knob shows when you point at it (click to jump).
+// (".bp-panel scale.bp-seek": stronger than the GTK theme's own scale styles.)
+// The scale gets room above and below so the knob is never cut off, and the
+// knob keeps its size (only its colour changes), so nothing moves on hover.
+.bp-panel scale.bp-seek {
+  padding: 6px 0;
+  margin: -6px 0;
+}
+.bp-panel scale.bp-seek trough {
   min-height: 4px;
+  border: none;
   border-radius: $nc-pill-radius;
+  background-image: none;
   background-color: rgba($fg, 0.14);
 }
-.bp-seek highlight {
+.bp-panel scale.bp-seek highlight {
+  border: none;
   border-radius: $nc-pill-radius;
+  background-image: none;
   background-color: $fg;
 }
-.bp-seek slider {
-  min-width: 12px;
-  min-height: 12px;
-  margin: -4px 0;
+.bp-panel scale.bp-seek slider {
+  min-width: 14px;
+  min-height: 14px;
+  margin: -5px 0;
+  border: none;
   border-radius: $nc-pill-radius;
+  background-image: none;
   background-color: transparent;
   box-shadow: none;
+  outline: none;
 }
-.bp-seek:hover highlight {
+.bp-panel scale.bp-seek:hover highlight {
   background-color: $nc-accent;
 }
-.bp-seek:hover slider {
+.bp-panel scale.bp-seek:hover slider {
   background-color: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }

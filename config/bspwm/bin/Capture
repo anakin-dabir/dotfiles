@@ -9,7 +9,7 @@
 #                         tesseract; languages in $OCR_LANG, default "eng")
 #   Capture record        start recording the monitor under the mouse; again to stop
 #   Capture stop          stop recording
-#   Capture bar           the bar item: a camera, or a red timer while recording
+#   Capture bar           the bar item's text: a red timer while recording (the icon is the bar's)
 #
 # Screenshots go to ~/Pictures/ScreenShots and are copied to the clipboard;
 # recordings go to ~/Videos/Recordings.
@@ -133,9 +133,9 @@ case "$1" in
         if recording; then
             s=$(( $(date +%s) - $(sed -n 2p "$PIDFILE") ))
             red=$(sed -n 's/^red *= *//p' "$HOME/.config/bspwm/bars/colors.ini" | head -1)
-            printf '%%{F%s}󰑊 %d:%02d%%{F-}\n' "${red:-#FF453A}" $((s / 60)) $((s % 60))
+            printf ' %%{F%s}● %d:%02d%%{F-}\n' "${red:-#FF453A}" $((s / 60)) $((s % 60))
         else
-            echo "󰄀"
+            echo "%{O1}"                  # (empty would hide the camera too)
         fi ;;
     *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
