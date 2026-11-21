@@ -54,9 +54,28 @@ bell() {
 accent() { sed -n 's/^\$nc-accent: *\(#[0-9A-Fa-f]*\);.*/\1/p' "$BSPDIR/eww/colors.scss" 2>/dev/null | head -1; }
 
 # Polybar's bell: unread in the accent colour
+# The bar's own bells, if you chose them (Control Center > Bar > Notifications >
+# Change icon): notify / notify-unread / notify-dnd and notify-font in the bar's [icons]
+bar_icons() {
+    local rice bar cfg
+    read -r rice < "$BSPDIR/.rice"
+    bar=$(sed -n 's/^main_bar="\{0,1\}\([^"]*\)"\{0,1\}.*/\1/p' "$BSPDIR/rices/$rice/theme-config.bash" 2>/dev/null | head -1)
+    cfg="$BSPDIR/bars/$bar/config.ini"
+    [ -f "$cfg" ] && awk '/^\[icons\]/{s=1; next} /^\[/{s=0} s && /^notify/{print}' "$cfg"
+}
+
 bar_bell() {
-    local b a; b=$(bell); a=$(accent)
-    if [ "$b" = "$BELL_DOT" ] && [ -n "$a" ]; then echo "%{F$a}$b%{F-}"; else echo "$b"; fi
+    local b a icons glyph font
+    b=$(bell); a=$(accent); icons=$(bar_icons)
+    case "$b" in
+        "$BELL_DOT") glyph=$(sed -n 's/^notify-unread *= *//p' <<< "$icons") ;;
+        "$BELL_OFF") glyph=$(sed -n 's/^notify-dnd *= *//p' <<< "$icons") ;;
+        *)           glyph=$(sed -n 's/^notify *= *//p' <<< "$icons") ;;
+    esac
+    font=$(sed -n 's/^notify-font *= *//p' <<< "$icons")
+    [ -n "$glyph" ] || glyph=$b
+    [ -n "$font" ] && [ "$font" != 0 ] && glyph="%{T$font}$glyph%{T-}"
+    if [ "$b" = "$BELL_DOT" ] && [ -n "$a" ]; then echo "%{F$a}$glyph%{F-}"; else echo "$glyph"; fi
 }
 
 current_bar() {

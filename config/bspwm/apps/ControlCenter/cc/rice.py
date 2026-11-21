@@ -282,19 +282,50 @@ def _icon_only(value):
     return v if v and len(v) <= 2 and all(ord(c) >= 0xE000 for c in v) else None
 
 
-def item_icon(bar, name):
-    """Where an item's icon is, if it's one changeable icon:
-    {"path", "section", "key", "font_key", "icon"}, else None."""
-    if name in SHARED_ICONS:
-        path = bar_config(bar)
-        with open(path) as f:
+NOTIFY_STATES = [("notify", "No new notifications", ""), ("notify-unread", "Something unread", ""),
+                 ("notify-dnd", "Do not disturb", "")]
+LEVELS = ["Almost empty", "Low", "Half", "High", "Full"]
+
+
+def _slot_label(key):
+    m = re.fullmatch(r"ramp-capacity-(\d+)", key)
+    if m:
+        n = int(m.group(1))
+        return f"Battery: {LEVELS[n] if n < len(LEVELS) else n + 1}"
+    m = re.fullmatch(r"animation-charging-(\d+)", key)
+    if m:
+        return f"Charging, step {int(m.group(1)) + 1}"
+    m = re.fullmatch(r"ramp-volume-(\d+)", key)
+    if m:
+        return f"Volume level {int(m.group(1)) + 1}"
+    m = re.fullmatch(r"format-([a-z]+)-prefix", key)
+    if m:
+        return {"connected": "Connected", "disconnected": "Not connected", "mounted": "Icon",
+                "unmounted": "Not mounted", "full": "Battery full", "muted": "Muted",
+                "volume": "Sound on", "charging": "Charging", "discharging": "On battery"}.get(m.group(1), m.group(1).capitalize())
+    return "Icon"
+
+
+def _strip_font(v):
+    return re.sub(r"%\{T-?\d*\}", "", v)
+
+
+def item_icons(bar, name):
+    """Every icon an item shows, as slots: [{"label", "kind", "path", "section", "key", "font_key", "icon", ...}].
+    kind: "ini" (a key's value), "icons" (the bar's [icons] section), "arg" (an argument of the
+    script the item runs). Empty if it has no icon of its own."""
+    cfg = bar_config(bar)
+    if name in SHARED_ICONS or name == "notifications":
+        with open(cfg) as f:
             text = f.read()
         span = _section_body(text, "icons")
-        if not span:
-            return None
-        m = re.search(rf"(?m)^{name}\s*=\s*(.*)$", text[span[0]:span[1]])
-        return m and {"path": path, "section": "icons", "key": name, "font_key": f"{name}-font",
-                      "icon": m.group(1).strip()}
+        body = text[span[0]:span[1]] if span else ""
+        keys = dict(re.findall(r"(?m)^([\w-]+)\s*=\s*(.*)$", body))
+        if name in SHARED_ICONS:
+            return [{"label": "Icon", "kind": "icons", "path": cfg, "section": "icons", "key": name,
+                     "font_key": f"{name}-font", "icon": keys.get(name, "").strip()}] if name in keys else []
+        return [{"label": label, "kind": "icons", "path": cfg, "section": "icons", "key": k,
+                 "font_key": "notify-font", "icon": keys.get(k, default).strip()} for k, label, default in NOTIFY_STATES]
     for fname in ("modules.ini", "config.ini"):
         path = os.path.join(BARS, bar, fname)
         try:
@@ -306,17 +337,33 @@ def item_icon(bar, name):
         if not span:
             continue
         body = text[span[0]:span[1]]
-        keys = dict(re.findall(r"(?m)^([\w-]+)\s*=\s*(.*)$", body))
-        if any(k.startswith("ramp-") for k in keys):
-            return None                 # (an icon per level, like the battery's: not one icon)
-        # format-prefix, then format-<state>-prefix (connected, mounted...), then label
-        order = ["format-prefix"] + sorted(k for k in keys if re.fullmatch(r"format-[a-z]+-prefix", k)) + ["label"]
-        for key in order:
-            icon = _icon_only(keys.get(key, ""))
-            if icon:
-                return {"path": path, "section": f"module/{name}", "key": key, "font_key": f"{key}-font", "icon": icon}
-        return None
-    return None
+        pairs = re.findall(r"(?m)^([\w-]+)\s*=\s*(.*)$", body)
+        keys = dict(pairs)
+        slots = []
+        # script items with their icons as arguments: VolumeBar "<icon>" "<muted icon>"
+        m = re.match(r'(\S*VolumeBar)\s+"([^"]*)"\s+"([^"]*)"', keys.get("exec", ""))
+        if m:
+            for i, label in ((1, "Sound on"), (2, "Muted")):
+                icon = _strip_font(m.group(i + 1))
+                if _icon_only(icon):
+                    slots.append({"label": label, "kind": "arg", "path": path, "section": f"module/{name}",
+                                  "key": "exec", "arg": i, "font_key": None, "icon": icon})
+            return slots
+        for key, value in pairs:
+            if key == "format-prefix" or re.fullmatch(r"format-[a-z]+-prefix", key) or key == "label" \
+                    or re.fullmatch(r"(ramp|animation)-[a-z]+-\d+", key):
+                icon = _icon_only(value)
+                if icon:
+                    slots.append({"label": _slot_label(key), "kind": "ini", "path": path, "section": f"module/{name}",
+                                  "key": key, "font_key": f"{key}-font", "icon": icon})
+        return slots
+    return []
+
+
+def item_icon(bar, name):
+    """The first of an item's icons (or None)."""
+    slots = item_icons(bar, name)
+    return slots[0] if slots else None
 
 
 def _set_keys(path, section, values):
@@ -341,12 +388,21 @@ def _set_keys(path, section, values):
 def set_item_icon(where, char, font):
     """Put a new icon in (font: which font-N draws it, plus one; 0 = any)."""
     path, section, key = where["path"], where["section"], where["key"]
-    if section == "icons":
+    if where["kind"] == "icons":
         _set_keys(path, section, {key: char, where["font_key"]: str(font)})
         return
     with open(path) as f:
         text = f.read()
     span = _section_body(text, section)
     m = re.search(rf"(?m)^{re.escape(key)}\s*=\s*(.*)$", text[span[0]:span[1]])
-    value = m.group(1).replace(where["icon"], char, 1) if m else char
+    old = m.group(1) if m else ""
+    if where["kind"] == "arg":
+        # the icon travels with its font in the script's output: %{T<n>}icon%{T-}
+        shown = f"%{{T{font}}}{char}%{{T-}}" if font else char
+        args = re.match(r'(\S*VolumeBar)\s+"([^"]*)"\s+"([^"]*)"(.*)', old)
+        parts = [args.group(2), args.group(3)]
+        parts[where["arg"] - 1] = shown
+        _set_keys(path, section, {key: f'{args.group(1)} "{parts[0]}" "{parts[1]}"{args.group(4)}'})
+        return
+    value = old.replace(where["icon"], char, 1) if old else char
     _set_keys(path, section, {key: value, where["font_key"]: str(font)})

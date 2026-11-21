@@ -544,25 +544,34 @@ class BarPage(Page):
         return label
 
     def _icon_picker(self, name):
-        where = rice.item_icon(self.bar, name)
-        if not where:
+        slots = rice.item_icons(self.bar, name)
+        if not slots:
             return
+        cur = {"slot": slots[0]}
+        where = slots[0]
         fonts = rice.bar_fonts(self.bar, self.section)
         sets = [st for st in glyphs.SETS if st[2] in fonts and glyphs.icon_set(st[0])]
         if not sets:
             self.toast("This bar has no icon font to pick from")
             return
         title = describe(name, self.modules.get(name, {}))[0]
-        state = re.fullmatch(r"format-([a-z]+)-prefix", where["key"])
-        d = Adw.Dialog(title=f"Icon for {title}", content_width=560, content_height=560)
+        d = Adw.Dialog(title=f"Icon for {title}", content_width=560, content_height=580)
         view = Adw.ToolbarView()
         view.add_top_bar(Adw.HeaderBar())
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_start=14, margin_end=14,
                       margin_bottom=14)
-        if state:
-            note = Gtk.Label(label=f"The icon shown when it's {state.group(1)}.", xalign=0)
-            note.add_css_class("dim-label")
-            box.append(note)
+        if len(slots) > 1:
+            # Items with several icons (battery levels, the bell's states...): pick which one
+            which = Adw.ComboRow(title="Which icon", model=Gtk.StringList.new([sl["label"] for sl in slots]))
+            lst = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+            lst.add_css_class("boxed-list")
+            lst.append(which)
+            box.append(lst)
+
+            def change_slot(r, _p):
+                cur["slot"] = slots[r.get_selected()]
+                fill()
+            which.connect("notify::selected", change_slot)
         kinds = Adw.ToggleGroup(homogeneous=True)
         for sid, stitle, _f, _w in sets:
             kinds.add(Adw.Toggle(name=sid, label=stitle))
@@ -586,15 +595,23 @@ class BarPage(Page):
         def pick(char, family):
             idx = fonts.index(family) + 1
             font = 0 if family == glyphs.MDI else idx       # (Material icons are found in any font order)
+            slot = cur["slot"]
             try:
-                rice.set_item_icon(where, char, font)
+                rice.set_item_icon(slot, char, font)
             except OSError as e:
                 self.toast(f"Couldn't save: {e.strerror}")
                 return
-            d.close()
             run_quiet(["polybar-msg", "cmd", "restart"])
-            self.toast(f"New icon for {title}")
+            self.toast(f"New icon for {title}" + (f": {slot['label'].lower()}" if len(slots) > 1 else ""))
             self._fill_items()
+            if len(slots) == 1:
+                d.close()
+            else:                         # (stay open for the other icons)
+                fresh = rice.item_icons(self.bar, name)
+                for i, sl in enumerate(fresh):
+                    slots[i] = sl
+                cur["slot"] = next((sl for sl in slots if sl["label"] == slot["label"]), slots[0])
+                fill()
 
         def fill(*_):
             while (c := grid.get_first_child()) is not None:
@@ -609,7 +626,7 @@ class BarPage(Page):
                 lab = Gtk.Label()
                 lab.set_markup(f'<span font_family="{family}" size="18pt">{GLib.markup_escape_text(c)}</span>')
                 b.set_child(lab)
-                if c == where["icon"]:
+                if c == cur["slot"]["icon"]:
                     b.add_css_class("suggested-action")
                 b.connect("clicked", lambda _b, c=c, f=family: pick(c, f))
                 grid.append(b)
