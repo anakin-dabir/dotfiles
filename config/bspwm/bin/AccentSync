@@ -27,6 +27,8 @@ _theme_blue=$blue; [ -n "$new" ] && blue=$new; . "$MODULE_DIR/02-bar.sh"; blue=$
 . "$MODULE_DIR/04-rofi.sh"
 . "$MODULE_DIR/06-eww.sh" >/dev/null 2>&1
 [ -f "$MODULE_DIR/06-jgmenu.sh" ] && . "$MODULE_DIR/06-jgmenu.sh"
+# the theme's own additions (e.g. Cupertino's rounded menus, added to shared.rasi)
+[ -f "$MODULE_DIR/99-rice-hook.sh" ] && . "$MODULE_DIR/99-rice-hook.sh"
 polybar-msg cmd restart >/dev/null 2>&1
 eww --no-daemonize -c "$HOME/.config/bspwm/eww" reload >/dev/null 2>&1
 exit 0
