@@ -7,6 +7,7 @@ from gi.repository import Adw, Gtk
 
 from .. import rice
 from ..common import BSPDIR, HOME, Page, current_rice, group, have, launch, run_quiet, thumbnail, tool
+from ..preview import current_wallpaper
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
 
@@ -81,6 +82,14 @@ class AppearancePage(Page):
 
         self.walls = group(self, "Wallpaper")
         more = Gtk.Box(spacing=6)
+        # Which pictures the grid shows: the theme's or the folder's
+        self.source = "theme"
+        self.shown = None
+        self.sources = Adw.ToggleGroup(valign=Gtk.Align.CENTER, width_request=160)
+        self.sources.add(Adw.Toggle(name="theme", label="Theme"))
+        self.sources.add(Adw.Toggle(name="folder", label="Folder"))
+        self.sources.connect("notify::active-name", self._source)
+        more.append(self.sources)
         b = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open the wallpaper folder")
         b.add_css_class("flat")
         b.connect("clicked", lambda *_: launch(["xdg-open", self.wall_dir()]))
@@ -89,9 +98,8 @@ class AppearancePage(Page):
         self.wall_grid = grid(3)
         self.walls.add(self.wall_grid)
         self.wall_tiles = {}
-        self.load_walls()
         self.load_mode()
-        self.mark()
+        self.follow_mode()
 
     # ----- themes -----
 
@@ -108,8 +116,8 @@ class AppearancePage(Page):
         def done(_ok):
             self.applying = None
             self.toast(f"{name.capitalize()} applied")
-            self.load_walls()
-            self.mark()
+            self.load_mode()
+            self.follow_mode()
         run_quiet([tool("Theme.sh")], done)
 
     # ----- wallpapers -----
@@ -117,8 +125,44 @@ class AppearancePage(Page):
     def theme_config(self):
         return os.path.join(BSPDIR, "rices", self.rice, "theme-config.bash")
 
-    def wall_dir(self):
+    def theme_dir(self):
         return os.path.join(BSPDIR, "rices", self.rice, "walls")
+
+    def custom_dir(self):
+        """The theme's CUSTOM_DIR, if it's a real folder."""
+        d = os.path.expanduser(rice.theme_vars(self.rice).get("CUSTOM_DIR", ""))
+        return d if d and os.path.isdir(d) else None
+
+    def auto_source(self):
+        """The pictures the wallpaper mode uses."""
+        custom = self.custom_dir()
+        if not custom:
+            return "theme"
+        v = rice.theme_vars(self.rice)
+        engine = v.get("ENGINE", "Default")
+        if engine == "CustomDir":
+            return "folder"
+        if engine == "Default":
+            wall = os.path.realpath(os.path.expanduser(v.get("DEFAULT_WALL", "")))
+            if wall.startswith(os.path.realpath(custom) + os.sep):
+                return "folder"
+        return "theme"
+
+    def wall_dir(self):
+        return (self.custom_dir() if self.source == "folder" else None) or self.theme_dir()
+
+    def follow_mode(self):
+        """Show the pictures the current mode uses."""
+        self.source = self.auto_source()
+        self.quietly(lambda: self.sources.set_active_name(self.source))
+        self.sources.set_visible(self.custom_dir() is not None)
+        self.load_walls()
+
+    def _source(self, group_, _p):
+        name = group_.get_active_name()
+        if not self._updating and name and name != self.source:
+            self.source = name
+            self.load_walls()
 
     def current_wall(self):
         try:
@@ -133,14 +177,20 @@ class AppearancePage(Page):
             self.wall_grid.remove(t.get_parent())
         self.wall_tiles.clear()
         d = self.wall_dir()
+        self.shown = d
         try:
             files = sorted(f for f in os.listdir(d) if f.lower().endswith(IMAGES))
         except OSError:
             files = []
-        self.walls.set_description(f"{len(files)} in {self.rice.capitalize()}'s collection" if files else "No wallpapers for this theme")
+        where = (d.replace(HOME, "~", 1) if d != self.theme_dir()
+                 else f"{self.rice.capitalize()}'s collection")
+        if files:
+            self.walls.set_description(f"{len(files)} in {where} · picking one switches to One picture")
+        else:
+            self.walls.set_description(f"No pictures in {where}")
         for f in files:
             path = os.path.join(d, f)
-            t = tile(os.path.splitext(f)[0], 176, 99)
+            t = tile(os.path.splitext(f)[0], 330, 186)
             t.connect("clicked", lambda _b, p=path: self.set_wall(p))
             self.wall_grid.append(t)
             self.wall_tiles[path] = t
@@ -154,7 +204,7 @@ class AppearancePage(Page):
         except OSError as e:
             self.toast(f"Couldn't save the wallpaper: {e.strerror}")
             return
-        run_quiet([tool("WallApply")])         # also stops a slideshow / video
+        run_quiet([tool("WallApply")], lambda _ok: self.mark())   # also stops a slideshow / video
         self.load_mode()
         self.mark()
 
@@ -185,6 +235,7 @@ class AppearancePage(Page):
             self.toast(f"Couldn't save: {e.strerror}")
             return
         self.load_mode()
+        self.follow_mode()
         if engine == "CustomDir" and not os.path.isdir(os.path.expanduser(self.folder_row.get_text())):
             self.toast("Type the folder with your wallpapers, then press ✓")
             return
@@ -201,6 +252,7 @@ class AppearancePage(Page):
         except OSError as e:
             self.toast(f"Couldn't save: {e.strerror}")
             return
+        self.follow_mode()
         run_quiet([tool("WallApply")], lambda _ok: (self.mark(), self.toast("Wallpaper updated")))
 
     # ----- state -----
@@ -208,7 +260,7 @@ class AppearancePage(Page):
     def mark(self):
         for name, t in self.theme_tiles.items():
             (t.add_css_class if name == self.rice else t.remove_css_class)("cc-current")
-        cur = os.path.realpath(self.current_wall())
+        cur = os.path.realpath(current_wallpaper() or self.current_wall())
         for path, t in self.wall_tiles.items():
             (t.add_css_class if os.path.realpath(path) == cur else t.remove_css_class)("cc-current")
 
@@ -216,6 +268,6 @@ class AppearancePage(Page):
         rice = current_rice()
         if rice != self.rice and not self.applying:    # changed from elsewhere (rofi, keybind)
             self.rice = rice
-            self.load_walls()
             self.load_mode()
+            self.follow_mode()
         self.mark()
