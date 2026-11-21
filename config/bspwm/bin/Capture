@@ -59,7 +59,9 @@ ocr() {
     sleep 0.25                            # (the dropdown that started this is gone)
     # Drag a box: done when you let go (Esc or right click cancels). Not
     # flameshot: it opens its editor and waits for Enter.
-    maim -u -s -o -c 0.47,0.24,0.86,0.15 -l "$img" 2>/dev/null
+    dunstify -a "Text from screen" -r 3452 -t 0 -i edit-select-all "Drag over the text" "Esc to cancel"
+    maim -u -s -o -c 0.47,0.24,0.86,0.3 -l "$img" 2>/dev/null
+    dunstify -C 3452
     [ -s "$img" ] || return 0             # (cancelled)
     # Screen text is small: bigger and grey reads much better
     if command -v magick >/dev/null; then
