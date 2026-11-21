@@ -48,7 +48,7 @@ case "$1" in
 		PowerMenu
 		;;
 	--android)
-		AndroidMount
+		ControlCenter phones
 		;;
 	--keyboard)
 		KeyBoardL

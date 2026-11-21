@@ -5,6 +5,8 @@
 # Triggered by udev on USB connect — see /etc/udev/rules.d/99-iphone-automount.rules
 
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+# Off in Control Center > Phones? Then don't open it by itself
+[ "$(jq -r '.iphone_auto // true' "$HOME/.config/bspwm/config/phones.json" 2>/dev/null)" = false ] && exit 0
 
 for i in $(seq 1 10); do
     UDID=$(idevice_id -l 2>/dev/null | head -1)

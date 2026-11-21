@@ -19,6 +19,7 @@ from .pages import fans, keyboard
 from .pages.dropdowns import DropdownsPage
 from .pages.network import NetworkPage
 from .pages.notifications import NotificationsPage
+from .pages.phones import PhonesPage
 from .pages.power import PowerPage
 from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
@@ -29,7 +30,7 @@ PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, Displa
          BluetoothPage, ShortcutsPage, TypingPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
-PAGES += [PowerPage, NotificationsPage, UpdatesPage, AboutPage]
+PAGES += [PowerPage, NotificationsPage, PhonesPage, UpdatesPage, AboutPage]
 
 # Other words people may search for, besides the names on each page
 KEYWORDS = {
@@ -52,6 +53,7 @@ KEYWORDS = {
     "shortcuts": "keys keybindings hotkeys sxhkd keyboard shortcuts",
     "updates": "upgrade pacman aur yay paru packages system update",
     "typing": "keyboard layout language caps lock key repeat urdu arabic input",
+    "phones": "android iphone mtp afc usb phone files photos scrcpy mount",
     "apps": "default browser file manager editor terminal startup autostart login",
 }
 

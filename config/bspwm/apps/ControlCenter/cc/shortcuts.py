@@ -295,7 +295,7 @@ NAMES = [
     (r"RofiLauncher --choose-style", "Choose the app menu style", "Control Center"),
     (r"Term --selecterm", "Choose the terminal", "Control Center"),
     (r"OpenApps --KeyHelp", "Show all shortcuts", "System"),
-    (r"OpenApps --android", "Android phone (mount)", "System"),
+    (r"OpenApps --android", "Phones (Control Center)", "Control Center"),
     (r"OpenApps --netmanager", "Network menu", "System"),
     (r"OpenApps --bluetooth", "Bluetooth menu", "System"),
     (r"OpenApps --clipboard", "Clipboard history", "System"),
