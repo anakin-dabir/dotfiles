@@ -59,6 +59,43 @@ DROPDOWNS = [
         ]),
         ("battery_buttons", "Settings and Power Off buttons"),
     ]),
+    ("calendar", "Calendar", [
+        ("calendar_month", "Month"),
+        ("calendar_week", "Week, day of the year and time zone"),
+    ]),
+    ("media", "Media", [
+        ("media_now", "What's playing (cover and title)"),
+        ("media_seek", "Progress (click to jump)"),
+        ("media_controls", "Previous, play/pause and next"),
+        ("media_button", "Music player button"),
+    ]),
+    ("clipboard", "Clipboard", [
+        ("clipboard_list", "Recent copies"),
+        ("clipboard_clear", "Clear all button"),
+    ]),
+    ("capture", "Screenshot", [
+        ("capture_shots", "Screen, Area, Window, In 5 s, Text"),
+        ("capture_record", "Screen recording"),
+        ("capture_last", "Last screenshot"),
+        ("capture_button", "Screenshots folder button"),
+    ]),
+    ("windows", "Windows", [
+        ("windows_list", "Open windows (go to, close)"),
+        ("windows_focused", "Float, Full screen and Pin"),
+        ("windows_layout", "Side by side / One at a time"),
+    ]),
+    ("power", "Power", [
+        ("power_session", "Up time, computer and kernel"),
+        ("power_actions", "Lock, Sleep and Log out"),
+        ("power_off", "Restart and Shut down"),
+    ]),
+    ("weather", "Weather", [
+        ("weather_stats", "Feels like, humidity, wind, rain"),
+        ("weather_hours", "Next hours"),
+        ("weather_days", "Next days"),
+        ("weather_sun", "Sunrise and sunset"),
+        ("weather_buttons", "Refresh and Location buttons"),
+    ]),
 ]
 
 NAMES = {}           # section -> name

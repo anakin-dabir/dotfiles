@@ -16,6 +16,7 @@
 #   media play|next|prev | media seek PCT
 #   clip-copy ID | clip-remove ID | clip-clear
 #   weather-refresh
+#   win-focus ID | win-close ID | win-state floating|fullscreen | win-sticky | win-layout tiled|monocle
 
 BIN="$HOME/.config/bspwm/bin"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
@@ -249,6 +250,14 @@ case "$1" in
         "$BIN/BarPanel" --close ;;
     clip-remove) clipcatctl remove "$2" >/dev/null 2>&1; push clipboard ;;
     clip-clear)  clipcatctl clear >/dev/null 2>&1; push clipboard ;;
+
+    # Windows dropdown (the bar's window title). The dropdown never takes the
+    # focus, so "focused" is the window you were using.
+    win-focus)  bspc node "$2" -f; "$BIN/BarPanel" --close ;;
+    win-close)  bspc node "$2" -c; sleep 0.3; push windows ;;
+    win-state)  bspc node focused.window -t "~$2"; sleep 0.1; push windows ;;
+    win-sticky) bspc node focused.window -g sticky; push windows ;;
+    win-layout) bspc desktop focused -l "$2"; push windows ;;
 
     weather-refresh)
         rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/barpanel-weather/forecast.json"

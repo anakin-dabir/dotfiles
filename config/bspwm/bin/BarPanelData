@@ -504,11 +504,44 @@ capture() {
         '{recording: $rec, since: $since, last: $last, last_name: ($last | split("/") | last // "")}'
 }
 
+# ----- power: who's logged in, for how long -----
+
+power() {
+    local up; up=$(awk '{ s = int($1); d = int(s / 86400); h = int(s % 86400 / 3600); m = int(s % 3600 / 60);
+                       if (d) printf "%d d %d h", d, h; else if (h) printf "%d h %d min", h, m; else printf "%d min", m }' /proc/uptime)
+    jq -nc --arg user "$(id -un)" --arg host "$(cat /etc/hostname 2>/dev/null || uname -n)" --arg up "$up" \
+        --arg kernel "$(uname -r | cut -d- -f1)" '{user: $user, host: $host, uptime: $up, kernel: $kernel}'
+}
+
+# ----- windows on the focused desktop (bspwm) -----
+
+windows() {
+    local tree; tree=$(bspc query -T -d focused 2>/dev/null) || tree='{}'
+    local fid; fid=$(bspc query -N -n focused.window 2>/dev/null | head -1)
+    [ -n "$fid" ] && fid=$(printf '%d' "$fid")          # (hex -> the tree's decimal ids)
+    # Titles (bspwm doesn't keep them)
+    local titles="" id
+    for id in $(jq -r '[.. | objects | select(.client? != null) | .id] | .[]' <<< "$tree" 2>/dev/null); do
+        titles+="$(printf '%d\t%s' "$id" "$(xdotool getwindowname "$id" 2>/dev/null | tr '\t' ' ')")"$'\n'
+    done
+    jq -c --arg fid "$fid" --arg titles "$titles" '
+        ($titles | split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: (.[1:] | join(" "))}) | from_entries) as $t
+        | [.. | objects | select(.client? != null and .hidden != true)
+           | {id: (.id | tostring), cls: .client.className, state: .client.state, sticky: .sticky,
+              title: ($t[.id | tostring] // .client.className)}] as $w
+        | $fid as $f
+        | {desktop: .name, layout: .layout, count: ($w | length),
+           focused: (if any($w[]; .id == $f) then $f else "" end),
+           fstate: ([$w[] | select(.id == $f) | .state][0] // ""),
+           fsticky: ([$w[] | select(.id == $f) | .sticky][0] // false),
+           items: [$w[] | . + {focused: (.id == $f)}]}' <<< "$tree"
+}
+
 case "$1" in
     closable) closable "$2"; exit ;;
     media-bar) media_bar; exit ;;
     weather-bar) weather_bar; exit ;;
-    cpu|memory|disk|sound|network|battery|wifi|bt|calendar|media|weather|clipboard|capture)
+    cpu|memory|disk|sound|network|battery|wifi|bt|calendar|media|weather|clipboard|capture|power|windows)
         out=$("$1" | holds "bp_$1")
         if [ "$PUSH" = 1 ]; then
             # Send straight to the open dropdown instead of waiting for its next poll

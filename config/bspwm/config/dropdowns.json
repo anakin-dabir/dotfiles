@@ -22,6 +22,29 @@
   "battery_night": true,
   "battery_awake": true,
   "battery_buttons": true,
+  "calendar_month": true,
+  "calendar_week": true,
+  "media_now": true,
+  "media_seek": true,
+  "media_controls": true,
+  "media_button": true,
+  "clipboard_list": true,
+  "clipboard_clear": true,
+  "capture_shots": true,
+  "capture_record": true,
+  "capture_last": true,
+  "capture_button": true,
+  "windows_list": true,
+  "windows_focused": true,
+  "windows_layout": true,
+  "power_session": true,
+  "power_actions": true,
+  "power_off": true,
+  "weather_stats": true,
+  "weather_hours": true,
+  "weather_days": true,
+  "weather_sun": true,
+  "weather_buttons": true,
   "network_rows": true,
   "battery_toggles": true,
   "order": {
@@ -65,6 +88,43 @@
     "battery_toggles": [
       "battery_night",
       "battery_awake"
+    ],
+    "calendar": [
+      "calendar_month",
+      "calendar_week"
+    ],
+    "media": [
+      "media_now",
+      "media_seek",
+      "media_controls",
+      "media_button"
+    ],
+    "clipboard": [
+      "clipboard_list",
+      "clipboard_clear"
+    ],
+    "capture": [
+      "capture_shots",
+      "capture_record",
+      "capture_last",
+      "capture_button"
+    ],
+    "windows": [
+      "windows_list",
+      "windows_focused",
+      "windows_layout"
+    ],
+    "power": [
+      "power_session",
+      "power_actions",
+      "power_off"
+    ],
+    "weather": [
+      "weather_stats",
+      "weather_hours",
+      "weather_days",
+      "weather_sun",
+      "weather_buttons"
     ]
   },
   "first": {
@@ -77,6 +137,13 @@
     "disk": true,
     "sound": true,
     "network": true,
-    "battery": true
+    "battery": true,
+    "calendar": true,
+    "media": true,
+    "clipboard": true,
+    "capture": true,
+    "windows": true,
+    "power": true,
+    "weather": true
   }
 }

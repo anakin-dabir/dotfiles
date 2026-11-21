@@ -43,11 +43,21 @@ class DropdownsPage(Page):
 
         top = group(self, description="The panels that open when you click an item on the bar. Pick one, "
                                       "then switch its sections on or off and change their order. Saved right away.")
-        self.tabs = Adw.ToggleGroup(homogeneous=True, margin_top=4)
+        # One button per dropdown, in rows (too many for one strip)
+        self.tabs = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True, column_spacing=4,
+                                row_spacing=4, min_children_per_line=7, max_children_per_line=7, margin_top=4)
+        self.tab_buttons = {}
+        first = None
         for dd, title, _units in ddconfig.DROPDOWNS:
-            self.tabs.add(Adw.Toggle(name=dd, label=title))
-        self.tabs.set_active_name(self.current)
-        self.tabs.connect("notify::active-name", self._pick)
+            b = Gtk.ToggleButton(label=title, active=(dd == self.current))
+            b.add_css_class("cc-ddtab")
+            if first is None:
+                first = b
+            else:
+                b.set_group(first)
+            b.connect("toggled", lambda btn, d=dd: btn.get_active() and self._pick(d))
+            self.tabs.append(b)
+            self.tab_buttons[dd] = b
         top.add(self.tabs)
 
         body = group(self)
@@ -89,9 +99,8 @@ class DropdownsPage(Page):
 
     # ----- showing -----
 
-    def _pick(self, tabs, _p):
-        name = tabs.get_active_name()
-        if name:
+    def _pick(self, name):
+        if name and name != self.current:
             self.current = name
             self.build()
 

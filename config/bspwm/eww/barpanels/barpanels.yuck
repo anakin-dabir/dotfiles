@@ -520,10 +520,8 @@
 
 ;; ================= Calendar =================
 
-(defwidget bp-calendar-panel []
-  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
-    (bp-head :icon "󰃭" :title {formattime(EWW_TIME, "%A")}
-             :sub {formattime(EWW_TIME, "%B %-d, %Y")} :value {formattime(EWW_TIME, "%H:%M")})
+(defwidget bp-s-calendar_month []
+  (box :orientation "v" :space-evenly false
     ;; (scroll over the month to go back and forward)
     (eventbox :onscroll "~/.config/bspwm/bin/BarPanelAction cal {} &"
       (box :class "bp-card bp-cal" :orientation "v" :space-evenly false :spacing 2
@@ -546,7 +544,26 @@
                 (label :class "bp-cal-day ${d.in ? '' : 'bp-cal-out'} ${d.today ? 'bp-cal-today' : ''}"
                        :text {d.d})))))))))
 
-;; ================= media, weather, clipboard, screenshot =================
+(defwidget bp-s-calendar_week []
+  (box :class "bp-card bp-stats" :space-evenly true
+    (bp-stat :label "Week" :value {formattime(EWW_TIME, "%V")})
+    (bp-stat :label "Day of the year" :value {formattime(EWW_TIME, "%-j")})
+    (bp-stat :label "Time zone" :value {formattime(EWW_TIME, "%Z")})))
+
+(defwidget bp-o-calendar []
+  (box :visible {bp_show.any.calendar} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.calendar}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "calendar_month"} :orientation "v" :space-evenly false (bp-s-calendar_month))
+        (box :visible {k == "calendar_week"} :orientation "v" :space-evenly false (bp-s-calendar_week))))))
+
+(defwidget bp-calendar-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
+    (bp-head :icon "󰃭" :title {formattime(EWW_TIME, "%A")}
+             :sub {formattime(EWW_TIME, "%B %-d, %Y")} :value {formattime(EWW_TIME, "%H:%M")})
+    (bp-o-calendar)))
+
+;; ================= media, weather, clipboard, screenshot, power, windows =================
 
 (defpoll bp_media :interval "1s" :run-while {bp_open == "media"}
   :initial '{"has":false,"playing":false,"player":"","title":"","artist":"","art":"","pos":"","len":"","pct":0,"seek":false}'
@@ -560,75 +577,125 @@
 (defpoll bp_capture :interval "1s" :run-while {bp_open == "capture"}
   :initial '{"recording":false,"since":"","last":"","last_name":""}'
   "~/.config/bspwm/bin/BarPanelData capture")
+(defpoll bp_power :interval "30s" :run-while {bp_open == "power"}
+  :initial '{"user":"","host":"","uptime":"","kernel":""}'
+  "~/.config/bspwm/bin/BarPanelData power")
+(defpoll bp_windows :interval "2s" :run-while {bp_open == "windows"}
+  :initial '{"desktop":"","layout":"tiled","count":0,"focused":"","fstate":"","fsticky":false,"items":[]}'
+  "~/.config/bspwm/bin/BarPanelData windows")
+
+;; ----- media -----
+
+(defwidget bp-s-media_now []
+  (box :class "bp-card" :space-evenly false :spacing 14
+    (box :class "bp-art" :visible {bp_media.art != ""} :style "background-image: url('${bp_media.art}');")
+    (box :class "bp-art bp-art-empty" :visible {bp_media.art == ""}
+      (label :class "bp-art-icon" :hexpand true :text "󰝚"))
+    (box :orientation "v" :space-evenly false :spacing 3 :valign "center" :hexpand true
+      (label :class "bp-media-title" :halign "start" :xalign 0 :limit-width 21 :tooltip {bp_media.title} :text {bp_media.title})
+      (label :class "bp-sub" :halign "start" :xalign 0 :limit-width 28 :visible {bp_media.artist != ""} :text {bp_media.artist}))))
+
+(defwidget bp-s-media_seek []
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 2 :visible {bp_media.seek}
+    (eventbox :cursor "pointer"
+      (scale :class "bp-seek" :hexpand true :min 0 :max 101 :value {bp_media.pct}
+             :onchange "~/.config/bspwm/bin/BarPanelAction media seek {} &"))
+    (box
+      (label :class "bp-media-time" :halign "start" :text {bp_media.pos})
+      (label :class "bp-media-time" :halign "end" :text {bp_media.len}))))
+
+(defwidget bp-s-media_controls []
+  (box :halign "center" :space-evenly false :spacing 22
+    (eventbox :cursor "pointer" :tooltip "Previous"
+      (button :class "bp-round" :onclick "~/.config/bspwm/bin/BarPanelAction media prev &" "󰒮"))
+    (eventbox :cursor "pointer" :tooltip {bp_media.playing ? "Pause" : "Play"}
+      (button :class "bp-round bp-round-on bp-play" :onclick "~/.config/bspwm/bin/BarPanelAction media play &" {bp_media.playing ? "󰏤" : "󰐊"}))
+    (eventbox :cursor "pointer" :tooltip "Next"
+      (button :class "bp-round" :onclick "~/.config/bspwm/bin/BarPanelAction media next &" "󰒭"))))
+
+(defwidget bp-s-media_button []
+  (bp-button :icon "󰝚" :text "Music player" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --music &"))
+
+(defwidget bp-o-media []
+  (box :visible {bp_show.any.media} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.media}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "media_now"} :orientation "v" :space-evenly false (bp-s-media_now))
+        (box :visible {k == "media_seek"} :orientation "v" :space-evenly false (bp-s-media_seek))
+        (box :visible {k == "media_controls"} :orientation "v" :space-evenly false (bp-s-media_controls))
+        (box :visible {k == "media_button"} :orientation "v" :space-evenly false (bp-s-media_button))))))
 
 (defwidget bp-media-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰝚" :title "Media"
              :sub {bp_media.has ? "${bp_media.player} · ${bp_media.playing ? 'Playing' : 'Paused'}" : "Nothing playing"} :value "")
-    (box :class "bp-card" :orientation "v" :space-evenly false :spacing 14 :visible {bp_media.has}
-      (box :space-evenly false :spacing 14
-        (box :class "bp-art" :visible {bp_media.art != ""} :style "background-image: url('${bp_media.art}');")
-        (box :class "bp-art bp-art-empty" :visible {bp_media.art == ""}
-          (label :class "bp-art-icon" :hexpand true :text "󰝚"))
-        (box :orientation "v" :space-evenly false :spacing 3 :valign "center" :hexpand true
-          (label :class "bp-media-title" :halign "start" :xalign 0 :limit-width 21 :tooltip {bp_media.title} :text {bp_media.title})
-          (label :class "bp-sub" :halign "start" :xalign 0 :limit-width 28 :visible {bp_media.artist != ""} :text {bp_media.artist})))
-      (box :orientation "v" :space-evenly false :spacing 2 :visible {bp_media.seek}
-        (eventbox :cursor "pointer"
-          (scale :class "bp-seek" :hexpand true :min 0 :max 101 :value {bp_media.pct}
-                 :onchange "~/.config/bspwm/bin/BarPanelAction media seek {} &"))
-        (box
-          (label :class "bp-media-time" :halign "start" :text {bp_media.pos})
-          (label :class "bp-media-time" :halign "end" :text {bp_media.len})))
-      (box :halign "center" :space-evenly false :spacing 22
-        (eventbox :cursor "pointer" :tooltip "Previous"
-          (button :class "bp-round" :onclick "~/.config/bspwm/bin/BarPanelAction media prev &" "󰒮"))
-        (eventbox :cursor "pointer" :tooltip {bp_media.playing ? "Pause" : "Play"}
-          (button :class "bp-round bp-round-on bp-play" :onclick "~/.config/bspwm/bin/BarPanelAction media play &" {bp_media.playing ? "󰏤" : "󰐊"}))
-        (eventbox :cursor "pointer" :tooltip "Next"
-          (button :class "bp-round" :onclick "~/.config/bspwm/bin/BarPanelAction media next &" "󰒭"))))
-    (box :class "bp-card" :visible {!bp_media.has}
-      (label :class "bp-dim" :hexpand true :text "Play something in a browser or music app and it shows up here."
-             :wrap true))
-    (bp-button :icon "󰝚" :text "Music player" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --music &")))
+    (box :visible {bp_media.has && bp_show.any.media} :orientation "v" :space-evenly false (bp-o-media))
+    (box :visible {!bp_media.has} :orientation "v" :space-evenly false :spacing 12
+      (box :class "bp-card"
+        (label :class "bp-dim" :hexpand true :wrap true :text "Play something in a browser or music app and it shows up here."))
+      (bp-s-media_button))))
+
+;; ----- weather -----
+
+(defwidget bp-s-weather_stats []
+  (box :class "bp-card bp-stats" :space-evenly true
+    (bp-stat :label "Feels like" :value {bp_weather.feels ?: "–"})
+    (bp-stat :label "Humidity" :value {bp_weather.humidity ?: "–"})
+    (bp-stat :label "Wind" :value {bp_weather.wind ?: "–"})
+    (bp-stat :label "Rain" :value {bp_weather.rain ?: "–"})))
+
+(defwidget bp-s-weather_hours []
+  (bp-card :title "Next hours"
+    (box :space-evenly true
+      (for h in {bp_weather.hours}
+        (box :orientation "v" :space-evenly false :spacing 4
+          (label :class "bp-w-time" :text {h.t})
+          (label :class "bp-w-icon" :text {h.icon})
+          (label :class "bp-w-temp" :text {h.temp}))))))
+
+(defwidget bp-s-weather_days []
+  (bp-card :title "Next days"
+    (box :orientation "v" :space-evenly false :spacing 6
+      (for d in {bp_weather.days}
+        (box :class "bp-w-day" :space-evenly false :spacing 10
+          (label :class "bp-w-dayname" :halign "start" :xalign 0 :text {d.d})
+          (label :class "bp-w-icon-small" :text {d.icon})
+          (label :class "bp-dim" :halign "start" :xalign 0 :hexpand true :limit-width 16 :text {d.desc})
+          (label :class "bp-w-lo" :text {d.lo})
+          (label :class "bp-w-hi" :text {d.hi}))))))
+
+(defwidget bp-s-weather_sun []
+  (box :class "bp-w-sun" :space-evenly false :spacing 16 :halign "center"
+    (label :class "bp-dim" :text "󰖜  Sunrise ${bp_weather.sunrise}")
+    (label :class "bp-dim" :text "󰖛  Sunset ${bp_weather.sunset}")))
+
+(defwidget bp-s-weather_buttons []
+  (box :spacing 8
+    (bp-button :icon "󰑐" :text "Refresh" :onclick "~/.config/bspwm/bin/BarPanelAction weather-refresh &")
+    (bp-button :icon "󰍎" :text "Location…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter bar &")))
+
+(defwidget bp-o-weather []
+  (box :visible {bp_show.any.weather} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.weather}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "weather_stats"} :orientation "v" :space-evenly false (bp-s-weather_stats))
+        (box :visible {k == "weather_hours"} :orientation "v" :space-evenly false (bp-s-weather_hours))
+        (box :visible {k == "weather_days"} :orientation "v" :space-evenly false (bp-s-weather_days))
+        (box :visible {k == "weather_sun"} :orientation "v" :space-evenly false (bp-s-weather_sun))
+        (box :visible {k == "weather_buttons"} :orientation "v" :space-evenly false (bp-s-weather_buttons))))))
 
 (defwidget bp-weather-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon {bp_weather.icon} :title {bp_weather.place}
              :sub {bp_weather.ok ? "${bp_weather.desc} · ${bp_weather.hi} / ${bp_weather.lo}" : bp_weather.desc}
              :value {bp_weather.temp})
-    (box :class "bp-card bp-stats" :space-evenly true :visible {bp_weather.ok}
-      (bp-stat :label "Feels like" :value {bp_weather.feels ?: "–"})
-      (bp-stat :label "Humidity" :value {bp_weather.humidity ?: "–"})
-      (bp-stat :label "Wind" :value {bp_weather.wind ?: "–"})
-      (bp-stat :label "Rain" :value {bp_weather.rain ?: "–"}))
-    (bp-card :title "Next hours"
-      (box :space-evenly true
-        (for h in {bp_weather.hours}
-          (box :orientation "v" :space-evenly false :spacing 4
-            (label :class "bp-w-time" :text {h.t})
-            (label :class "bp-w-icon" :text {h.icon})
-            (label :class "bp-w-temp" :text {h.temp})))))
-    (bp-card :title "Next days"
-      (box :orientation "v" :space-evenly false :spacing 6
-        (for d in {bp_weather.days}
-          (box :class "bp-w-day" :space-evenly false :spacing 10
-            (label :class "bp-w-dayname" :halign "start" :xalign 0 :text {d.d})
-            (label :class "bp-w-icon-small" :text {d.icon})
-            (label :class "bp-dim" :halign "start" :xalign 0 :hexpand true :limit-width 16 :text {d.desc})
-            (label :class "bp-w-lo" :text {d.lo})
-            (label :class "bp-w-hi" :text {d.hi})))))
-    (box :class "bp-w-sun" :space-evenly false :spacing 16 :halign "center" :visible {bp_weather.ok}
-      (label :class "bp-dim" :text "󰖜  Sunrise ${bp_weather.sunrise}")
-      (label :class "bp-dim" :text "󰖛  Sunset ${bp_weather.sunset}"))
-    (box :spacing 8
-      (bp-button :icon "󰑐" :text "Refresh" :onclick "~/.config/bspwm/bin/BarPanelAction weather-refresh &")
-      (bp-button :icon "󰍎" :text "Location…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter bar &"))))
+    (box :visible {bp_weather.ok && bp_show.any.weather} :orientation "v" :space-evenly false (bp-o-weather))
+    (box :visible {!bp_weather.ok} :orientation "v" :space-evenly false (bp-s-weather_buttons))))
 
-(defwidget bp-clipboard-panel []
-  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
-    (bp-head :icon "󰆒" :title "Clipboard"
-             :sub {bp_clipboard.count == 0 ? "Nothing copied yet" : "Click one to copy it again"} :value "")
+;; ----- clipboard -----
+
+(defwidget bp-s-clipboard_list []
+  (box :orientation "v" :space-evenly false
     (box :class "bp-card bp-clip-list" :orientation "v" :space-evenly false :spacing 2 :visible {bp_clipboard.count > 0}
       (for it in {bp_clipboard.items}
         (box :space-evenly false :spacing 6
@@ -636,15 +703,32 @@
             (button :class "bp-clip" :onclick "~/.config/bspwm/bin/BarPanelAction clip-copy ${it.id} &" :tooltip "Copy this again"
               (box :space-evenly false :spacing 10
                 (label :class "bp-clip-icon" :text {it.image ? "󰋩" : "󰦨"})
-                (label :class "bp-clip-text" :halign "start" :xalign 0 :hexpand true :limit-width 34 :text {it.text}))))
+                (label :class "bp-clip-text" :halign "start" :xalign 0 :hexpand true :limit-width 26 :text {it.text}))))
           (eventbox :cursor "pointer"
             (button :class "bp-x" :tooltip "Remove it from the history" :onclick "~/.config/bspwm/bin/BarPanelAction clip-remove ${it.id} &" "󰅖")))))
     (box :class "bp-card" :visible {bp_clipboard.count == 0}
-      (label :class "bp-dim" :hexpand true :wrap true :text "Things you copy show up here."))
-    (box :visible {bp_clipboard.count > 0}
-      (eventbox :cursor "pointer" :hexpand true
-        (button :class "bp-button bp-clear-all" :onclick "~/.config/bspwm/bin/BarPanelAction clip-clear &"
-          (label :class "bp-btn-text" :text "Clear all"))))))
+      (label :class "bp-dim" :hexpand true :wrap true :text "Things you copy show up here."))))
+
+(defwidget bp-s-clipboard_clear []
+  (box :visible {bp_clipboard.count > 0}
+    (eventbox :cursor "pointer" :hexpand true
+      (button :class "bp-button bp-clear-all" :onclick "~/.config/bspwm/bin/BarPanelAction clip-clear &"
+        (label :class "bp-btn-text" :text "Clear all")))))
+
+(defwidget bp-o-clipboard []
+  (box :visible {bp_show.any.clipboard} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.clipboard}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "clipboard_list"} :orientation "v" :space-evenly false (bp-s-clipboard_list))
+        (box :visible {k == "clipboard_clear"} :orientation "v" :space-evenly false (bp-s-clipboard_clear))))))
+
+(defwidget bp-clipboard-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
+    (bp-head :icon "󰆒" :title "Clipboard"
+             :sub {bp_clipboard.count == 0 ? "Nothing copied yet" : "Click one to copy it again"} :value "")
+    (bp-o-clipboard)))
+
+;; ----- screenshot -----
 
 (defwidget bp-capture-tile [icon text onclick]
   (eventbox :cursor "pointer" :hexpand true
@@ -653,32 +737,144 @@
         (label :class "bp-tile-icon" :text icon)
         (label :class "bp-tile-text" :text text)))))
 
+(defwidget bp-s-capture_shots []
+  (box :space-evenly true :spacing 6
+    (bp-capture-tile :icon "󰍹" :text "Screen" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture screen &")
+    (bp-capture-tile :icon "󰆞" :text "Area" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture area &")
+    (bp-capture-tile :icon "󰖯" :text "Window" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture window &")
+    (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &")
+    (bp-capture-tile :icon "󱄺" :text "Text" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture text &")))
+
+(defwidget bp-s-capture_record []
+  (box :class "bp-card bp-rec ${bp_capture.recording ? 'bp-rec-on' : ''}" :space-evenly false :spacing 12
+    (label :class "bp-rec-dot" :valign "center" :text "󰑊")
+    (box :orientation "v" :space-evenly false :hexpand true :valign "center"
+      (label :class "bp-item-name" :halign "start" :text "Screen recording")
+      (label :class "bp-item-sub" :halign "start" :xalign 0
+             :text {bp_capture.recording ? "Recording · ${bp_capture.since}" : "This screen, with its sound"}))
+    (eventbox :cursor "pointer" :valign "center"
+      (button :class {bp_capture.recording ? "bp-danger bp-danger-sure" : "bp-chip"}
+              :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture record &"
+        (label :text {bp_capture.recording ? "Stop" : "Start"})))))
+
+(defwidget bp-s-capture_last []
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 8 :visible {bp_capture.last != ""}
+    (label :class "bp-section" :halign "start" :text "Last screenshot")
+    (eventbox :cursor "pointer" :tooltip "Open it"
+      (button :class "bp-shot-btn" :onclick "~/.config/bspwm/bin/BarPanelAction run xdg-open '${bp_capture.last}' &"
+        (box :class "bp-shot" :style "background-image: url('${bp_capture.last}');")))))
+
+(defwidget bp-s-capture_button []
+  (bp-button :icon "󰉋" :text "Screenshots folder"
+             :onclick "~/.config/bspwm/bin/BarPanelAction run xdg-open ${replace(bp_capture.last, '/[^/]*$', '')} &"))
+
+(defwidget bp-o-capture []
+  (box :visible {bp_show.any.capture} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.capture}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "capture_shots"} :orientation "v" :space-evenly false (bp-s-capture_shots))
+        (box :visible {k == "capture_record"} :orientation "v" :space-evenly false (bp-s-capture_record))
+        (box :visible {k == "capture_last"} :orientation "v" :space-evenly false (bp-s-capture_last))
+        (box :visible {k == "capture_button"} :orientation "v" :space-evenly false (bp-s-capture_button))))))
+
 (defwidget bp-capture-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
     (bp-head :icon "󰄀" :title "Screenshot" :sub "Saved, and copied to the clipboard" :value "")
-    (box :space-evenly true :spacing 6
-      (bp-capture-tile :icon "󰍹" :text "Screen" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture screen &")
-      (bp-capture-tile :icon "󰆞" :text "Area" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture area &")
-      (bp-capture-tile :icon "󰖯" :text "Window" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture window &")
-      (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &")
-      (bp-capture-tile :icon "󱄺" :text "Text" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture text &"))
-    (box :class "bp-card bp-rec ${bp_capture.recording ? 'bp-rec-on' : ''}" :space-evenly false :spacing 12
-      (label :class "bp-rec-dot" :valign "center" :text "󰑊")
-      (box :orientation "v" :space-evenly false :hexpand true :valign "center"
-        (label :class "bp-item-name" :halign "start" :text "Screen recording")
-        (label :class "bp-item-sub" :halign "start" :xalign 0
-               :text {bp_capture.recording ? "Recording · ${bp_capture.since}" : "This screen, with its sound"}))
-      (eventbox :cursor "pointer" :valign "center"
-        (button :class {bp_capture.recording ? "bp-danger bp-danger-sure" : "bp-chip"}
-                :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture record &"
-          (label :text {bp_capture.recording ? "Stop" : "Start"}))))
-    (box :class "bp-card" :orientation "v" :space-evenly false :spacing 8 :visible {bp_capture.last != ""}
-      (label :class "bp-section" :halign "start" :text "Last screenshot")
-      (eventbox :cursor "pointer" :tooltip "Open it"
-        (button :class "bp-shot-btn" :onclick "~/.config/bspwm/bin/BarPanelAction run xdg-open '${bp_capture.last}' &"
-          (box :class "bp-shot" :style "background-image: url('${bp_capture.last}');"))))
-    (bp-button :icon "󰉋" :text "Screenshots folder"
-               :onclick "~/.config/bspwm/bin/BarPanelAction run xdg-open ${replace(bp_capture.last, '/[^/]*$', '')} &")))
+    (bp-o-capture)))
+
+;; ----- power (the bar's power button) -----
+
+(defwidget bp-power-btn [icon text onclick ?danger ?id]
+  (eventbox :cursor "pointer" :hexpand true
+    (button :class "bp-tile ${danger == 'true' ? 'bp-tile-danger' : ''} ${id != '' && bp_confirm == id ? 'bp-tile-sure' : ''}"
+            :onclick onclick
+      (box :orientation "v" :space-evenly false :spacing 6
+        (label :class "bp-tile-icon" :text icon)
+        (label :class "bp-tile-text" :text {id != "" && bp_confirm == id ? "Sure?" : text})))))
+
+(defwidget bp-s-power_session []
+  (box :class "bp-card bp-stats" :space-evenly true
+    (bp-stat :label "Up for" :value {bp_power.uptime ?: "–"})
+    (bp-stat :label "Computer" :value {bp_power.host ?: "–"})
+    (bp-stat :label "Kernel" :value {bp_power.kernel ?: "–"})))
+
+(defwidget bp-s-power_actions []
+  (box :space-evenly true :spacing 6
+    (bp-power-btn :icon "󰌾" :text "Lock" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ScreenLocker &")
+    (bp-power-btn :icon "󰒲" :text "Sleep" :onclick "~/.config/bspwm/bin/BarPanelAction run systemctl suspend &")
+    (bp-power-btn :icon "󰍃" :text "Log out" :id "pw:logout"
+                  :onclick "~/.config/bspwm/bin/BarPanelAction confirm pw:logout run bspc quit &")))
+
+(defwidget bp-s-power_off []
+  (box :space-evenly true :spacing 6
+    (bp-power-btn :icon "󰜉" :text "Restart" :id "pw:reboot"
+                  :onclick "~/.config/bspwm/bin/BarPanelAction confirm pw:reboot run systemctl reboot &")
+    (bp-power-btn :icon "󰐥" :text "Shut down" :danger "true" :id "pw:off"
+                  :onclick "~/.config/bspwm/bin/BarPanelAction confirm pw:off run systemctl poweroff &")))
+
+(defwidget bp-o-power []
+  (box :visible {bp_show.any.power} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.power}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "power_session"} :orientation "v" :space-evenly false (bp-s-power_session))
+        (box :visible {k == "power_actions"} :orientation "v" :space-evenly false (bp-s-power_actions))
+        (box :visible {k == "power_off"} :orientation "v" :space-evenly false (bp-s-power_off))))))
+
+(defwidget bp-power-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
+    (bp-head :icon "󰀄" :title {bp_power.user ?: "Session"} :sub "Restart and Shut down ask once more" :value "")
+    (bp-o-power)))
+
+;; ----- windows (the bar's window title) -----
+
+(defwidget bp-s-windows_list []
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 2
+    (label :class "bp-dim" :halign "start" :visible {bp_windows.count == 0} :text "No windows on this desktop")
+    (for w in {bp_windows.items}
+      (box :space-evenly false :spacing 6
+        (eventbox :cursor "pointer" :hexpand true
+          (button :class "bp-clip ${w.focused ? 'bp-win-on' : ''}" :onclick "~/.config/bspwm/bin/BarPanelAction win-focus ${w.id} &" :tooltip "Go to this window"
+            (box :space-evenly false :spacing 10
+              (label :class "bp-clip-icon" :text {w.state == "floating" ? "󰲏" : w.state == "fullscreen" ? "󰊓" : "󰖯"})
+              (box :orientation "v" :space-evenly false :hexpand true
+                (label :class "bp-clip-text" :halign "start" :xalign 0 :limit-width 22 :text {w.title})
+                (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 28 :text {w.cls})))))
+        (eventbox :cursor "pointer"
+          (button :class "bp-x" :tooltip "Close this window" :onclick "~/.config/bspwm/bin/BarPanelAction win-close ${w.id} &" "󰅖"))))))
+
+(defwidget bp-s-windows_focused []
+  (box :space-evenly true :spacing 6 :visible {bp_windows.focused != ""}
+    (bp-power-btn :icon "󰲏" :text {bp_windows.fstate == "floating" ? "Tile" : "Float"}
+                  :onclick "~/.config/bspwm/bin/BarPanelAction win-state floating &")
+    (bp-power-btn :icon "󰊓" :text {bp_windows.fstate == "fullscreen" ? "Exit full" : "Full screen"}
+                  :onclick "~/.config/bspwm/bin/BarPanelAction win-state fullscreen &")
+    (bp-power-btn :icon "󰐃" :text {bp_windows.fsticky ? "Unpin" : "Pin"}
+                  :onclick "~/.config/bspwm/bin/BarPanelAction win-sticky &")))
+
+(defwidget bp-s-windows_layout []
+  (box :class "bp-seg" :space-evenly true
+    (eventbox :cursor "pointer"
+      (button :class "bp-seg-item ${bp_windows.layout == 'tiled' ? 'bp-seg-on' : ''}" :onclick "~/.config/bspwm/bin/BarPanelAction win-layout tiled &"
+        (box :space-evenly false :spacing 6 :halign "center"
+          (label :class "bp-seg-icon" :text "󰕰") (label :class "bp-seg-name" :text "Side by side"))))
+    (eventbox :cursor "pointer"
+      (button :class "bp-seg-item ${bp_windows.layout == 'monocle' ? 'bp-seg-on' : ''}" :onclick "~/.config/bspwm/bin/BarPanelAction win-layout monocle &"
+        (box :space-evenly false :spacing 6 :halign "center"
+          (label :class "bp-seg-icon" :text "󰖯") (label :class "bp-seg-name" :text "One at a time"))))))
+
+(defwidget bp-o-windows []
+  (box :visible {bp_show.any.windows} :orientation "v" :space-evenly false :spacing 12
+    (for k in {bp_show.order.windows}
+      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+        (box :visible {k == "windows_list"} :orientation "v" :space-evenly false (bp-s-windows_list))
+        (box :visible {k == "windows_focused"} :orientation "v" :space-evenly false (bp-s-windows_focused))
+        (box :visible {k == "windows_layout"} :orientation "v" :space-evenly false (bp-s-windows_layout))))))
+
+(defwidget bp-windows-panel []
+  (box :class "bp-panel" :orientation "v" :space-evenly false :spacing 12
+    (bp-head :icon "󰖲" :title "Windows"
+             :sub "Desktop ${bp_windows.desktop} · ${bp_windows.count} open" :value "")
+    (bp-o-windows)))
 
 ;; ================= windows =================
 
@@ -693,6 +889,8 @@
 (defwindow bp-weather   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-weather-panel))
 (defwindow bp-clipboard :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-clipboard-panel))
 (defwindow bp-capture   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-capture-panel))
+(defwindow bp-power     :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-power-panel))
+(defwindow bp-windows   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-windows-panel))
 
 ;; Invisible layer under the open dropdown: a click on it closes the dropdown.
 ;; BarPanel sizes it to everything except the bar, so bar clicks still work.
