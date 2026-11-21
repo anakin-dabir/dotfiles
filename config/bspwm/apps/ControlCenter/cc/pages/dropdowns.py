@@ -5,12 +5,11 @@ its sections) next to the list of its sections. Saved right away
 
 import json
 import os
-import threading
 
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
 from .. import ddconfig, ddshots
-from ..common import BSPDIR, Page, group, icon_button, run_quiet, widgets_changed
+from ..common import BSPDIR, Page, group, icon_button, launch, run_quiet, widgets_changed
 
 MOCK_W = 262          # width of the mock dropdown's pictures
 GAP = 10              # space between its sections
@@ -48,8 +47,8 @@ class DropdownsPage(Page):
         self.tabs.set_active_name(self.current)
         self.tabs.connect("notify::active-name", self._pick)
         top.add(self.tabs)
-        self.status = Adw.ActionRow(title="Taking pictures of your dropdowns…",
-                                    subtitle="Once per theme, off-screen")
+        self.status = Adw.ActionRow(title="Preparing previews for this theme…",
+                                    subtitle="About 30 seconds, once per theme. You can close this window meanwhile.")
         self.status.add_prefix(Adw.Spinner())
         self.status.set_visible(False)
         top.add(self.status)
@@ -206,6 +205,8 @@ class DropdownsPage(Page):
     # ----- pictures -----
 
     def _capture(self):
+        """Pictures are taken by a separate process (closing this window
+        doesn't stop it); this page shows them as they arrive."""
         if self.capturing:
             return
         if ddshots.dropdown_open():          # don't disturb an open dropdown; try again shortly
@@ -213,16 +214,17 @@ class DropdownsPage(Page):
             return
         self.capturing = True
         self.status.set_visible(True)
+        launch(["python3", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                                        "take-dropdown-pictures.py")])
+        folder = ddshots.cache_dir()
 
-        def work():
-            try:
-                ddshots.capture(lambda _key: False)
-            finally:
-                GLib.idle_add(finished)
-
-        def finished():
-            self.capturing = False
-            self.status.set_visible(False)
-            self.build()
-            return False
-        threading.Thread(target=work, daemon=True).start()
+        def check():
+            done = os.path.exists(os.path.join(folder, ".complete"))
+            if self.window.page is self:
+                self.build()                  # show the pictures taken so far
+            if done:
+                self.capturing = False
+                self.status.set_visible(False)
+                return False
+            return True
+        GLib.timeout_add_seconds(2, check)
