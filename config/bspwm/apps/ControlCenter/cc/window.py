@@ -5,15 +5,17 @@ from gi.repository import Adw, GLib, Gtk
 from .common import set_pointer_root, widgets_changed
 from .pages.about import AboutPage
 from .pages.appearance import AppearancePage
+from .pages.bar import BarPage
 from .pages.bluetooth import BluetoothPage
+from .pages.customize import CustomizePage
 from .pages.display import DisplayPage
 from .pages.network import NetworkPage
 from .pages.notifications import NotificationsPage
 from .pages.power import PowerPage
 from .pages.sound import SoundPage
 
-PAGES = [AppearancePage, DisplayPage, SoundPage, NetworkPage, BluetoothPage,
-         PowerPage, NotificationsPage, AboutPage]
+PAGES = [AppearancePage, CustomizePage, BarPage, DisplayPage, SoundPage, NetworkPage,
+         BluetoothPage, PowerPage, NotificationsPage, AboutPage]
 
 
 class Window(Adw.ApplicationWindow):
@@ -35,6 +37,20 @@ class Window(Adw.ApplicationWindow):
         self.heading = Adw.WindowTitle()
         content_view.add_top_bar(Adw.HeaderBar(title_widget=self.heading))
         content_view.set_content(self.toasts)
+
+        # "Unsaved changes · Discard · Apply" (pages that collect changes)
+        self.pending_label = Gtk.Label(xalign=0, hexpand=True, ellipsize=3)
+        discard = Gtk.Button(label="Discard")
+        discard.connect("clicked", lambda *_: self.page.discard())
+        apply = Gtk.Button(label="Apply")
+        apply.add_css_class("suggested-action")
+        apply.connect("clicked", lambda *_: self.page.apply())
+        bar = Gtk.Box(spacing=8, margin_start=12, margin_end=12, margin_top=8, margin_bottom=8)
+        bar.append(self.pending_label)
+        bar.append(discard)
+        bar.append(apply)
+        self.pending_bar = Gtk.Revealer(child=bar, transition_type=Gtk.RevealerTransitionType.SLIDE_UP)
+        content_view.add_bottom_bar(self.pending_bar)
         self.content = Adw.NavigationPage(title="", child=content_view)
 
         # Sidebar
@@ -84,6 +100,7 @@ class Window(Adw.ApplicationWindow):
         self.heading.set_title(page.title)
         self.split.set_show_content(True)
         page.refresh()
+        self.update_pending()
         widgets_changed()
         self._schedule()
 
@@ -113,6 +130,15 @@ class Window(Adw.ApplicationWindow):
             GLib.source_remove(self.timer)
             self.timer = 0
         return False
+
+    def update_pending(self):
+        """Show the Discard/Apply bar when the visible page has unsaved changes."""
+        if not hasattr(self, "pending_bar"):      # pages load while the window is being built
+            return
+        text = self.page.pending_text() if self.page else ""
+        self.pending_label.set_label(text)
+        self.pending_bar.set_reveal_child(bool(text))
+        widgets_changed()
 
     def toast(self, text):
         self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=3))

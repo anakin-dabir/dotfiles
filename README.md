@@ -93,7 +93,7 @@ changes too. Commit them or ignore them; they're regenerated every time.
 | `super + alt + n` / `b` / `c` | Wi-Fi / Bluetooth / clipboard menus |
 | `super + alt + i` | Notification center panel (or click the bell on any bar; right-click it for Do Not Disturb). Click a notification to jump to its app |
 | click a bar item (any theme) | Dropdown for it: CPU, memory, storage, sound, network (airplane mode, Wi-Fi and Bluetooth lists), battery (health, power mode, brightness, night light, keep awake), calendar. Styled by the theme. Power mode needs a one-time `PowerMode --setup` (install.sh does it) |
-| `super + ,` | Control Center: themes, wallpapers, display (brightness, night light, resolution), sound, network, Bluetooth, power and notifications. Wears the current theme. Also in the app launcher, and the dropdowns' Settings buttons open the matching page (`ControlCenter network`) |
+| `super + ,` | Control Center: pick a theme and wallpaper; **customize** the theme (colours, borders, gaps, corners, shadows/blur, fonts for apps, terminal, notifications and launcher, notification position, GTK/icon/cursor themes); pick the **bar** design and edit its items (add, remove, reorder, move between left/center/right) and font; display, sound, network, Bluetooth, power, notifications. Edits keep the original so Reset always works. Also in the app launcher; the dropdowns' Settings buttons open the matching page (`ControlCenter network`) |
 | `Print` / `shift + Print` | Screenshot menu / Flameshot |
 | `super + alt + p` | Power menu |
 | `super + alt + j` / `g` | Keyboard backlight color / rainbow |
