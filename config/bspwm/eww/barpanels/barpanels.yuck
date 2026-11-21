@@ -186,22 +186,18 @@
 
 (defwidget bp-s-memory_apps []
   (bp-card :title "Apps using the most memory"
-    (box :orientation "v" :space-evenly false :spacing 10
-      ;; name · size · ×  on one line, the usage bar under the whole row
+    (box :orientation "v" :space-evenly false :spacing 8
       (for a in {bp_memory.apps}
-        (box :class "bp-proc" :orientation "v" :space-evenly false :spacing 6
-          (box :space-evenly false :spacing 8
-            (label :class "bp-row-name" :halign "start" :hexpand true :xalign 0 :limit-width 24 :text {a.name})
-            (label :class "bp-row-value" :valign "center" :text {a.size})
-            (box :visible {a.kill} :valign "center" (bp-close :proc {a.proc} :id "close:${a.proc}"))
-            (box :visible {!a.kill} :class "bp-x-space"))
-          (progress :class "bp-thin" :value {a.pct} :orientation "h"))))))
+        (box :space-evenly false :spacing 6
+          (box :hexpand true (bp-row :name {a.name} :value {a.size}))
+          (box :visible {a.kill} (bp-close :proc {a.proc} :id "close:${a.proc}"))
+          (box :visible {!a.kill} :class "bp-x-space"))))))
 
 (defwidget bp-s-memory_button []
   (bp-button :icon "󰍹" :text "System Monitor"
              :onclick "~/.config/bspwm/bin/BarPanelAction run gnome-system-monitor -p &"))
 
-;; One clean-up action: red badge, what it is, a red button (second click confirms)
+;; One clean-up action: red badge, what it is, a red button (one click)
 (defwidget bp-clean [icon title sub id action label]
   (box :class "bp-clean" :space-evenly false :spacing 12
     (label :class "bp-clean-badge" :valign "center" :text icon)
@@ -209,10 +205,7 @@
       (label :class "bp-item-name" :halign "start" :text title)
       (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 24 :text sub))
     (eventbox :cursor "pointer" :valign "center"
-      (button :class "bp-danger ${bp_confirm == id ? 'bp-danger-sure' : ''}"
-              :tooltip {bp_confirm == id ? "Click again to do it" : ""}
-              :onclick "~/.config/bspwm/bin/BarPanelAction confirm '${id}' ${action} &"
-        {bp_confirm == id ? "Sure?" : label}))))
+      (button :class "bp-danger" :onclick "~/.config/bspwm/bin/BarPanelAction ${action} &" label))))
 
 (defwidget bp-s-disk_clean []
   (box :class "bp-card" :orientation "v" :space-evenly false :spacing 8
@@ -237,27 +230,33 @@
     (bp-button :icon "󰄨" :text "Analyze" :onclick "~/.config/bspwm/bin/BarPanelAction run kitty -e ncdu ~ &")))
 
 (defwidget bp-s-sound_volume []
-  (bp-card :title "Volume"
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 6
     (bp-slider :icon {bp_sound.muted ? "󰖁" : "󰕾"} :value {bp_sound.vol}
-               :onchange "~/.config/bspwm/bin/BarPanelAction vol-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction vol-mute &")))
+               :onchange "~/.config/bspwm/bin/BarPanelAction vol-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction vol-mute &")
+    (label :class "bp-slider-sub" :halign "start" :xalign 0 :limit-width 34
+           :text {bp_sound.muted ? "Muted · ${bp_sound.output}" : "Playing through ${bp_sound.output}"})))
 
+;; (only when there's a choice: more than one output)
 (defwidget bp-s-sound_output []
-  (bp-card :title "Output"
-    (box :orientation "v" :space-evenly false :spacing 2
-      (for s in {bp_sound.sinks}
-        (eventbox :cursor "pointer"
-          (button :class "bp-item ${s.default ? 'bp-item-on' : ''}"
-                  :onclick "~/.config/bspwm/bin/BarPanelAction sink '${s.name}' &"
-            (box :space-evenly false :spacing 12
-              (label :class "bp-item-icon"
-                     :text {s.kind == "headphones" ? "󰋋" : s.kind == "hdmi" ? "󰡁" : s.kind == "bluetooth" ? "󰂯" : "󰓃"})
-              (label :class "bp-item-name" :halign "start" :hexpand true :xalign 0 :limit-width 30 :text {s.desc})
-              (label :class "bp-check" :visible {s.default} :text "󰄬"))))))))
+  (box :visible {arraylength(bp_sound.sinks) > 1}
+    (bp-card :title "Play sound through"
+      (box :orientation "v" :space-evenly false :spacing 2
+        (for s in {bp_sound.sinks}
+          (eventbox :cursor "pointer"
+            (button :class "bp-item ${s.default ? 'bp-item-on' : ''}"
+                    :onclick "~/.config/bspwm/bin/BarPanelAction sink '${s.name}' &"
+              (box :space-evenly false :spacing 12
+                (label :class "bp-item-icon"
+                       :text {s.kind == "headphones" ? "󰋋" : s.kind == "hdmi" ? "󰡁" : s.kind == "bluetooth" ? "󰂯" : "󰓃"})
+                (label :class "bp-item-name" :halign "start" :hexpand true :xalign 0 :limit-width 30 :text {s.desc})
+                (label :class "bp-check" :visible {s.default} :text "󰄬")))))))))
 
 (defwidget bp-s-sound_mic []
-  (bp-card :title "Microphone"
+  (box :class "bp-card" :orientation "v" :space-evenly false :spacing 6
     (bp-slider :icon {bp_sound.mic_muted ? "󰍭" : "󰍬"} :value {bp_sound.mic_vol}
-               :onchange "~/.config/bspwm/bin/BarPanelAction mic-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction mic-mute &")))
+               :onchange "~/.config/bspwm/bin/BarPanelAction mic-set {} &" :onclick "~/.config/bspwm/bin/BarPanelAction mic-mute &")
+    (label :class "bp-slider-sub" :halign "start" :xalign 0 :limit-width 34
+           :text {bp_sound.mic_muted ? "Muted · ${bp_sound.mic}" : bp_sound.mic})))
 
 (defwidget bp-s-sound_button []
   (bp-button :icon "󰒓" :text "Sound Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter sound &"))
@@ -309,7 +308,9 @@
   (box :visible {arraylength(bp_battery.profiles) > 0}
     (box :class "bp-card" :orientation "v" :space-evenly false :spacing 10
       (box :class "bp-card-head" :space-evenly false
-        (label :class "bp-section" :halign "start" :hexpand true :valign "center" :text "Power mode")
+        (label :class "bp-section" :halign "start" :valign "center" :text "Power mode")
+        (label :class "bp-dim bp-mode-now" :halign "start" :hexpand true :valign "center"
+               :text {bp_battery.profile_name != "" ? "· ${bp_battery.profile_name}" : ""})
         ;; not allowed yet: one small button instead of a sentence
         (box :visible {!bp_battery.can_profile}
           (eventbox :cursor "pointer"
@@ -321,10 +322,8 @@
         (for p in {bp_battery.profiles}
           (eventbox :cursor {bp_battery.can_profile ? "pointer" : "default"}
                     :onclick {bp_battery.can_profile ? "~/.config/bspwm/bin/BarPanelAction power-mode ${p.id} &" : ""}
-            (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}"
-                 :orientation "v" :space-evenly false :spacing 2 :tooltip {p.name}
-              (label :class "bp-seg-icon" :text {p.icon})
-              (label :class "bp-seg-name" :text {p.name}))))))))
+            (box :class "bp-seg-item ${p.id == bp_battery.profile ? 'bp-seg-on' : ''}" :tooltip {p.name}
+              (label :class "bp-seg-icon" :hexpand true :text {p.icon}))))))))
 
 ;; ----- order -----
 
@@ -372,7 +371,8 @@
 (defwidget bp-o-sound []
   (box :visible {bp_show.any.sound} :orientation "v" :space-evenly false :spacing 12
     (for k in {bp_show.order.sound}
-      (box :visible {bp_show[k]} :orientation "v" :space-evenly false
+      ;; (the device list only when there's a choice, without leaving a gap)
+      (box :visible {bp_show[k] && (k != "sound_output" || arraylength(bp_sound.sinks) > 1)} :orientation "v" :space-evenly false
         (box :visible {k == "sound_volume"} :orientation "v" :space-evenly false (bp-s-sound_volume))
         (box :visible {k == "sound_output"} :orientation "v" :space-evenly false (bp-s-sound_output))
         (box :visible {k == "sound_mic"} :orientation "v" :space-evenly false (bp-s-sound_mic))

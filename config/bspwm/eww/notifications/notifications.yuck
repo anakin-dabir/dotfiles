@@ -52,24 +52,27 @@
             (label :class "nc-pill-icon" :text {nc_dnd ? "󰂛" : "󰖔"})
             (label :text "Do Not Disturb"))))
       (eventbox :cursor "pointer" :visible {nc_total > 0}
-        (button :class "nc-pill ${nc_confirm ? 'nc-pill-danger' : ''}"
-                :tooltip "Delete all notifications"
-                :onclick {nc_confirm ? "~/.config/bspwm/bin/NotifyCenter --clear &" : "${EWW_CMD} update nc_confirm=true"}
-          (label :text {nc_confirm ? "Sure?" : "Clear"}))))
+        (button :class "nc-pill"
+                :tooltip "Delete all notifications (the list is kept as a backup)"
+                :onclick "~/.config/bspwm/bin/NotifyCenter --clear &"
+          (label :text "Clear"))))
     (revealer :reveal {nc_total == 0} :transition "none"
       (box :class "nc-empty" :orientation "v" :space-evenly false
         (label :class "nc-empty-icon" :text "󰂜")
         (label :class "nc-empty-text" :text "No notifications")))
-    (scroll :class "nc-scroll" :vscroll true :hscroll false
-            :visible {nc_total > 0} :height nc_height
-      (box :class "nc-list" :orientation "v" :space-evenly false :spacing 8
-        (for n in nc_items
-          (nc-card :n n))))))
+    ;; (a revealer, not :visible: a hidden list kept its height, so the
+    ;; empty panel stayed tall)
+    (revealer :reveal {nc_total > 0} :transition "none"
+      (scroll :class "nc-scroll" :vscroll true :hscroll false :height {nc_total > 0 ? nc_height : 0}
+        (box :class "nc-list" :orientation "v" :space-evenly false :spacing 8
+          (for n in nc_items
+            (nc-card :n n)))))))
 
 (defwindow notifcenter
   :geometry (geometry :x "0px" :y "0px" :width "400px" :anchor "top left")
   :stacking "fg"
   :wm-ignore true
+  :resizable false        ;; shrinks to fit (e.g. after "Clear")
   (nc-panel))
 
 ;; Opened, placed and closed by bin/BarPanel (click-outside layer: bp-closer

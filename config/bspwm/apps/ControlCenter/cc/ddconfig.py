@@ -36,9 +36,9 @@ DROPDOWNS = [
         ("disk_buttons", "Files and Analyze buttons"),
     ]),
     ("sound", "Sound", [
-        ("sound_volume", "Volume slider"),
-        ("sound_output", "Output devices"),
-        ("sound_mic", "Microphone slider"),
+        ("sound_volume", "Volume (and what it plays through)"),
+        ("sound_output", "Output devices (when there's a choice)"),
+        ("sound_mic", "Microphone"),
         ("sound_button", "Sound Settings button"),
     ]),
     ("network", "Network", [

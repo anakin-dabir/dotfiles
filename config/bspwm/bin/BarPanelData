@@ -127,9 +127,13 @@ sound() {
     muted=$(pamixer --get-mute 2>/dev/null || echo false)
     mvol=$(pamixer --default-source --get-volume 2>/dev/null || echo 0)
     mmuted=$(pamixer --default-source --get-mute 2>/dev/null || echo false)
+    # The microphone's short name (its port, e.g. "Stereo Microphone")
+    local mic src; src=$(pactl get-default-source 2>/dev/null)
+    mic=$(pactl -f json list sources 2>/dev/null | jq -r --arg s "$src" \
+        '.[] | select(.name == $s) | . as $d | ((($d.ports // [])[] | select(.name == $d.active_port)) // ($d.ports // [])[0] // $d) | .description' 2>/dev/null | head -1)
     jq -nc --argjson vol "$vol" --argjson muted "$muted" --argjson mvol "$mvol" --argjson mmuted "$mmuted" \
-        --argjson sinks "${sinks:-[]}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks,
-          output: ([$sinks[] | select(.default) | .desc][0] // "No output")}'
+        --argjson sinks "${sinks:-[]}" --arg mic "${mic:-Microphone}" '{vol: $vol, muted: $muted, mic_vol: $mvol, mic_muted: $mmuted, sinks: $sinks,
+          output: ([$sinks[] | select(.default) | .desc][0] // "No output"), mic: $mic}'
 }
 
 network() {
@@ -207,7 +211,8 @@ battery() {
                       "balanced": "󰗑", "balanced-performance": "󰓅",
                       "performance": "󱓞"}[.] // "󰓅")})),
           can_profile: $can,
-          night: $night, awake: $awake}'
+          night: $night, awake: $awake}
+         | .profile_name = (.profile as $p | [.profiles[] | select(.id == $p) | .name][0] // "")'
 }
 
 # A month as six weeks of days (calendar dropdown). $CAL_OFFSET months from now.

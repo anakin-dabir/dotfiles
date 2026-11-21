@@ -319,7 +319,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-seg-item {
-  padding: 7px 2px 6px 2px;
+  padding: 6px 2px;
   border-radius: max($nc-card-radius - 3px, 4px);
 }
 
@@ -334,7 +334,7 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-panel .bp-seg-icon {
   font-family: $bp-icons;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .bp-panel .bp-seg-name {
@@ -552,4 +552,15 @@ $bp-icons: "Material Design Icons Desktop";
 
 .bp-sep-clean {
   margin: 0 0 0 44px;     // lines start under the text, after the badge
+}
+
+// Line under a slider: which device it is (Sound)
+.bp-panel .bp-slider-sub {
+  font-size: 11px;
+  color: rgba($fg, 0.55);
+  margin-left: 44px;       // under the slider, after its round button
+}
+
+.bp-panel .bp-mode-now {
+  margin-left: 5px;
 }
