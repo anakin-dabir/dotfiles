@@ -32,8 +32,10 @@
 
 (defwindow desktop
   :geometry (geometry :x "40px" :y "60px" :anchor "top left")
+  ;; a desktop-type window: the window manager keeps it under every window
+  :windowtype "desktop"
   :stacking "bg"
-  :wm-ignore true
+  :wm-ignore false
   :focusable false
   :resizable false
   (dw))

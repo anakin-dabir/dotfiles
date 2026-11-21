@@ -26,10 +26,6 @@ ORIGINS = [("top-right", "Top right"), ("top-center", "Top center"), ("top-left"
            ("bottom-right", "Bottom right"), ("bottom-center", "Bottom center"), ("bottom-left", "Bottom left")]
 
 
-ANIM_DIR = os.path.join(BSPDIR, "config", "picom", "animations")
-ANIM_STYLES = [("zoom", "Zoom in"), ("pop", "Pop"), ("fade", "Fade"), ("slide", "Slide up")]
-
-
 def _hex(v):
     v = (v or "").strip()
     if re.fullmatch(r"#[0-9A-Fa-f]{8}", v):      # #AARRGGBB (polybar style)
@@ -180,11 +176,6 @@ class CustomizePage(Page):
         self.vsync = Adw.SwitchRow(title="vSync", subtitle="No tearing; turn off if it makes things lag")
         self.vsync.connect("notify::active", lambda r, _p: self._updating or self._picom_set("vsync", "true" if r.get_active() else "false"))
         general.add(self.vsync)
-        self.anim_style = Adw.ComboRow(title="How windows open and close",
-                                       subtitle="When Animations is on for the theme (Windows, above)",
-                                       model=Gtk.StringList.new([t for _v, t in ANIM_STYLES]))
-        self.anim_style.connect("notify::selected", self._anim_style)
-        general.add(self.anim_style)
         self.pixel = Adw.SwitchRow(title="Pixel art in new terminals", subtitle="A random colour script when a terminal opens")
         self.pixel.connect("notify::active", lambda r, _p: self._updating or self._zshrc("colorscript -r", r.get_active()))
         general.add(self.pixel)
@@ -436,26 +427,7 @@ class CustomizePage(Page):
             f.write("\n".join(lines))
         self.toast("Applied to new terminals")
 
-    def _anim_style(self, row, _p):
-        if self._updating:
-            return
-        style, title = ANIM_STYLES[row.get_selected()]
-        try:
-            with open(os.path.join(ANIM_DIR, f"{style}.conf")) as f:
-                text = f.read()
-            with open(os.path.join(BSPDIR, "config", "picom", "picom-animations.conf"), "w") as f:
-                f.write(text)
-            with open(os.path.join(ANIM_DIR, "current"), "w") as f:
-                f.write(style + "\n")
-        except OSError as e:
-            self.toast(f"Couldn't save: {e.strerror}")
-            return
-        run_quiet(["pkill", "-USR1", "-x", "picom"])
-        self.toast(f"Windows: {title.lower()}")
-
     def _load_general(self):
-        cur = read_file(os.path.join(ANIM_DIR, "current"), "zoom").strip()
-        self.quietly(lambda: self.anim_style.set_selected(next((i for i, (v, _t) in enumerate(ANIM_STYLES) if v == cur), 0)))
         backend = self._picom_get("backend")
         def put():
             if backend in ("glx", "xrender", "egl"):

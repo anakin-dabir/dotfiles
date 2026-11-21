@@ -117,8 +117,5 @@ done &
 # Desktop widgets: clock, what's playing, weather (Control Center > Appearance)
 DesktopWidgets &
 
-# The dock (Control Center > Appearance)
-Dock &
-
 # Your startup apps (Control Center > Apps)
 Startup &
