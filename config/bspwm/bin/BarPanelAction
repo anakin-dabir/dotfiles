@@ -257,7 +257,7 @@ case "$1" in
     win-close)  bspc node "$2" -c; sleep 0.3; push windows ;;
     win-state)  bspc node focused.window -t "~$2"; sleep 0.1; push windows ;;
     win-sticky) bspc node focused.window -g sticky; push windows ;;
-    win-layout) bspc desktop focused -l "$2"; push windows ;;
+    win-layout) "$BIN/Layout" set "$2"; sleep 0.1; push windows ;;
 
     weather-refresh)
         rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/barpanel-weather/forecast.json"

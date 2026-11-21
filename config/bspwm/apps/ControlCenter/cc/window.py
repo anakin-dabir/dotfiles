@@ -25,8 +25,9 @@ from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
 from .pages.typing import TypingPage
 from .pages.updates import UpdatesPage
+from .pages.windows import WindowsPage
 
-PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, DisplayPage, SoundPage, NetworkPage,
+PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, WindowsPage, AppsPage, DisplayPage, SoundPage, NetworkPage,
          BluetoothPage, ShortcutsPage, TypingPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
@@ -59,6 +60,7 @@ KEYWORDS = {
     "updates": "upgrade pacman aur yay paru packages system update",
     "typing": "keyboard layout language caps lock key repeat urdu arabic input",
     "phones": "android iphone mtp afc usb phone files photos scrcpy mount",
+    "windows": "layout tiled monocle grid floating rules workspace desktop app opens where size",
     "apps": "default browser file manager editor terminal startup autostart login",
 }
 

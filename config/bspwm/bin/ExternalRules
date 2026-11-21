@@ -75,13 +75,13 @@ case "$class" in
 		result "state=floating focus=on sticky=on rectangle=231x112+1605+55"
 		;;
 	Io.ente.auth)
-		result "state=floating focus=on center-on rectangle=300x300+0+0"
+		result "state=floating focus=on center=on rectangle=300x300+0+0"
 		;;
 	gnome-calculator)
 		result "state=floating focus=on rectangle=400x600+1505+55"
 		;;
 	terminal64.exe)
-		result "desktop^10 follow=on"
+		result "desktop=^10 follow=on"
 esac
 
 case "$instance" in
