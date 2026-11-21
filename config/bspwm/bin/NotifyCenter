@@ -15,7 +15,8 @@ DIR="${XDG_STATE_HOME:-$HOME/.local/state}/notifications"
 LOG="$DIR/log.jsonl"
 SEEN="$DIR/last-seen"
 BSPDIR="$HOME/.config/bspwm"
-EWW=(eww -c "$BSPDIR/eww")
+# --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
+EWW=(timeout 3 eww --no-daemonize -c "$BSPDIR/eww")
 
 SHOWN=500     # notifications listed in the panel (scrollable); NotifyLog keeps 500
 
@@ -55,7 +56,7 @@ refresh_bars() {
     polybar-msg action notifications hook 0 >/dev/null 2>&1
     local bar; bar=$(current_bar)
     if [ -f "$BSPDIR/bars/$bar/eww.yuck" ]; then
-        eww -c "$BSPDIR/bars/$bar" update notif_bell="$(bell)" >/dev/null 2>&1
+        eww --no-daemonize -c "$BSPDIR/bars/$bar" update notif_bell="$(bell)" >/dev/null 2>&1
     fi
 }
 

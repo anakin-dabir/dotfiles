@@ -103,9 +103,14 @@
     (eventbox :cursor "pointer"
       (button :class "bp-round" :tooltip "Back" :onclick "~/.config/bspwm/bin/BarPanelAction view main &" "󰅁"))
     (label :class "bp-title" :halign "start" :hexpand true :text title)
-    (eventbox :cursor "pointer"
-      (button :class "bp-switch ${on ? 'bp-switch-on' : ''}" :onclick toggle
-        (box :class "bp-switch-knob" :halign {on ? "end" : "start"})))))
+    (bp-switch :on on :toggle toggle)))
+
+;; On/off switch: a track with a knob that sits left (off) or right (on).
+;; Plain boxes, not a button, so the GTK theme's button padding can't change its size.
+(defwidget bp-switch [on toggle]
+  (eventbox :cursor "pointer" :onclick toggle :valign "center" :tooltip {on ? "Turn off" : "Turn on"}
+    (box :class "bp-switch ${on ? 'bp-switch-on' : ''}" :space-evenly false :valign "center"
+      (box :class "bp-switch-knob" :hexpand true :valign "center" :halign {on ? "end" : "start"}))))
 
 ;; ================= CPU =================
 
@@ -221,9 +226,13 @@
         (revealer :reveal {bp_network.wifi_on && !bp_scanning} :transition "none"
          (eventbox :cursor "pointer"
           (button :class "bp-mini" :tooltip "Search again" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-scan &" "󰑐"))))
-      (revealer :reveal {bp_network.wifi_on} :transition "slidedown" :duration "150ms"
+      ;; At least 4 rows tall, so the dropdown doesn't jump while it searches
+      (revealer :reveal {bp_network.wifi_on && arraylength(bp_wifi.networks) == 0} :transition "none"
+        (label :class "bp-dim bp-list-empty" :height 188 :valign "center"
+               :text {bp_scanning ? "Looking for networks nearby…" : "No networks found"}))
+      (revealer :reveal {bp_network.wifi_on && arraylength(bp_wifi.networks) > 0} :transition "none"
       (scroll :vscroll true :hscroll false
-              :height {arraylength(bp_wifi.networks) > 7 ? 330 : arraylength(bp_wifi.networks) * 46 + 4}
+              :height {arraylength(bp_wifi.networks) > 7 ? 330 : arraylength(bp_wifi.networks) < 4 ? 188 : arraylength(bp_wifi.networks) * 46 + 4}
         (box :orientation "v" :space-evenly false :spacing 2
           (for n in {bp_wifi.networks}
             (eventbox :cursor "pointer"
@@ -266,7 +275,7 @@
 
 (defwidget bp-network-panel []
   (box :class "bp-panel" :orientation "v" :space-evenly false
-;; (revealers, not :visible: eww shows hidden widgets for a moment when a
+    ;; (revealers, not :visible: eww shows hidden widgets for a moment when a
     ;; window opens, which would size the dropdown for all three views)
     (revealer :reveal {bp_view == "main"} :transition "none" (bp-network-main))
     (revealer :reveal {bp_view == "wifi"} :transition "none" (bp-wifi-list))
@@ -302,13 +311,13 @@
 
 ;; ================= windows =================
 
-(defwindow bp-cpu      :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-cpu-panel))
-(defwindow bp-memory   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-memory-panel))
-(defwindow bp-disk     :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-disk-panel))
-(defwindow bp-sound    :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-sound-panel))
-(defwindow bp-network  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-network-panel))
-(defwindow bp-battery  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-battery-panel))
-(defwindow bp-calendar :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true (bp-calendar-panel))
+(defwindow bp-cpu      :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-cpu-panel))
+(defwindow bp-memory   :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-memory-panel))
+(defwindow bp-disk     :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-disk-panel))
+(defwindow bp-sound    :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-sound-panel))
+(defwindow bp-network  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-network-panel))
+(defwindow bp-battery  :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-battery-panel))
+(defwindow bp-calendar :geometry (geometry :width "340px") :stacking "fg" :wm-ignore true :resizable false (bp-calendar-panel))
 
 ;; Invisible layer under the open dropdown: a click on it closes the dropdown.
 ;; BarPanel sizes it to everything except the bar, so bar clicks still work.

@@ -3,14 +3,14 @@
 #   BarPanel NAME       open NAME's dropdown, or close it if it's already open
 #                       NAME: cpu memory disk sound network battery calendar notifcenter
 #   BarPanel --close    close whichever dropdown is open
-#   BarPanel --refit    redraw the open dropdown at its natural size
 #
 # Only one dropdown is open at a time. Clicking anywhere outside it (or
 # switching window/desktop) closes it; clicking another bar item switches to
 # that item's dropdown.
 
 BSPDIR="$HOME/.config/bspwm"
-EWW=(eww -c "$BSPDIR/eww")
+# --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
+EWW=(timeout 3 eww --no-daemonize -c "$BSPDIR/eww")
 STATE="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
 GAP=8
 mkdir -p "$STATE"
@@ -118,8 +118,8 @@ close() {
     stop_watcher
     rm -f "$STATE/open"
     local wins; wins=$("${EWW[@]}" active-windows 2>/dev/null | cut -d: -f1 | grep -E '^(notifcenter|bp-)')
-    [ -n "$wins" ] && timeout 2 "${EWW[@]}" close $wins >/dev/null 2>&1
-    timeout 2 "${EWW[@]}" update bp_open="" >/dev/null 2>&1
+    [ -n "$wins" ] && "${EWW[@]}" close $wins >/dev/null 2>&1
+    "${EWW[@]}" update bp_open="" >/dev/null 2>&1
     # Still on screen? A stuck or duplicate eww is drawing it: restart eww.
     [ -n "$(open_windows)" ] && "$BSPDIR/bin/EwwDaemon" --restart 7>&-
     [ "$was" = notifcenter ] && "$BSPDIR/bin/NotifyCenter" --closed 7>&-
@@ -139,19 +139,17 @@ open() { # $1 = name
     read -r cpos csize maxh <<< "$rest"
     if [ -n "$filler" ]; then wait "$filler"; else fill "$name" "$maxh"; fi
     show() {
-        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" >/dev/null 2>&1
-        "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1
+        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" >/dev/null 2>&1 &&
+        "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &&
         "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
     }
-    show
-    # If eww started a duplicate copy while opening, start over with one clean eww
-    # (a quick count is enough here; the full check ran just before)
-    if [ "$(pgrep -fc "^eww -c $BSPDIR/eww( |\$)")" -gt 1 ] || [ "$(open_windows | wc -l)" -ne 1 ]; then
+    # eww didn't answer, or an old copy left a window behind: start over
+    # with one clean eww (the eww calls here never start a copy themselves)
+    if ! show || [ "$(open_windows | wc -l)" -gt 1 ]; then
         "$BSPDIR/bin/EwwDaemon" --restart 7>&-
         fill "$name" "$maxh"; show
     fi
     echo "$name" > "$STATE/open"
-    echo "$win $mon $pos $anchor" > "$STATE/placed"
     start_watcher
 }
 
@@ -159,19 +157,8 @@ open() { # $1 = name
 exec 7> "$STATE/.lock"
 flock -w 3 7 || exit 1
 
-# Redraw the open dropdown in place at its natural size (an open window
-# grows with its content but never shrinks, e.g. back from the Wi-Fi list)
-refit() {
-    local win mon pos anchor
-    read -r win mon pos anchor < "$STATE/placed" 2>/dev/null || return
-    [ -n "$(current)" ] || return
-    "${EWW[@]}" close "$win" >/dev/null 2>&1
-    "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
-}
-
 case "$1" in
     --close|"") close ;;
-    --refit) refit ;;
     *)
         was=$(current)
         [ -n "$was" ] || [ -n "$(open_windows)" ] && close

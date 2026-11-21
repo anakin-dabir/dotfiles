@@ -9,7 +9,8 @@
 #   run COMMAND...          close the dropdown, then run COMMAND
 
 BIN="$HOME/.config/bspwm/bin"
-EWW=(eww -c "$HOME/.config/bspwm/eww")
+# --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
+EWW=(timeout 3 eww --no-daemonize -c "$HOME/.config/bspwm/eww")
 upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }
 push() { local p; for p in "$@"; do "$BIN/BarPanelData" "$p" --push; done; }
 
@@ -41,12 +42,14 @@ case "$1" in
         sleep 0.5; push network bt ;;
 
     view)
-        upd bp_view="$2"
-        "$BIN/BarPanel" --refit
+        # Fill the list before showing it (networks from the last scan), so
+        # the view opens complete instead of filling in while you watch
         case "$2" in
-            wifi) push wifi; exec "$0" wifi-scan ;;
+            wifi) push wifi ;;
             bt)   push bt ;;
-        esac ;;
+        esac
+        upd bp_view="$2"
+        [ "$2" = wifi ] && exec "$0" wifi-scan ;;
     wifi-scan)
         upd bp_scanning=true
         "$BIN/BarPanelData" wifi --rescan --push

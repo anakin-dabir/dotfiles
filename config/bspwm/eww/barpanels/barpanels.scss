@@ -300,13 +300,13 @@ $bp-icons: "Material Design Icons Desktop";
   color: $nc-accent;
 }
 
-// On/off switch in list headers
+// On/off switch in list headers: 42×24 track, 20px knob, 2px inset
 .bp-switch {
-  min-width: 44px;
-  min-height: 24px;
-  padding: 3px;
+  min-width: 38px;
+  min-height: 20px;
+  padding: 2px;
   border-radius: $nc-pill-radius;
-  background-color: rgba($fg, 0.18);
+  background-color: rgba($fg, 0.20);
 }
 
 .bp-switch-on {
@@ -314,11 +314,11 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-switch-knob {
-  min-width: 18px;
-  min-height: 18px;
+  min-width: 20px;
+  min-height: 20px;
   border-radius: $nc-pill-radius;
   background-color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
 }
 
 // ----- sliders ----- //

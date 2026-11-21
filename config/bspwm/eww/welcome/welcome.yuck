@@ -20,7 +20,7 @@
     (eventbox :cursor "pointer"
       (button :class "welcome-close"
               :tooltip "Close"
-              :onclick "eww -c ~/.config/bspwm/eww open --toggle welcome"
+              :onclick "eww --no-daemonize -c ~/.config/bspwm/eww open --toggle welcome"
               " 󰅙 ")
     )
   )
