@@ -22,12 +22,13 @@ from .pages.notifications import NotificationsPage
 from .pages.power import PowerPage
 from .pages.shortcuts import ShortcutsPage
 from .pages.sound import SoundPage
+from .pages.updates import UpdatesPage
 
 PAGES = [AppearancePage, CustomizePage, BarPage, DropdownsPage, AppsPage, DisplayPage, SoundPage, NetworkPage,
          BluetoothPage, ShortcutsPage]
 # Hardware pages, only on laptops that have the hardware
 PAGES += [P for P, here in ((keyboard.KeyboardPage, keyboard.available()), (fans.FansPage, fans.available())) if here]
-PAGES += [PowerPage, NotificationsPage, AboutPage]
+PAGES += [PowerPage, NotificationsPage, UpdatesPage, AboutPage]
 
 # Other words people may search for, besides the names on each page
 KEYWORDS = {
@@ -48,6 +49,7 @@ KEYWORDS = {
     "notifications": "do not disturb dunst popups",
     "about": "system version kernel computer",
     "shortcuts": "keys keybindings hotkeys sxhkd keyboard shortcuts",
+    "updates": "upgrade pacman aur yay paru packages system update",
     "apps": "default browser file manager editor terminal startup autostart login",
 }
 
