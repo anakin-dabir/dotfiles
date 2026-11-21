@@ -168,6 +168,9 @@ class Window(Adw.ApplicationWindow):
         page = row.page
         if self.page is not None and self.page is not page:
             self.page.leave()
+        # Load the page's state before it's on screen: switches then don't
+        # slide from their old position and lists don't fill in visibly
+        page.refresh()
         self.stack.set_visible_child(page)
         self.content.set_title(page.title)
         self.heading.set_title(page.title)
@@ -180,7 +183,6 @@ class Window(Adw.ApplicationWindow):
             self.sticky.append(widget)
         self._show_sticky()
         self.split.set_show_content(True)
-        page.refresh()
         self.update_pending()
         widgets_changed()
         self._schedule()

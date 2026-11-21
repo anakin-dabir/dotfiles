@@ -37,19 +37,6 @@ class PowerPage(Page):
         level_row = Adw.PreferencesRow(activatable=False, child=self.level)
         bat.add(level_row)
 
-        self.health = Adw.ActionRow(title="Health",
-                                    subtitle="How much a full charge holds now, compared with when the battery was new")
-        self.health_v = self._value(self.health)
-        bat.add(self.health)
-        self.cycles = Adw.ActionRow(title="Charge cycles", subtitle="Full charges used so far")
-        self.cycles_v = self._value(self.cycles)
-        bat.add(self.cycles)
-        self.cap = Adw.ActionRow(title="A full charge holds")
-        self.cap_v = self._value(self.cap)
-        bat.add(self.cap)
-        self.draw = Adw.ActionRow(title="Using now")
-        self.draw_v = self._value(self.draw)
-        bat.add(self.draw)
 
         # Power mode
         self.mode_group = group(self, "Power mode", "How hard the processor and fans may work.")
@@ -105,12 +92,6 @@ class PowerPage(Page):
             self.hero_icon.set_from_icon_name(battery_icon(d["pct"], charging))
             self.pct.set_label(f"{d['pct']}%")
             self.level.set_value(d["pct"])
-            self.health_v.set_label(d["health"] or "–")
-            self.cycles_v.set_label(d["cycles"] or "–")
-            self.cap.set_visible(bool(d["cap"]))
-            self.cap_v.set_label(d["cap"])
-            self.draw.set_visible(bool(d["watts"]))
-            self.draw_v.set_label(d["watts"])
 
             profiles = d.get("profiles", [])
             self.mode_group.set_visible(bool(profiles))

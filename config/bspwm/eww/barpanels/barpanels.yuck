@@ -36,7 +36,7 @@
   :initial '{"kind":"none","name":"","signal":0,"ip":"","iface":"","down":"","up":"","down_b":0,"wifi_on":false,"bt_on":false,"bt_dev":"","airplane":false}'
   `~/.config/bspwm/bin/BarPanelData network`)
 (defpoll bp_battery :interval "2s" :run-while {bp_open == "battery"}
-  :initial '{"pct":0,"status":"","time":"","health":"","cycles":"","cap":"","watts":"","bright":0,"profile":"","profiles":[],"can_profile":false,"night":false,"awake":false}'
+  :initial '{"pct":0,"status":"","time":"","bright":0,"profile":"","profiles":[],"can_profile":false,"night":false,"awake":false}'
   `~/.config/bspwm/bin/BarPanelData battery`)
 
 ;; Which sections each dropdown shows (Control Center > Dropdowns; BarPanel
@@ -261,16 +261,7 @@
 (defwidget bp-s-battery_details []
   (bp-card
     (progress :class "bp-meter ${bp_battery.pct <= 20 ? 'bp-hot' : bp_battery.status == 'Charging' ? 'bp-good' : ''}"
-              :value {bp_battery.pct} :orientation "h")
-    (box :class "bp-stats" :space-evenly true
-      (bp-stat :label "Status" :value {bp_battery.status})
-      (box :tooltip "How much a full charge holds now, compared with when the battery was new"
-        (bp-stat :label "Health" :value {bp_battery.health == "" ? "–" : bp_battery.health}))
-      (box :tooltip "Times the battery has been charged and used, in full charges"
-        (bp-stat :label "Cycles" :value {bp_battery.cycles == "" ? "–" : bp_battery.cycles})))
-    (box :orientation "v" :space-evenly false :spacing 6 :visible {bp_battery.cap != "" || bp_battery.watts != ""}
-      (box :visible {bp_battery.cap != ""} (bp-row :name "Full charge holds" :value {bp_battery.cap}))
-      (box :visible {bp_battery.watts != ""} (bp-row :name "Using now" :value {bp_battery.watts})))))
+              :value {bp_battery.pct} :orientation "h")))
 
 (defwidget bp-s-battery_brightness []
   (bp-card :title "Display brightness"

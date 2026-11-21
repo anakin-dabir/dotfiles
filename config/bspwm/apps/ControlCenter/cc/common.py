@@ -116,6 +116,27 @@ def run_quiet(argv, done=None):
     proc.wait_async(None, finished)
 
 
+def radio_on(kind):
+    """Is a radio ("wlan", "bluetooth") switched on? Read straight from the
+    kernel: instant, so pages can show the right state before they're drawn."""
+    import glob
+    found = False
+    for d in glob.glob("/sys/class/rfkill/rfkill*"):
+        if read_file(os.path.join(d, "type")) == kind:
+            found = True
+            if read_file(os.path.join(d, "soft")) == "0" and read_file(os.path.join(d, "hard")) == "0":
+                return True
+    return False if found else None
+
+
+def quick(argv, timeout=1):
+    """Run a fast command and return its output (blocks: keep it quick)."""
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
 def run_json(argv, done):
     """Run a command that prints JSON; done(data or None)."""
     def parsed(ok, out, _err):

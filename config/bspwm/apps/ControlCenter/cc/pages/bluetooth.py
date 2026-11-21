@@ -1,10 +1,11 @@
 """Bluetooth: on/off, paired devices, finding and pairing new ones."""
 
+import json
 import re
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..common import Page, group, have, icon_button, launch, run, run_json, text_button, tool
+from ..common import Page, group, have, icon_button, launch, quick, radio_on, run, run_json, text_button, tool
 
 ICONS = {"audio-headset": "audio-headset-symbolic", "audio-headphones": "audio-headphones-symbolic",
          "audio-card": "audio-speakers-symbolic", "input-keyboard": "input-keyboard-symbolic",
@@ -49,6 +50,8 @@ class BluetoothPage(Page):
         head.append(self.search_btn)
         self.found.set_header_suffix(head)
         self.found_rows = []
+        self.paired.set_visible(False)
+        self.found.set_visible(False)
 
         if have("blueman-manager"):
             more = group(self)
@@ -70,6 +73,24 @@ class BluetoothPage(Page):
     # ----- paired -----
 
     def refresh(self):
+        # On or off first (before the page is drawn), so the device lists
+        # don't show up and then vanish
+        if radio_on("bluetooth") is False:
+            powered = False
+        else:
+            powered = "Powered: yes" in quick(["bluetoothctl", "show"])
+        if powered != self.on:
+            self.on = powered
+            self.quietly(lambda: self.power.set_active(powered))
+            self._show_lists()
+
+        # First visit: the paired devices before the page is drawn
+        if self.paired_key is None and powered:
+            try:
+                self._paired(json.loads(quick([tool("BarPanelData"), "bt"])))
+            except ValueError:
+                pass
+
         def net(d):
             if d:
                 self.on = d["bt_on"]

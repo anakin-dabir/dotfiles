@@ -171,27 +171,20 @@ network() {
 
 battery() {
     local b; b=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
-    local pct=0 status="No battery" time="" health="" cycles="" cap="" watts=""
+    local pct=0 status="No battery" time=""
     if [ -n "$b" ]; then
         pct=$(cat "$b/capacity" 2>/dev/null || echo 0)
         status=$(cat "$b/status" 2>/dev/null)
-        local now full power design
+        local now full power
         now=$(cat "$b/energy_now" "$b/charge_now" 2>/dev/null | head -1)
         full=$(cat "$b/energy_full" "$b/charge_full" 2>/dev/null | head -1)
         power=$(cat "$b/power_now" "$b/current_now" 2>/dev/null | head -1)
-        design=$(cat "$b/energy_full_design" "$b/charge_full_design" 2>/dev/null | head -1)
         if [ "${power:-0}" -gt 0 ] 2>/dev/null; then
             local mins=0
             [ "$status" = Discharging ] && mins=$(( now * 60 / power ))
             [ "$status" = Charging ] && mins=$(( (full - now) * 60 / power ))
             (( mins > 0 )) && time="$(( mins / 60 ))h $(( mins % 60 ))m $([ "$status" = Charging ] && echo "until full" || echo left)"
-            [ -r "$b/power_now" ] && watts=$(awk -v p="$power" 'BEGIN { printf "%.1f W", p / 1e6 }')
         fi
-        # Health: what a full charge holds now, compared with when it was new
-        [ "${design:-0}" -gt 0 ] 2>/dev/null && health="$(( full * 100 / design ))%"
-        [ -r "$b/energy_full" ] && [ "${design:-0}" -gt 0 ] &&
-            cap=$(awk -v f="$full" -v d="$design" 'BEGIN { printf "%.1f of %.1f Wh", f / 1e6, d / 1e6 }')
-        cycles=$(cat "$b/cycle_count" 2>/dev/null); [ "$cycles" = 0 ] && cycles=""
         [ "$status" = "Not charging" ] && status="Plugged in"
     fi
     local bright; bright=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d %)
@@ -202,12 +195,10 @@ battery() {
     [ -w /sys/firmware/acpi/platform_profile ] && can=true
     [ -f "$HOME/.cache/barpanel/nightlight" ] && night=true
     kill -0 "$(cat "$RUN/awake.pid" 2>/dev/null)" 2>/dev/null && awake=true
-    jq -nc --argjson pct "$pct" --arg status "$status" --arg time "$time" --arg health "$health" \
-        --arg cycles "$cycles" --arg cap "$cap" --arg watts "$watts" --argjson bright "${bright:-0}" \
+    jq -nc --argjson pct "$pct" --arg status "$status" --arg time "$time" --argjson bright "${bright:-0}" \
         --arg profile "$profile" --arg profiles "$profiles" --argjson can "$can" \
         --argjson night "$night" --argjson awake "$awake" \
-        '{pct: $pct, status: $status, time: $time, health: $health, cycles: $cycles, cap: $cap,
-          watts: $watts, bright: $bright, profile: $profile,
+        '{pct: $pct, status: $status, time: $time, bright: $bright, profile: $profile,
           profiles: ($profiles | split(" ") | map(select(. != "")) | map({id: ., name: (
               {"low-power": "Saver", "cool": "Cool", "quiet": "Quiet", "balanced": "Balanced",
                "balanced-performance": "Balanced+", "performance": "Performance"}[.] // .),
@@ -235,7 +226,7 @@ while len(days) < 42:                       # always 6 rows: the dropdown keeps 
     days.append(days[-1] + datetime.timedelta(days=1))
 weeks = [[{"d": d.day, "in": d.month == month, "today": d == today} for d in days[i:i + 7]]
          for i in range(0, 42, 7)]
-names = [datetime.date(2024, 1, 1 + (start + i) % 7).strftime("%a")[:2] for i in range(7)]
+names = [datetime.date(2024, 1, 1 + (start + i) % 7).strftime("%a")[:3] for i in range(7)]
 print(json.dumps({"title": datetime.date(year, month, 1).strftime("%B %Y"), "offset": offset,
                   "weekdays": names, "weeks": weeks}, separators=(",", ":")))
 PY

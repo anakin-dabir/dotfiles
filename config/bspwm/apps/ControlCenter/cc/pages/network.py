@@ -1,10 +1,12 @@
 """Network: airplane mode, Wi-Fi, connecting to networks."""
 
+import glob
 import json
+import os
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..common import Page, group, have, icon_button, launch, run, run_json, run_quiet, text_button, tool
+from ..common import Page, group, have, icon_button, launch, quick, radio_on, read_file, run, run_json, run_quiet, text_button, tool
 
 BARS = {4: "network-wireless-signal-excellent-symbolic", 3: "network-wireless-signal-good-symbolic",
         2: "network-wireless-signal-ok-symbolic", 1: "network-wireless-signal-weak-symbolic"}
@@ -42,7 +44,14 @@ class NetworkPage(Page):
         self.conn.add_suffix(self.speed)
         self.current.add(self.conn)
 
+        more = group(self)
+        if have("nm-connection-editor"):
+            row = Adw.ActionRow(title="Hidden networks, VPN and advanced settings", subtitle="Network Connections")
+            row.add_suffix(text_button("Open", lambda: launch(["nm-connection-editor"])))
+            more.add(row)
+
         self.nets = group(self, "Networks")
+        self.nets.set_visible(False)              # (until we know Wi-Fi is on)
         head = Gtk.Box(spacing=6)
         self.spinner = Adw.Spinner(visible=False)
         head.append(self.spinner)
@@ -50,11 +59,6 @@ class NetworkPage(Page):
         self.nets.set_header_suffix(head)
         self.net_rows = []
 
-        more = group(self)
-        if have("nm-connection-editor"):
-            row = Adw.ActionRow(title="Hidden networks, VPN and advanced settings", subtitle="Network Connections")
-            row.add_suffix(text_button("Open", lambda: launch(["nm-connection-editor"])))
-            more.add(row)
 
     # ----- switches -----
 
@@ -73,6 +77,23 @@ class NetworkPage(Page):
     # ----- data -----
 
     def refresh(self):
+        # Wi-Fi / airplane state first (before the page is drawn), so the
+        # network list doesn't show up and then vanish
+        wifi = radio_on("wlan")
+        if wifi is not None:
+            blocked_all = all(read_file(os.path.join(d, "soft")) == "1"
+                              for d in glob.glob("/sys/class/rfkill/rfkill*")) if glob.glob("/sys/class/rfkill/rfkill*") else False
+            self.state.update(wifi_on=wifi, airplane=blocked_all)
+            self.quietly(lambda: (self.wifi.set_active(wifi), self.airplane.set_active(blocked_all)))
+            self.nets.set_visible(wifi)
+
+        # First visit: the network list before the page is drawn
+        if self.list_key is None and wifi:
+            try:
+                self._networks(json.loads(quick([tool("BarPanelData"), "wifi"])))
+            except ValueError:
+                pass
+
         def got(d):
             if not d:
                 return

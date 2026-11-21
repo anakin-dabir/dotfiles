@@ -21,19 +21,30 @@ HEAD = 42           # height of a dropdown's header (bp-head)
 GAP = 12            # space between sections
 
 
-VERSION = "7"       # bump when the way pictures are cut changes
+VERSION = "9"       # bump when the dropdowns' layout or the way pictures are cut changes
 
 
 def cache_dir():
+    """Pictures depend on the theme (colours, corners, fonts), so they're kept
+    per theme: they're retaken only after switching theme (or a VERSION bump)."""
     h = hashlib.sha1(VERSION.encode())
-    for p in (os.path.join(BSPDIR, "eww", "colors.scss"), os.path.join(BSPDIR, "eww", "barpanels", "barpanels.yuck"),
-              os.path.join(BSPDIR, "eww", "barpanels", "barpanels.scss")):
+    for p in (os.path.join(BSPDIR, "eww", "colors.scss"),):
         try:
             with open(p, "rb") as f:
                 h.update(f.read())
         except OSError:
             pass
     return os.path.join(CACHE, "dropdowns", h.hexdigest()[:16])
+
+
+def forget_old(keep):
+    """Delete picture sets of other themes/versions (they're cheap to retake)."""
+    import shutil
+    base = os.path.dirname(keep)
+    for d in os.listdir(base) if os.path.isdir(base) else []:
+        p = os.path.join(base, d)
+        if p != keep and os.path.isdir(p):
+            shutil.rmtree(p, ignore_errors=True)
 
 
 def _eww(*args):
@@ -113,9 +124,15 @@ def capture(done_one=None):
             saved = json.dumps(json.load(f), separators=(",", ":"))
     except (OSError, ValueError):
         saved = "{}"
-    edge = None
+    try:            # (measured once per set, kept for a resumed run)
+        edge = int(open(os.path.join(folder, ".edge")).read())
+    except (OSError, ValueError):
+        edge = None
     try:
         for name, keys in dropdowns:
+            if all(os.path.exists(os.path.join(folder, k + ".png")) for k in keys) and \
+                    os.path.exists(os.path.join(folder, f"head_{name}.png")):
+                continue
             data = subprocess.run([os.path.join(BIN, "BarPanelData"), name], capture_output=True, text=True, timeout=10).stdout.strip()
             if data:
                 _eww("update", f"bp_{name}={data}")
@@ -131,12 +148,16 @@ def capture(done_one=None):
             # disk cards always show)
             if edge is None:
                 edge = max(0, (h0 - HEAD) // 2)
+                with open(os.path.join(folder, ".edge"), "w") as f:
+                    f.write(str(edge))
             # Everything above the sections: the header (and Storage's disk cards)
             top = h0 - 2 * edge
             if top > 0:
                 head.new_subpixbuf(edge, edge, head.get_width() - 2 * edge, top).savev(
                     os.path.join(folder, f"head_{name}.png"), "png", [], [])
             for key in keys:
+                if os.path.exists(os.path.join(folder, key + ".png")):
+                    continue            # (taken already: an interrupted run continues)
                 _eww("update", "bp_show=" + only(key))
                 _settle(name)
                 pix = _grab(name)
@@ -155,4 +176,5 @@ def capture(done_one=None):
         _eww("update", "bp_open=", "bp_show=" + saved)
     with open(os.path.join(folder, ".complete"), "w") as f:
         f.write("")
+    forget_old(folder)
     return folder
