@@ -564,3 +564,131 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-mode-now {
   margin-left: 5px;
 }
+
+// ----- media -----
+.bp-art {
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+}
+.bp-art-empty {
+  background-color: rgba($nc-accent, 0.18);
+}
+.bp-panel .bp-art-icon {
+  font-family: $bp-icons;
+  font-size: 26px;
+  color: $nc-accent;
+}
+.bp-panel .bp-media-title {
+  font-size: 13px;
+  font-weight: bold;
+}
+.bp-panel .bp-media-time {
+  font-size: 10px;
+  color: rgba($fg, 0.6);
+}
+.bp-panel .bp-play {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+}
+
+// ----- weather -----
+.bp-panel .bp-w-time,
+.bp-panel .bp-w-temp {
+  font-size: 11px;
+}
+.bp-panel .bp-w-time {
+  color: rgba($fg, 0.6);
+}
+.bp-panel .bp-w-icon {
+  font-family: $bp-icons;
+  font-size: 20px;
+  color: $nc-accent;
+}
+.bp-panel .bp-w-icon-small {
+  font-family: $bp-icons;
+  font-size: 16px;
+  min-width: 20px;
+  color: $nc-accent;
+}
+.bp-panel .bp-w-dayname {
+  min-width: 46px;
+  font-weight: bold;
+}
+.bp-panel .bp-w-lo {
+  min-width: 34px;
+  color: rgba($fg, 0.55);
+}
+.bp-panel .bp-w-hi {
+  min-width: 34px;
+  font-weight: bold;
+}
+.bp-panel .bp-w-sun label {
+  font-size: 11px;
+}
+
+// ----- clipboard -----
+.bp-clip {
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.bp-clip:hover {
+  background-color: rgba($fg, 0.08);
+}
+.bp-panel .bp-clip-icon {
+  font-family: $bp-icons;
+  font-size: 15px;
+  color: $nc-accent;
+}
+.bp-panel .bp-clip-text {
+  font-size: 12px;
+}
+.bp-panel .bp-clear-all {
+  background-color: rgba($red, 0.16);
+}
+.bp-panel .bp-clear-all:hover {
+  background-color: rgba($red, 0.28);
+}
+.bp-panel .bp-clear-all label {
+  color: $red;
+  font-weight: bold;
+}
+
+// ----- screenshot -----
+.bp-tile {
+  padding: 12px 4px 10px 4px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.05);
+}
+.bp-tile:hover {
+  background-color: rgba($nc-accent, 0.18);
+}
+.bp-panel .bp-tile-icon {
+  font-family: $bp-icons;
+  font-size: 20px;
+  color: $nc-accent;
+}
+.bp-panel .bp-tile-text {
+  font-size: 11px;
+}
+.bp-panel .bp-rec-dot {
+  font-family: $bp-icons;
+  font-size: 20px;
+  color: rgba($fg, 0.45);
+}
+.bp-rec-on .bp-rec-dot {
+  color: $red;
+}
+.bp-shot-btn {
+  padding: 0;
+  border-radius: 8px;
+}
+.bp-shot {
+  min-height: 150px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+}

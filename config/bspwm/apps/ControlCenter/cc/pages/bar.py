@@ -3,13 +3,14 @@ and in what order, and its text font. Item and font changes are collected
 and applied together with "Apply"."""
 
 import hashlib
+import json
 import os
 import re
 
 from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 
 from .. import rice
-from ..common import CACHE, Page, current_rice, group, icon_button, run_quiet, text_button, tool, widgets_changed
+from ..common import BSPDIR, CACHE, Page, current_rice, group, icon_button, read_file, run, run_quiet, text_button, tool, widgets_changed
 from ..common import _pool
 from ..pickers import FontButton
 from .appearance import grid, tile
@@ -43,6 +44,10 @@ FRIENDLY = {
     "r00t": ("User menu", "avatar-default-symbolic"),
     "colorpicker": ("Color picker", "color-select-symbolic"),
     "weather": ("Weather", "weather-few-clouds-symbolic"),
+    "forecast": ("Weather and forecast", "weather-few-clouds-symbolic"),
+    "media": ("Media", "audio-x-generic-symbolic"),
+    "clipboard": ("Clipboard", "edit-paste-symbolic"),
+    "capture": ("Screenshot and recording", "camera-photo-symbolic"),
     "xkeyboard": ("Keyboard layout", "input-keyboard-symbolic"),
     "brightness": ("Brightness", "display-brightness-symbolic"),
     "vpn": ("VPN", "network-vpn-symbolic"),
@@ -161,6 +166,10 @@ SHOWS = {
     "r00t": "A button for your user menu",
     "colorpicker": "A button to pick a colour from the screen",
     "weather": "Current weather",
+    "forecast": "Weather now (icon and temperature)",
+    "media": "The song or video playing, with its player's controls",
+    "clipboard": "A clipboard icon",
+    "capture": "A camera; a red timer while the screen is being recorded",
     "xkeyboard": "Keyboard layout, and Caps Lock",
     "brightness": "Screen brightness",
     "vpn": "Whether a VPN is connected",
@@ -169,7 +178,11 @@ CLICKS = [
     (r"BarPanel (cpu)", "opens the processor dropdown"), (r"BarPanel (memory)", "opens the memory dropdown"),
     (r"BarPanel (disk)", "opens the storage dropdown"), (r"BarPanel (sound)", "opens the sound dropdown"),
     (r"BarPanel (network)", "opens the network dropdown"), (r"BarPanel (battery)", "opens the battery dropdown"),
-    (r"BarPanel (calendar)", "opens the calendar"), (r"^NotifyCenter$", "opens the notification center"),
+    (r"BarPanel (calendar)", "opens the calendar"),
+    (r"BarPanel (media)", "opens what's playing (cover, controls)"),
+    (r"BarPanel (weather)", "opens the forecast for the next hours and days"),
+    (r"BarPanel (clipboard)", "opens your recent copies"),
+    (r"BarPanel (capture)", "opens screenshots and screen recording"), (r"^NotifyCenter$", "opens the notification center"),
     (r"--menu\b", "opens the app launcher"), (r"--powermenu", "opens the power menu"),
     (r"--checkupdates", "checks for updates"), (r"--player", "opens the music player"),
     (r"--usercard", "opens the user card"), (r"^Colorpicker", "picks a colour"),
@@ -204,9 +217,11 @@ def explain(name, info):
 def module_sections(bar):
     """{name: {key: value}} for every [module/...] the bar defines."""
     out = {}
-    for fname in ("modules.ini", "config.ini"):
+    paths = [os.path.join(BSPDIR, "config", "system.ini")]         # (items any bar can use)
+    paths += [os.path.join(rice.BARS, bar, f) for f in ("modules.ini", "config.ini")]
+    for path in paths:
         try:
-            with open(os.path.join(rice.BARS, bar, fname)) as f:
+            with open(path) as f:
                 text = f.read()
         except OSError:
             continue
@@ -332,7 +347,44 @@ class BarPage(Page):
         self.reset_row.add_suffix(text_button("Reset…", self._reset))
         self.extra.add(self.reset_row)
 
+        # Settings of the bar items (for every bar and theme)
+        weather = group(self, "Weather", "For the Weather and forecast item. Saved right away, for every theme.")
+        self.city = Adw.EntryRow(title="City (empty: found from your internet connection)", show_apply_button=True)
+        self.city.add_prefix(Gtk.Image.new_from_icon_name("find-location-symbolic"))
+        self.city.set_text(self._city())
+        self.city.connect("apply", lambda r: self._set_city(r.get_text().strip()))
+        weather.add(self.city)
+
         self.load()
+
+    # ----- weather -----
+
+    WEATHER = os.path.join(BSPDIR, "config", "weather.json")
+
+    def _city(self):
+        try:
+            with open(self.WEATHER) as f:
+                return json.load(f).get("city", "")
+        except (OSError, ValueError):
+            return ""
+
+    def _set_city(self, city):
+        try:
+            with open(self.WEATHER, "w") as f:
+                json.dump({"city": city}, f)
+                f.write("\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        # The forecast for the new place (and the bar item) at once
+        def done(ok, out, _e):
+            try:
+                place = json.loads(out).get("place", "")
+            except ValueError:
+                place = ""
+            self.toast(f"Weather for {place} (the bar follows within a minute)" if ok and place and place != "Weather"
+                       else "Couldn't find that place")
+        run([tool("BarPanelData"), "weather"], done)
 
     # ----- loading -----
 

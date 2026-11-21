@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Dropdown panels under the bar items (eww/barpanels, eww/notifications).
 #   BarPanel NAME       open NAME's dropdown, or close it if it's already open
-#                       NAME: cpu memory disk sound network battery calendar notifcenter
+#                       NAME: cpu memory disk sound network battery calendar media weather
+#                             clipboard capture notifcenter
 #   BarPanel --close    close whichever dropdown is open
 #
 # Only one dropdown is open at a time. Clicking anywhere outside it (or
@@ -23,7 +24,7 @@ width_of() {
 window_of() { [ "$1" = notifcenter ] && echo notifcenter || echo "bp-$1"; }
 
 # What's on screen, asked from X (a stuck eww's windows count too)
-open_windows() { xdotool search --name '^Eww - (notifcenter|bp-(cpu|memory|disk|sound|network|battery|calendar))$' 2>/dev/null; }
+open_windows() { xdotool search --name '^Eww - (notifcenter|bp-(cpu|memory|disk|sound|network|battery|calendar|media|weather|clipboard|capture))$' 2>/dev/null; }
 current() { cat "$STATE/open" 2>/dev/null; }
 
 

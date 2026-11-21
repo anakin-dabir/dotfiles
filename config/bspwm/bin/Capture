@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Screenshots and screen recording (the bar's Screenshot dropdown).
+#
+#   Capture screen        the monitor under the mouse
+#   Capture area          drag to choose an area (or click a window)
+#   Capture window        the focused window
+#   Capture delay N       the monitor under the mouse, in N seconds
+#   Capture record        start recording the monitor under the mouse; again to stop
+#   Capture stop          stop recording
+#   Capture bar           the bar item: a camera, or a red timer while recording
+#
+# Screenshots go to ~/Pictures/ScreenShots and are copied to the clipboard;
+# recordings go to ~/Videos/Recordings.
+
+RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
+mkdir -p "$RUN"
+PIDFILE="$RUN/rec.pid"     # pid, start time, file
+SHOTS="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/ScreenShots"
+VIDEOS="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Recordings"
+
+monitor_geometry() { # WxH+X+Y of the monitor under the mouse
+    bspc query -T -m pointed | jq -r '.rectangle | "\(.width)x\(.height)+\(.x)+\(.y)"'
+}
+
+notify_shot() {
+    local file=$1
+    paplay /usr/share/sounds/freedesktop/stereo/screen-capture.oga >/dev/null 2>&1 &
+    xclip -selection clipboard -t image/png -i "$file"
+    # "Open" opens the picture; the notification shows a small version of it
+    local action
+    action=$(dunstify -a "Screenshot" -i "$file" -A "open,Open" -A "folder,Show in folder" \
+        "Screenshot saved" "Copied to the clipboard · ${file##*/}")
+    case "$action" in
+        open) xdg-open "$file" >/dev/null 2>&1 & ;;
+        folder) xdg-open "$SHOTS" >/dev/null 2>&1 & ;;
+    esac
+}
+
+shot() { # maim options...
+    mkdir -p "$SHOTS"
+    local file; file="$SHOTS/Shot-$(date +%Y-%m-%d-%H%M%S).png"
+    sleep 0.25                            # (the dropdown that started this is gone)
+    if maim -u "$@" "$file" 2>/dev/null; then
+        notify_shot "$file"
+    fi
+}
+
+recording() { [ -s "$PIDFILE" ] && kill -0 "$(head -1 "$PIDFILE")" 2>/dev/null; }
+
+record_start() {
+    mkdir -p "$VIDEOS"
+    local geo size pos file
+    geo=$(monitor_geometry); size=${geo%%+*}; pos=${geo#*+}; pos=${pos/+/,}
+    file="$VIDEOS/Recording-$(date +%Y-%m-%d-%H%M%S).mp4"
+    # Screen + what the computer plays (the default output's monitor)
+    local audio=()
+    local mon; mon="$(pactl get-default-sink 2>/dev/null).monitor"
+    [ "$mon" != ".monitor" ] && audio=(-f pulse -i "$mon")
+    setsid ffmpeg -loglevel error -y -f x11grab -framerate 30 -video_size "$size" -i "${DISPLAY:-:0}+$pos" \
+        "${audio[@]}" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -crf 23 -c:a aac -b:a 160k \
+        "$file" </dev/null >/dev/null 2>"$RUN/rec.log" &
+    printf '%s\n%s\n%s\n' "$!" "$(date +%s)" "$file" > "$PIDFILE"
+    dunstify -a "Screen recording" -i media-record -t 2500 "Recording the screen" "Click the bar's red timer to stop"
+}
+
+record_stop() {
+    recording || { rm -f "$PIDFILE"; return; }
+    local pid file
+    pid=$(sed -n 1p "$PIDFILE"); file=$(sed -n 3p "$PIDFILE")
+    kill -INT "$pid"                      # (ffmpeg finishes the file)
+    for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+    rm -f "$PIDFILE"
+    local action
+    action=$(dunstify -a "Screen recording" -i media-record -A "open,Play" -A "folder,Show in folder" \
+        "Recording saved" "${file##*/}")
+    case "$action" in
+        open) xdg-open "$file" >/dev/null 2>&1 & ;;
+        folder) xdg-open "$VIDEOS" >/dev/null 2>&1 & ;;
+    esac
+}
+
+case "$1" in
+    screen) shot -g "$(monitor_geometry)" ;;
+    area)   shot -s -o -c 0.47,0.24,0.86,0.15 -l ;;
+    window) shot -i "$(xdotool getactivewindow)" ;;
+    delay)
+        n=${2:-5}
+        for ((i = n; i > 0; i--)); do
+            dunstify -a "Screenshot" -r 3451 -t 1100 -i camera-photo "Screenshot in $i…"; sleep 1
+        done
+        dunstify -C 3451
+        shot -g "$(monitor_geometry)" ;;
+    record) if recording; then record_stop; else record_start; fi ;;
+    stop)   record_stop ;;
+    bar)
+        if recording; then
+            s=$(( $(date +%s) - $(sed -n 2p "$PIDFILE") ))
+            red=$(sed -n 's/^red *= *//p' "$HOME/.config/bspwm/bars/colors.ini" | head -1)
+            printf '%%{F%s}󰑊 %d:%02d%%{F-}\n' "${red:-#FF453A}" $((s / 60)) $((s % 60))
+        else
+            echo "󰄀"
+        fi ;;
+    *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

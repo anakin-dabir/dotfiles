@@ -321,9 +321,194 @@ PUSH=0
 for a in "${@:2}"; do
     case "$a" in --fast) FAST=1 ;; --push) PUSH=1 ;; --rescan) RESCAN=1 ;; esac
 done
+# ----- media (what's playing, from playerctl) -----
+
+media() {
+    local sep=$'\x1f' line best="" fmt     # (not a tab: read would merge empty fields)
+    fmt="{{playerName}}${sep}{{status}}${sep}{{title}}${sep}{{artist}}${sep}{{album}}${sep}{{mpris:artUrl}}${sep}{{position}}${sep}{{mpris:length}}"
+    # The player that's playing, else the first one
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        [ -z "$best" ] && best=$line
+        [[ "$line" == *"${sep}Playing${sep}"* ]] && { best=$line; break; }
+    done < <(playerctl -a metadata --format "$fmt" 2>/dev/null)
+    if [ -z "$best" ]; then
+        echo '{"has":false,"playing":false,"player":"","title":"","artist":"","art":"","pos":"","len":"","pct":0,"seek":false}'
+        return
+    fi
+    local player status title artist album art pos len
+    IFS=$'\x1f' read -r player status title artist album art pos len <<< "$best"
+    # Cover art: a local file, or a web picture fetched once in the background
+    local pic=""
+    case "$art" in
+        file://*) pic=$(printf '%b' "${art#file://}" | sed 's/%20/ /g') ;;
+        http*://*)
+            mkdir -p "$RUN/art"
+            pic="$RUN/art/$(printf '%s' "$art" | md5sum | cut -c1-16)"
+            if [ ! -s "$pic" ]; then
+                ( curl -fsS --max-time 4 -o "$pic.part" "$art" && mv "$pic.part" "$pic" ) >/dev/null 2>&1 7>&- &
+                pic=""
+            fi ;;
+    esac
+    [ -n "$pic" ] && [ ! -s "$pic" ] && pic=""
+    jq -nc --arg player "$player" --arg status "$status" --arg title "$title" --arg artist "$artist" \
+        --arg album "$album" --arg art "$pic" --arg pos "${pos:-0}" --arg len "${len:-0}" '
+        def clock: (. / 1000000 | floor) as $s | "\($s / 60 | floor):\($s % 60 | tostring | if length < 2 then "0" + . else . end)";
+        ($pos | tonumber? // 0) as $p | ($len | tonumber? // 0) as $l
+        | {has: true, playing: ($status == "Playing"), status: $status,
+           player: ($player | split(".")[0] | if . == "" then "Player" else (.[0:1] | ascii_upcase) + .[1:] end),
+           title: (if $title == "" then "Unknown title" else $title end), artist: $artist, album: $album,
+           art: $art, pos: ($p | clock), len: (if $l > 0 then ($l | clock) else "" end),
+           pct: (if $l > 0 then ([($p * 100 / $l), 100] | min | floor) else 0 end), seek: ($l > 0)}'
+}
+
+# Bar text: "Title · Artist" (nothing when nothing is playing)
+media_bar() {
+    media | jq -r 'if .has then ((if .playing then "" else "󰏤 " end) + .title + (if .artist != "" then " · " + .artist else "" end))
+                   | if length > 32 then .[0:31] + "…" else . end else "" end'
+}
+
+# ----- weather (Open-Meteo: no account or key needed) -----
+
+WCACHE="${XDG_CACHE_HOME:-$HOME/.cache}/barpanel-weather"
+
+weather_place() { # "lat lon city": the city in config/weather.json, else from your IP address
+    local city; city=$(jq -r '.city // ""' "$HOME/.config/bspwm/config/weather.json" 2>/dev/null)
+    if [ -n "$city" ]; then
+        local f; f="$WCACHE/place-$(printf '%s' "$city" | md5sum | cut -c1-12)"
+        if [ ! -s "$f" ]; then
+            curl -fsS --max-time 4 -G "https://geocoding-api.open-meteo.com/v1/search" \
+                --data-urlencode "name=$city" -d count=1 2>/dev/null |
+                jq -r '.results[0] // empty | "\(.latitude) \(.longitude) \(.name)"' > "$f.new" &&
+                [ -s "$f.new" ] && mv "$f.new" "$f"
+            rm -f "$f.new"
+        fi
+        [ -s "$f" ] && { cat "$f"; return; }
+    fi
+    local f="$WCACHE/place" now; now=$(date +%s)
+    if [ -s "$f" ] && [ $(( now - $(stat -c %Y "$f") )) -lt 21600 ]; then cat "$f"; return; fi
+    local j; j=$(curl -fsS --max-time 4 https://ipwho.is/ 2>/dev/null)
+    if [ "$(jq -r '.success' <<< "$j" 2>/dev/null)" = true ]; then
+        jq -r '"\(.latitude) \(.longitude) \(.city)"' <<< "$j" | tee "$f"
+    elif [ -s "$f" ]; then
+        cat "$f"
+    fi
+}
+
+weather_fetch() { # $1 = "lat lon city"
+    local lat lon city
+    read -r lat lon city <<< "$1"
+    [ -n "$lat" ] || return 1
+    curl -fsS --max-time 6 "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&timezone=auto&forecast_days=6&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day&hourly=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset" \
+        2>/dev/null | jq -c --arg city "$city" --arg place "$1" '. + {city: $city, place: $place}' > "$WCACHE/forecast.new" &&
+        [ -s "$WCACHE/forecast.new" ] && mv "$WCACHE/forecast.new" "$WCACHE/forecast.json"
+    rm -f "$WCACHE/forecast.new"
+}
+
+# The forecast: refreshed every 15 minutes (in the background, the last one
+# is shown meanwhile), or at once for a new place
+weather_data() {
+    mkdir -p "$WCACHE"
+    local f="$WCACHE/forecast.json" place
+    place=$(weather_place)
+    if [ ! -s "$f" ] || [ "$(jq -r '.place // ""' "$f" 2>/dev/null)" != "$place" ]; then
+        weather_fetch "$place"
+    elif [ $(( $(date +%s) - $(stat -c %Y "$f") )) -gt 900 ]; then
+        ( weather_fetch "$place" ) >/dev/null 2>&1 7>&- &
+    fi
+    [ -s "$f" ] && cat "$f"
+}
+
+WEATHER_JQ='
+def look($code; $day):
+  if $code == 0 or $code == 1 then (if $day == 1 then ["󰖙", "Clear"] else ["󰖔", "Clear"] end) | (if $code == 1 then .[1] = "Mostly clear" else . end)
+  elif $code == 2 then (if $day == 1 then ["󰖕", "Partly cloudy"] else ["󰼱", "Partly cloudy"] end)
+  elif $code == 3 then ["󰖐", "Cloudy"]
+  elif $code == 45 or $code == 48 then ["󰖑", "Fog"]
+  elif $code >= 51 and $code <= 57 then ["󰖗", "Drizzle"]
+  elif $code >= 61 and $code <= 67 then ["󰖖", "Rain"]
+  elif $code >= 71 and $code <= 77 then ["󰖘", "Snow"]
+  elif $code >= 80 and $code <= 82 then ["󰖗", "Showers"]
+  elif $code == 85 or $code == 86 then ["󰖘", "Snow showers"]
+  elif $code >= 95 then ["󰙾", "Thunderstorm"]
+  else ["󰖐", "—"] end;
+def deg: "\(round)°";
+'
+
+weather() {
+    local data; data=$(weather_data)
+    if [ -z "$data" ]; then
+        echo '{"ok":false,"place":"Weather","temp":"","desc":"No forecast (offline?)","icon":"󰖐","hours":[],"days":[]}'
+        return
+    fi
+    jq -c "$WEATHER_JQ"'
+      . as $all | .current as $c | look($c.weather_code; $c.is_day) as $now
+      | ($c.time[0:13]) as $hour
+      | [range(0; $all.hourly.time | length) | select($all.hourly.time[.][0:13] > $hour)] [0:6] as $next
+      | {ok: true, place: (if (.city // "") == "" then "Weather" else .city end),
+         temp: ($c.temperature_2m | deg), feels: ($c.apparent_temperature | deg),
+         desc: $now[1], icon: $now[0], humidity: "\($c.relative_humidity_2m)%",
+         wind: "\($c.wind_speed_10m | round) km/h",
+         hi: (.daily.temperature_2m_max[0] | deg), lo: (.daily.temperature_2m_min[0] | deg),
+         rain: "\(.daily.precipitation_probability_max[0] // 0)%",
+         sunrise: (.daily.sunrise[0][11:16]), sunset: (.daily.sunset[0][11:16]),
+         hours: [$next[] as $i | {t: $all.hourly.time[$i][11:16],
+                  icon: look($all.hourly.weather_code[$i]; $all.hourly.is_day[$i])[0],
+                  temp: ($all.hourly.temperature_2m[$i] | deg)}],
+         days: [range(0; ([.daily.time | length, 5] | min)) as $i
+                | {d: (if $i == 0 then "Today" else ($all.daily.time[$i] + "T00:00:00Z" | fromdate | strftime("%a")) end),
+                   icon: look($all.daily.weather_code[$i]; 1)[0], desc: look($all.daily.weather_code[$i]; 1)[1],
+                   hi: ($all.daily.temperature_2m_max[$i] | deg), lo: ($all.daily.temperature_2m_min[$i] | deg)}]}' <<< "$data"
+}
+
+weather_bar() {
+    local data; data=$(weather_data)
+    [ -n "$data" ] || { echo ""; return; }
+    jq -r "$WEATHER_JQ"'.current | "\(look(.weather_code; .is_day)[0]) \(.temperature_2m | deg)"' <<< "$data"
+}
+
+# ----- clipboard (clipcat's history) -----
+
+clipboard() {
+    local id text n=0 sep=$'\t'
+    {
+        while IFS= read -r line; do
+            [ $n -ge 10 ] && break
+            id=${line%%: *}; text=${line#*: }
+            [ -n "$id" ] && [ "$id" != "$line" ] || continue
+            if [[ "$text" =~ ^\[image/[a-z]+\ ([0-9.]+\ [KMG]i?B)\ [0-9-]+T([0-9][0-9]:[0-9][0-9]) ]]; then
+                # (clipcat only gives a picture by putting it on the clipboard: no thumbnail)
+                printf '%s%s%s%s%s%s%s\n' "$id" "$sep" "Picture · ${BASH_REMATCH[1]/iB/B} · ${BASH_REMATCH[2]}" "$sep" "true" "$sep" ""
+            else
+                printf '%s%s%s%s%s%s%s\n' "$id" "$sep" "$(printf '%s' "$text" | tr '\n\t' '  ' | sed 's/  */ /g; s/^ //; s/ $//')" "$sep" "false" "$sep" ""
+            fi
+            n=$((n + 1))
+        done < <(clipcatctl list 2>/dev/null)
+    } | jq -Rsc 'split("\n") | map(select(length > 0) | split("\t")
+          | {id: .[0], text: .[1], image: (.[2] == "true"), thumb: .[3]})
+          | {count: length, items: .}'
+}
+
+# ----- screenshots and screen recording (bin/Capture) -----
+
+capture() {
+    local rec=false since="" last
+    if [ -s "$RUN/rec.pid" ] && kill -0 "$(head -1 "$RUN/rec.pid")" 2>/dev/null; then
+        rec=true
+        local start; start=$(sed -n 2p "$RUN/rec.pid")
+        local s=$(( $(date +%s) - ${start:-$(date +%s)} ))
+        since=$(printf '%d:%02d' $((s / 60)) $((s % 60)))
+    fi
+    last=$(ls -t "$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/ScreenShots"/*.png 2>/dev/null | head -1)
+    jq -nc --argjson rec "$rec" --arg since "$since" --arg last "$last" \
+        '{recording: $rec, since: $since, last: $last, last_name: ($last | split("/") | last // "")}'
+}
+
 case "$1" in
     closable) closable "$2"; exit ;;
-    cpu|memory|disk|sound|network|battery|wifi|bt|calendar)
+    media-bar) media_bar; exit ;;
+    weather-bar) weather_bar; exit ;;
+    cpu|memory|disk|sound|network|battery|wifi|bt|calendar|media|weather|clipboard|capture)
         out=$("$1" | holds "bp_$1")
         if [ "$PUSH" = 1 ]; then
             # Send straight to the open dropdown instead of waiting for its next poll
@@ -331,5 +516,5 @@ case "$1" in
         else
             echo "$out"
         fi ;;
-    *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery|wifi|bt [--push] [--fast] [--rescan]" >&2; exit 1 ;;
+    *) echo "usage: BarPanelData cpu|memory|disk|sound|network|battery|wifi|bt|calendar|media|weather|clipboard|capture|media-bar|weather-bar [--push] [--fast] [--rescan]" >&2; exit 1 ;;
 esac

@@ -13,6 +13,9 @@
 #   wifi-toggle | bt-toggle | view main|wifi|bt | wifi-scan
 #   wifi-connect N (position in the list) | bt-connect MAC
 #   run COMMAND...          close the dropdown, then run COMMAND
+#   media play|next|prev | media seek PCT
+#   clip-copy ID | clip-remove ID | clip-clear
+#   weather-refresh
 
 BIN="$HOME/.config/bspwm/bin"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
@@ -226,10 +229,35 @@ case "$1" in
         upd bp_connecting=""
         push bt network ;;
 
+    media)          # the player that the dropdown shows (playing one first)
+        player=$(playerctl -a metadata --format '{{playerName}} {{status}}' 2>/dev/null |
+                 awk '$2 == "Playing" { print $1; found = 1; exit } NR == 1 { first = $1 } END { if (!found) print first }')
+        p=(playerctl ${player:+-p "$player"})
+        case "$2" in
+            play) "${p[@]}" play-pause ;;
+            next) "${p[@]}" next ;;
+            prev) "${p[@]}" previous ;;
+            seek)
+                len=$("${p[@]}" metadata mpris:length 2>/dev/null)
+                [[ "$len" =~ ^[0-9]+$ && "$3" =~ ^[0-9.]+$ ]] &&
+                    "${p[@]}" position "$(awk -v l="$len" -v p="$3" 'BEGIN { printf "%.1f", l / 1000000 * p / 100 }')" ;;
+        esac
+        sleep 0.15; push media ;;
+
+    clip-copy)      # put an older copy back on the clipboard
+        clipcatctl promote "$2" >/dev/null 2>&1
+        "$BIN/BarPanel" --close ;;
+    clip-remove) clipcatctl remove "$2" >/dev/null 2>&1; push clipboard ;;
+    clip-clear)  clipcatctl clear >/dev/null 2>&1; push clipboard ;;
+
+    weather-refresh)
+        rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/barpanel-weather/forecast.json"
+        push weather ;;
+
     run)
         shift
         "$BIN/BarPanel" --close
         setsid "$@" >/dev/null 2>&1 < /dev/null & ;;
 
-    *) sed -n '2,11p' "$0" >&2; exit 1 ;;
+    *) sed -n '2,18p' "$0" >&2; exit 1 ;;
 esac

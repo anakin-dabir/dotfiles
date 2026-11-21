@@ -33,7 +33,8 @@ KEYWORDS = {
     "customize": "colours colors accent font size border gap corners rounded shadow blur fade "
                  "animations transparency opacity terminal gtk icons cursor picom vsync "
                  "app menu launcher rofi spotlight launchpad",
-    "bar": "polybar modules items widgets panel top bar",
+    "bar": "polybar modules items widgets panel top bar weather city location forecast media music "
+           "clipboard screenshot recording",
     "dropdowns": "panels menus processor cpu memory ram storage disk sound network battery",
     "display": "screen brightness night light redshift resolution refresh rate monitor",
     "sound": "audio volume speakers headphones microphone mic output input",
