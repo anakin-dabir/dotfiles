@@ -36,7 +36,7 @@
   :initial '{"kind":"none","name":"","signal":0,"ip":"","iface":"","down":"","up":"","down_b":0,"wifi_on":false,"bt_on":false,"bt_dev":"","airplane":false}'
   `~/.config/bspwm/bin/BarPanelData network`)
 (defpoll bp_battery :interval "2s" :run-while {bp_open == "battery"}
-  :initial '{"pct":0,"status":"","time":"","bright":0,"profile":"","profiles":[],"can_profile":false,"night":false,"awake":false}'
+  :initial '{"pct":0,"status":"","time":"","bright":0,"night_temp":4500,"profile":"","profiles":[],"can_profile":false,"night":false,"awake":false}'
   `~/.config/bspwm/bin/BarPanelData battery`)
 
 ;; Which sections each dropdown shows (Control Center > Dropdowns; BarPanel
@@ -143,7 +143,7 @@
       (label :class "bp-round ${on ? 'bp-round-on' : ''}" :text icon)
       (box :orientation "v" :space-evenly false :hexpand true :valign "center"
         (label :class "bp-nav-title" :halign "start" :text title)
-        (label :class "bp-nav-sub" :halign "start" :xalign 0 :limit-width 30 :text sub))
+        (label :class "bp-nav-sub" :halign "start" :xalign 0 :limit-width 22 :text sub))
       (bp-switch-face :on on))))
 
 ;; ----- sections (each dropdown shows them in the order saved in
@@ -281,7 +281,7 @@
 
 (defwidget bp-s-network_airplane []
   (bp-toggle :icon "󰀝" :title "Airplane mode" :on {bp_network.airplane}
-             :sub {bp_network.airplane ? "Wi-Fi and Bluetooth are off" : "Off"}
+             :sub {bp_network.airplane ? "On" : "Off"}
              :toggle "~/.config/bspwm/bin/BarPanelAction airplane &"))
 
 (defwidget bp-s-network_wifi []
@@ -296,12 +296,12 @@
 
 (defwidget bp-s-battery_night []
   (bp-toggle :icon "󰖔" :title "Night light" :on {bp_battery.night}
-             :sub {bp_battery.night ? "Warmer colours, easier on the eyes" : "Off"}
+             :sub {bp_battery.night ? "On · ${bp_battery.night_temp} K" : "Off"}
              :toggle "~/.config/bspwm/bin/BarPanelAction night &"))
 
 (defwidget bp-s-battery_awake []
   (bp-toggle :icon "󰛊" :title "Keep awake" :on {bp_battery.awake}
-             :sub {bp_battery.awake ? "Won't sleep, even with the lid closed" : "Off"}
+             :sub {bp_battery.awake ? "On · won't sleep" : "Off"}
              :toggle "~/.config/bspwm/bin/BarPanelAction awake &"))
 
 (defwidget bp-s-battery_mode []

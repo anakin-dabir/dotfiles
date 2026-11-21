@@ -18,7 +18,7 @@ BIN="$HOME/.config/bspwm/bin"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/barpanel"
 SAVED="$HOME/.cache/barpanel"     # kept across restarts
 # Night light colour temperature in K (daylight is 6500); Control Center can change it
-NIGHT_TEMP=$(cat "$SAVED/nightlight-temp" 2>/dev/null); [[ "$NIGHT_TEMP" =~ ^[0-9]+$ ]] || NIGHT_TEMP=4000
+NIGHT_TEMP=$(cat "$SAVED/nightlight-temp" 2>/dev/null); [[ "$NIGHT_TEMP" =~ ^[0-9]+$ ]] || NIGHT_TEMP=4500
 # --no-daemonize: never start a second eww; timeout: a frozen eww can't hang us
 EWW=(timeout 3 eww --no-daemonize -c "$HOME/.config/bspwm/eww")
 upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }

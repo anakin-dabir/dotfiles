@@ -84,9 +84,9 @@ class DisplayPage(Page):
                 self.bright.set_value(int(parts[3].rstrip("%") or 0))
         run(["brightnessctl", "-m"], bright)
         on = os.path.exists(os.path.join(SAVED, "nightlight"))
-        temp = read_file(os.path.join(SAVED, "nightlight-temp"), "4000")
+        temp = read_file(os.path.join(SAVED, "nightlight-temp"), "4500")
         self.quietly(lambda: self.night.set_active(on))
-        self.warmth.set_value(int(temp) if temp.isdigit() else 4000)
+        self.warmth.set_value(int(temp) if temp.isdigit() else 4500)
         self.warmth.set_sensitive(True)
         if self.pending is None:
             run(["xrandr", "--query"], lambda ok, out, _e: ok and self._monitors(parse_xrandr(out)))

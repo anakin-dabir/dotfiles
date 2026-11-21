@@ -199,10 +199,11 @@ battery() {
     profiles=$(cat /sys/firmware/acpi/platform_profile_choices 2>/dev/null)
     [ -w /sys/firmware/acpi/platform_profile ] && can=true
     [ -f "$HOME/.cache/barpanel/nightlight" ] && night=true
+    local ntemp; ntemp=$(cat "$HOME/.cache/barpanel/nightlight-temp" 2>/dev/null); [[ "$ntemp" =~ ^[0-9]+$ ]] || ntemp=4500
     kill -0 "$(cat "$RUN/awake.pid" 2>/dev/null)" 2>/dev/null && awake=true
     jq -nc --argjson pct "$pct" --arg status "$status" --arg time "$time" --argjson bright "${bright:-0}" \
         --arg profile "$profile" --arg profiles "$profiles" --argjson can "$can" \
-        --argjson night "$night" --argjson awake "$awake" \
+        --argjson night "$night" --argjson awake "$awake" --argjson ntemp "$ntemp" \
         '{pct: $pct, status: $status, time: $time, bright: $bright, profile: $profile,
           profiles: ($profiles | split(" ") | map(select(. != "")) | map({id: ., name: (
               {"low-power": "Saver", "cool": "Cool", "quiet": "Quiet", "balanced": "Balanced",
@@ -211,7 +212,7 @@ battery() {
                       "balanced": "󰗑", "balanced-performance": "󰓅",
                       "performance": "󱓞"}[.] // "󰓅")})),
           can_profile: $can,
-          night: $night, awake: $awake}
+          night: $night, night_temp: $ntemp, awake: $awake}
          | .profile_name = (.profile as $p | [.profiles[] | select(.id == $p) | .name][0] // "")'
 }
 
