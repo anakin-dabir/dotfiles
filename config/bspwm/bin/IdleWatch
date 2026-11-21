@@ -101,6 +101,7 @@ class Watch:
         self.idle = Idle()
         self.dark_from = None        # brightness before going dark
         self.locked_now = False
+        self.was_discharging = True        # (first check closes a warning left from before)
         self.fd = None
         self.bus = None
         try:
@@ -156,7 +157,28 @@ class Watch:
             subprocess.run(["brightnessctl", "-q", "set", str(self.dark_from)])
             self.dark_from = None
 
+    def _plugged_in(self):
+        """Plugged in: close the low-battery warning at once (it stays until
+        clicked otherwise; bin/battery-warn only checks every minute)."""
+        status = ""
+        for d in ("BAT0", "BAT1"):
+            try:
+                with open(f"/sys/class/power_supply/{d}/status") as f:
+                    status = f.read().strip()
+                break
+            except OSError:
+                continue
+        charging = status not in ("", "Discharging")
+        if charging and self.was_discharging:
+            subprocess.run(["dunstify", "-C", "991337"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                os.remove(os.path.join(RUN, "battery-action"))       # (a pending sleep: cancelled)
+            except OSError:
+                pass
+        self.was_discharging = status == "Discharging"
+
     def tick(self):
+        self._plugged_in()
         s = settings()
         if s["lock_on_sleep"] and self.fd is None:
             self._inhibit()

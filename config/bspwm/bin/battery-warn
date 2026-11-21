@@ -6,7 +6,12 @@ CAP=$(cat "$BAT/capacity" 2>/dev/null) || exit 0
 STATUS=$(cat "$BAT/status" 2>/dev/null) || exit 0
 
 # Only warn while discharging (not charging / full / unknown)
-[ "$STATUS" = "Discharging" ] || { rm -f "${XDG_RUNTIME_DIR:-/tmp}/barpanel/battery-action"; exit 0; }
+if [ "$STATUS" != "Discharging" ]; then
+    # Plugged in: the warning (and a pending sleep) go away
+    rm -f "${XDG_RUNTIME_DIR:-/tmp}/barpanel/battery-action"
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" dunstify -C 991337 2>/dev/null
+    exit 0
+fi
 
 # Find a user session DBus so notify-send reaches dunst when invoked by systemd
 export DISPLAY=${DISPLAY:-:0}
