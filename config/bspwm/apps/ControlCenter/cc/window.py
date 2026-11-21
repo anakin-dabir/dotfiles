@@ -42,7 +42,8 @@ class Window(Adw.ApplicationWindow):
         header = Adw.HeaderBar(title_widget=self.heading)
         content_view.add_top_bar(header)
         # A page's preview that stays on screen while its settings scroll
-        self.sticky = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN)
+        # (no animation: sliding moved the whole page for a quarter second)
+        self.sticky = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.NONE)
         self.sticky.add_css_class("cc-sticky")
         content_view.add_top_bar(self.sticky)
         self.sticky_toggle = Gtk.ToggleButton(icon_name="view-reveal-symbolic", active=True,

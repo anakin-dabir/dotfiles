@@ -447,10 +447,10 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-x {
   font-family: $bp-icons;
   font-size: 13px;
-  min-width: 22px;
+  min-width: 22px;        // a circle: as wide as it is tall
   min-height: 22px;
-  padding: 0 4px;
-  border-radius: $nc-pill-radius;
+  padding: 0;
+  border-radius: 999px;
   color: rgba($fg, 0.45);
 }
 
@@ -460,7 +460,7 @@ $bp-icons: "Material Design Icons Desktop";
 }
 
 .bp-x-space {
-  min-width: 30px;       // same as the close button, so values line up
+  min-width: 22px;       // same as the close button, so values line up
 }
 
 .bp-panel .bp-x-sure,
