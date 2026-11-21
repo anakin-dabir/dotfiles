@@ -9,8 +9,14 @@
 (defvar bp_view "main")      ;; network dropdown: main | wifi | bt
 (defvar bp_scanning false)   ;; looking for Wi-Fi networks
 (defvar bp_connecting "")    ;; Wi-Fi name or Bluetooth address being connected
-(defvar bp_wifi '{"networks":[]}')
-(defvar bp_bt '{"devices":[]}')
+;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
+;; Wi-Fi search each time: that takes seconds, the refresh button does it)
+(defpoll bp_wifi :interval "3s" :run-while {bp_open == "network" && bp_view == "wifi"}
+  :initial '{"networks":[]}'
+  `~/.config/bspwm/bin/BarPanelData wifi`)
+(defpoll bp_bt :interval "3s" :run-while {bp_open == "network" && bp_view == "bt"}
+  :initial '{"devices":[]}'
+  `~/.config/bspwm/bin/BarPanelData bt`)
 
 (defpoll bp_cpu :interval "2s" :run-while {bp_open == "cpu"}
   :initial '{"total":0,"cores":[],"temp":"","load":"","model":"","procs":[],"threads":0}'
@@ -262,8 +268,8 @@
                   (box :orientation "v" :space-evenly false :hexpand true :valign "center"
                     (label :class "bp-item-name" :halign "start" :xalign 0 :limit-width 26 :text {n.ssid})
                     (label :class "bp-item-sub" :halign "start"
-                           :visible {n.active || n.known || bp_connecting == n.ssid}
-                           :text {bp_connecting == n.ssid ? "Connecting…" : n.active ? "Connected" : "Saved"}))
+                           :visible {n.active || n.known || n.connecting || bp_connecting == n.ssid}
+                           :text {n.connecting || bp_connecting == n.ssid ? "Connecting…" : n.active ? "Connected" : "Saved"}))
                   (label :class "bp-item-lock" :visible {n.secure} :text "󰌾")
                   (label :class "bp-check" :visible {n.active} :text "󰄬")))))))))
     (box :space-evenly true :spacing 8

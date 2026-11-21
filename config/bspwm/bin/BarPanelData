@@ -211,14 +211,24 @@ battery() {
 wifi() {
     local rescan=no; [ "$RESCAN" = 1 ] && rescan=yes
     local known; known=$(nmcli -t -f NAME,TYPE con show 2>/dev/null | sed -n 's/:802-11-wireless$//p' | jq -R . | jq -sc .)
+    # Which network we're on (or joining) right now, from the Wi-Fi card
+    # itself: the scan list's own "in use" mark can be minutes old
+    local dev now="" joining="" st
+    dev=$(basename "$(dirname "$(ls -d /sys/class/net/*/wireless 2>/dev/null | head -1)")")
+    if [ -n "$dev" ]; then
+        now=$(iw dev "$dev" link 2>/dev/null | sed -n 's/^\s*SSID: //p')
+        st=$(nmcli -g GENERAL.STATE,GENERAL.CONNECTION dev show "$dev" 2>/dev/null | paste -sd'|')
+        case "$st" in 4[0-9]\ *|5[0-9]\ *|6[0-9]\ *|7[0-9]\ *) joining=${st#*|}; now="" ;; esac   # 40-90: connecting
+    fi
     nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan "$rescan" 2>/dev/null |
         sed 's/\\:/\x01/g' |
         awk -F: '$2 != "" { gsub("\x01", ":", $2); print $1 "\t" $2 "\t" $3 "\t" $4 }' |
-        jq -R -s -c --argjson known "${known:-[]}" '
+        jq -R -s -c --argjson known "${known:-[]}" --arg now "$now" --arg joining "$joining" --arg dev "$dev" '
             split("\n") | map(select(. != "") | split("\t")
-              | {active: (.[0] == "*"), ssid: .[1], signal: (.[2] | tonumber? // 0),
-                 secure: (.[3] != "" and .[3] != "--")})
+              | {active: (if $dev != "" then .[1] == $now else .[0] == "*" end), ssid: .[1],
+                 signal: (.[2] | tonumber? // 0), secure: (.[3] != "" and .[3] != "--")})
             | group_by(.ssid) | map(max_by(.signal) + {active: (map(.active) | any)})
+            | map(. + {connecting: (.ssid == $joining)})
             | map(. + {known: (.ssid as $s | $known | index($s) != null),
                        bars: (if .signal >= 75 then 4 elif .signal >= 50 then 3 elif .signal >= 25 then 2 else 1 end)})
             | sort_by([(if .active then 0 else 1 end), (if .known then 0 else 1 end), -.signal])
