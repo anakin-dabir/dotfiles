@@ -98,6 +98,34 @@ def program(cmd):
     return os.path.basename(os.path.realpath(path)) if path else os.path.basename(first)
 
 
+def app_picker(chosen):
+    """A popover listing the installed apps (with search); chosen(app) on a click."""
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=8, margin_bottom=8,
+                  margin_start=8, margin_end=8)
+    search = Gtk.SearchEntry(placeholder_text="Search apps")
+    lst = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+    lst.add_css_class("navigation-sidebar")
+    for a in sorted((a for a in Gio.AppInfo.get_all() if isinstance(a, DesktopAppInfo) and a.should_show()),
+                    key=lambda a: a.get_name().lower()):
+        r = Gtk.ListBoxRow()
+        b = Gtk.Box(spacing=10, margin_top=4, margin_bottom=4)
+        if a.get_icon():
+            b.append(Gtk.Image.new_from_gicon(a.get_icon()))
+        b.append(Gtk.Label(label=a.get_name(), xalign=0))
+        r.set_child(b)
+        r.app = a
+        lst.append(r)
+    lst.set_filter_func(lambda r: search.get_text().lower() in r.app.get_name().lower())
+    search.connect("search-changed", lambda *_: lst.invalidate_filter())
+    scroll = Gtk.ScrolledWindow(child=lst, min_content_height=320, min_content_width=280,
+                                hscrollbar_policy=Gtk.PolicyType.NEVER)
+    box.append(search)
+    box.append(scroll)
+    pop = Gtk.Popover(child=box)
+    lst.connect("row-activated", lambda _l, r: (pop.popdown(), chosen(r.app)))
+    return pop
+
+
 class AppsPage(Page):
     name = "apps"
     title = "Apps"
@@ -217,31 +245,7 @@ class AppsPage(Page):
     # ----- startup apps -----
 
     def _app_popover(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=8, margin_bottom=8,
-                      margin_start=8, margin_end=8)
-        search = Gtk.SearchEntry(placeholder_text="Search apps")
-        lst = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-        lst.add_css_class("navigation-sidebar")
-        apps = sorted((a for a in Gio.AppInfo.get_all() if isinstance(a, DesktopAppInfo) and a.should_show()),
-                      key=lambda a: a.get_name().lower())
-        for a in apps:
-            r = Gtk.ListBoxRow()
-            b = Gtk.Box(spacing=10, margin_top=4, margin_bottom=4)
-            if a.get_icon():
-                b.append(Gtk.Image.new_from_gicon(a.get_icon()))
-            b.append(Gtk.Label(label=a.get_name(), xalign=0))
-            r.set_child(b)
-            r.app = a
-            lst.append(r)
-        lst.set_filter_func(lambda r: search.get_text().lower() in r.app.get_name().lower())
-        search.connect("search-changed", lambda *_: lst.invalidate_filter())
-        scroll = Gtk.ScrolledWindow(child=lst, min_content_height=320, min_content_width=280,
-                                    hscrollbar_policy=Gtk.PolicyType.NEVER)
-        box.append(search)
-        box.append(scroll)
-        pop = Gtk.Popover(child=box)
-        lst.connect("row-activated", lambda _l, r: (pop.popdown(), self._add_startup(r.app)))
-        return pop
+        return app_picker(self._add_startup)
 
     def _add_startup(self, app):
         items = _load(STARTUP, [])

@@ -526,8 +526,9 @@ windows() {
     done
     jq -c --arg fid "$fid" --arg titles "$titles" '
         ($titles | split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: (.[1:] | join(" "))}) | from_entries) as $t
-        | [.. | objects | select(.client? != null and .hidden != true)
-           | {id: (.id | tostring), cls: .client.className, state: .client.state, sticky: .sticky,
+        | [.. | objects | select(.client? != null)
+           | {id: (.id | tostring), cls: (.client.className + (if .hidden then " · hidden" else "" end)),
+              hidden: (.hidden == true), state: .client.state, sticky: .sticky,
               title: ($t[.id | tostring] // .client.className)}] as $w
         | $fid as $f
         | {desktop: .name, layout: .layout, count: ($w | length),

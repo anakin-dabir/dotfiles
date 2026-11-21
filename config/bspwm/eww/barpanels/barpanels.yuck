@@ -738,12 +738,15 @@
         (label :class "bp-tile-text" :text text)))))
 
 (defwidget bp-s-capture_shots []
-  (box :space-evenly true :spacing 6
-    (bp-capture-tile :icon "󰍹" :text "Screen" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture screen &")
-    (bp-capture-tile :icon "󰆞" :text "Area" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture area &")
-    (bp-capture-tile :icon "󰖯" :text "Window" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture window &")
-    (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &")
-    (bp-capture-tile :icon "󱄺" :text "Text" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture text &")))
+  (box :orientation "v" :space-evenly false :spacing 6
+    (box :space-evenly true :spacing 6
+      (bp-capture-tile :icon "󰍹" :text "Screen" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture screen &")
+      (bp-capture-tile :icon "󰆞" :text "Area" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture area &")
+      (bp-capture-tile :icon "󰖯" :text "Window" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture window &"))
+    (box :space-evenly true :spacing 6
+      (bp-capture-tile :icon "󰔛" :text "In 5 s" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture delay 5 &")
+      (bp-capture-tile :icon "󱄺" :text "Text" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Capture text &")
+      (bp-capture-tile :icon "󰉦" :text "Colour" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/Colorpicker &"))))
 
 (defwidget bp-s-capture_record []
   (box :class "bp-card bp-rec ${bp_capture.recording ? 'bp-rec-on' : ''}" :space-evenly false :spacing 12
@@ -839,6 +842,10 @@
               (box :orientation "v" :space-evenly false :hexpand true
                 (label :class "bp-clip-text" :halign "start" :xalign 0 :limit-width 22 :text {w.title})
                 (label :class "bp-item-sub" :halign "start" :xalign 0 :limit-width 28 :text {w.cls})))))
+        (box :visible {w.hidden}
+          (eventbox :cursor "pointer"
+            (button :class "bp-chip" :tooltip "Bring it back" :onclick "~/.config/bspwm/bin/BarPanelAction win-show ${w.id} &"
+              (label :text "Show"))))
         (eventbox :cursor "pointer"
           (button :class "bp-x" :tooltip "Close this window" :onclick "~/.config/bspwm/bin/BarPanelAction win-close ${w.id} &" "󰅖"))))))
 

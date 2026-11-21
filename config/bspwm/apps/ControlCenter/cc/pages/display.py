@@ -1,13 +1,26 @@
 """Display: brightness, night light, resolution and refresh rate."""
 
+import json
 import os
 import re
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..common import HOME, Page, group, launch, read_file, run, run_quiet, slider_row, tool
+from ..common import BSPDIR, HOME, Page, group, launch, read_file, run, run_quiet, slider_row, tool
 
 SAVED = os.path.join(HOME, ".cache", "barpanel")
+MONITORS = os.path.join(BSPDIR, "config", "monitors.json")
+POSITIONS = [("right-of", "Right of the main screen"), ("left-of", "Left of the main screen"),
+             ("above", "Above the main screen"), ("below", "Below the main screen"),
+             ("same-as", "Same picture (mirror)")]
+
+
+def monitors_saved():
+    try:
+        with open(MONITORS) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"primary": "", "positions": {}}
 
 
 def parse_xrandr(text):
@@ -61,6 +74,12 @@ class DisplayPage(Page):
         self.warmth.scale.set_inverted(True)        # warmer to the right
         night.add(self.warmth)
 
+        # Where the screens are (only with two or more)
+        self.arrange = group(self, "Arrangement", "Where your screens are, seen from the main one. Kept after a restart.")
+        self.arrange.set_visible(False)
+        self.arrange_rows = []
+        self.arrange_key = None
+
         self.monitors = group(self, "Monitors")
         self.monitor_rows = []
         self.layout = None
@@ -91,7 +110,73 @@ class DisplayPage(Page):
         if self.pending is None:
             run(["xrandr", "--query"], lambda ok, out, _e: ok and self._monitors(parse_xrandr(out)))
 
+    def _arrangement(self, outs):
+        on = [o for o in outs]
+        key = repr([o["name"] for o in on])
+        if key == self.arrange_key:
+            return
+        self.arrange_key = key
+        for r in self.arrange_rows:
+            self.arrange.remove(r)
+        self.arrange_rows.clear()
+        self.arrange.set_visible(len(on) >= 2)
+        if len(on) < 2:
+            return
+        saved = monitors_saved()
+        names = [o["name"] for o in on]
+        main = saved.get("primary") if saved.get("primary") in names else \
+            next((o["name"] for o in on if o["primary"]), names[0])
+        prim = Adw.ComboRow(title="Main screen", subtitle="The bar and new windows go here first",
+                            model=Gtk.StringList.new(names))
+        prim.set_selected(names.index(main))
+        prim.connect("notify::selected", lambda r, _p: self._updating or self._arrange_set(primary=names[r.get_selected()]))
+        self.arrange.add(prim)
+        self.arrange_rows.append(prim)
+        for o in on:
+            if o["name"] == main:
+                continue
+            pos = saved.get("positions", {}).get(o["name"], "right-of")
+            row = Adw.ComboRow(title=o["name"], subtitle="External display" if not o["builtin"] else "Built-in display",
+                               model=Gtk.StringList.new([t for _v, t in POSITIONS]))
+            row.set_selected(next((i for i, (v, _t) in enumerate(POSITIONS) if v == pos), 0))
+            row.connect("notify::selected", lambda r, _p, n=o["name"]:
+                        self._updating or self._arrange_set(position=(n, POSITIONS[r.get_selected()][0])))
+            self.arrange.add(row)
+            self.arrange_rows.append(row)
+
+    def _arrange_set(self, primary=None, position=None):
+        s = monitors_saved()
+        if primary:
+            s["primary"] = primary
+        if position:
+            s.setdefault("positions", {})[position[0]] = position[1]
+        try:
+            with open(MONITORS, "w") as f:
+                json.dump(s, f, indent=2)
+                f.write("\n")
+        except OSError as e:
+            self.toast(f"Couldn't save: {e.strerror}")
+            return
+        main = s.get("primary") or ""
+        cmds = []
+        if main:
+            cmds.append(["xrandr", "--output", main, "--primary"])
+        for out, pos in s.get("positions", {}).items():
+            if main and out != main:
+                cmds.append(["xrandr", "--output", out, "--auto", f"--{pos}", main])
+
+        def next_cmd(_ok=True):
+            if cmds:
+                run_quiet(cmds.pop(0), next_cmd)
+            else:
+                self._after_change()
+                self.arrange_key = None
+                self.layout = None
+                GLib.timeout_add(500, lambda: (self.refresh(), False)[1])
+        next_cmd()
+
     def _monitors(self, outs):
+        self._arrangement(outs)
         key = repr([(o["name"], o["current"], o["rate"], o["on"], sorted(o["modes"])) for o in outs])
         if key == self.layout:
             return

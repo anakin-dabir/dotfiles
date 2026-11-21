@@ -10,7 +10,7 @@ import re
 from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango
 
 from .. import glyphs, rice
-from ..common import BSPDIR, CACHE, Page, current_rice, group, icon_button, read_file, run, run_quiet, text_button, tool, widgets_changed
+from ..common import BSPDIR, CACHE, Page, current_rice, group, icon_button, quick, read_file, run, run_quiet, text_button, tool, widgets_changed
 from ..common import _pool
 from ..pickers import FontButton
 from .appearance import grid, tile
@@ -265,6 +265,14 @@ class BarPage(Page):
         self.sections = []
 
         # Designs: the current one, and all of them behind "Change…"
+        shown = group(self)
+        self.visible = Adw.SwitchRow(title="Show the bar", subtitle="Off: windows use the whole screen "
+                                                                    "(also Super + Alt + H / U)")
+        self.visible.add_prefix(Gtk.Image.new_from_icon_name("view-reveal-symbolic"))
+        self.visible.connect("notify::active", lambda r, _p: self._updating or run_quiet(
+            [tool("HideBar"), "-u" if r.get_active() else "-h"]))
+        shown.add(self.visible)
+
         designs = group(self, "Bar design", "Which bar this theme uses")
         self.current_pic = Gtk.Picture(content_fit=Gtk.ContentFit.SCALE_DOWN, can_shrink=False,
                                        halign=Gtk.Align.CENTER, margin_top=12, margin_bottom=6)
@@ -430,6 +438,9 @@ class BarPage(Page):
         self.window.update_pending()
 
     def refresh(self):
+        up = bool(quick(["xdotool", "search", "--onlyvisible", "--class", "Polybar"]).strip()) or \
+            bool(quick(["xdotool", "search", "--onlyvisible", "--name", "^Eww - bar"]).strip())
+        self.quietly(lambda: self.visible.set_active(up))
         if not self.pending_text():
             r = current_rice()
             if r != self.rice or rice.theme_vars(r).get("main_bar", "") != self.bar:

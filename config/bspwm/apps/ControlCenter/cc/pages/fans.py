@@ -3,10 +3,12 @@ speed, power mode and graphics mode (HP laptops / envycontrol)."""
 
 import glob
 import os
+import shlex
 
 from gi.repository import Adw, Gtk
 
 from ..common import Page, group, have, launch, read_file, run, run_quiet, text_button, tool
+from .apps import app_picker, command_of
 
 MODE_NAMES = {"low-power": "Saver", "cool": "Cool", "quiet": "Quiet", "balanced": "Balanced",
               "balanced-performance": "Balanced+", "performance": "Performance"}
@@ -91,9 +93,26 @@ class FansPage(Page):
             row.connect("activated", lambda _r, m=mode: self._gpu(m))
             self.gpu.add(row)
             self.gpu_rows[mode] = row
-        self.gpu.set_visible(have("envycontrol"))
+        # Run one app on the NVIDIA card (prime-run), the rest staying on the other one
+        if have("prime-run"):
+            nv = Adw.ActionRow(title="Run an app on the NVIDIA card",
+                               subtitle="For games and heavy apps, while everything else uses the power-saving card")
+            nv.add_prefix(Gtk.Image.new_from_icon_name("video-display-symbolic"))
+            pick = Gtk.MenuButton(label="Choose app…", valign=Gtk.Align.CENTER)
+            pick.set_popover(app_picker(lambda a: self._nvidia(a)))
+            nv.add_suffix(pick)
+            self.gpu.add(nv)
+        self.gpu.set_visible(have("envycontrol") or have("prime-run"))
         if have("envycontrol"):
             run(["envycontrol", "--query"], lambda ok, out, _e: self._gpu_now(out.strip().splitlines()[-1] if out.strip() else ""))
+
+    def _nvidia(self, app):
+        try:
+            argv = shlex.split(command_of(app))
+        except ValueError:
+            return
+        launch(["prime-run"] + argv)
+        self.toast(f"{app.get_name()} on the NVIDIA card")
 
     def _value_row(self, g, title, icon):
         row = Adw.ActionRow(title=title)

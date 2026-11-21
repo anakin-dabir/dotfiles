@@ -193,7 +193,7 @@ def GObject_flags():
 class WindowsPage(Page):
     name = "windows"
     title = "Windows"
-    icon = "preferences-system-windows-symbolic"
+    icon = "focus-windows-symbolic"
     interval = 0
 
     def __init__(self, window):

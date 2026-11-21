@@ -6,7 +6,7 @@ import re
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..common import BSPDIR, HOME, Page, current_rice, group, launch, read_file, run, text_button, thumbnail
+from ..common import tool, BSPDIR, HOME, Page, current_rice, group, launch, read_file, run, text_button, thumbnail
 
 REPO = "https://github.com/anakin-dabir/dotfiles"
 
@@ -72,6 +72,10 @@ class AboutPage(Page):
         folder = Adw.ActionRow(title="Rice files", subtitle=BSPDIR.replace(HOME, "~"))
         folder.add_suffix(text_button("Open", lambda: launch(["xdg-open", BSPDIR])))
         rice.add(folder)
+        reload = Adw.ActionRow(title="Reload the desktop",
+                               subtitle="Bar, compositor, shortcuts and notifications start again; windows stay")
+        reload.add_suffix(text_button("Reload", lambda: (launch([tool("SoftReload")]), self.toast("Reloading…"))))
+        rice.add(reload)
 
         pc = group(self, "This computer")
         product = read_file("/sys/class/dmi/id/product_name")

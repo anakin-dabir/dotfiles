@@ -151,3 +151,20 @@ case $NUM_MONITORS in
         echo "Warning: Configuration not supported for more than 4 monitors"
         ;;
 esac
+
+# Your arrangement (Control Center > Display): config/monitors.json
+#   {"primary": "HDMI-1", "positions": {"HDMI-1": "right-of", ...}}  (positions relative to the main screen)
+LAYOUT_FILE="$HOME/.config/bspwm/config/monitors.json"
+if [ -s "$LAYOUT_FILE" ] && [ "$NUM_MONITORS" -ge 2 ]; then
+    connected=$(xrandr | awk '$2 == "connected" {print $1}')
+    main=$(jq -r '.primary // ""' "$LAYOUT_FILE")
+    echo "$connected" | grep -qx "$main" || main=$(echo "$connected" | head -1)
+    [ -n "$main" ] && xrandr --output "$main" --primary
+    jq -r '.positions // {} | to_entries[] | "\(.key) \(.value)"' "$LAYOUT_FILE" | while read -r out pos; do
+        echo "$connected" | grep -qx "$out" || continue
+        [ "$out" = "$main" ] && continue
+        case "$pos" in
+            right-of|left-of|above|below|same-as) xrandr --output "$out" --auto "--$pos" "$main" ;;
+        esac
+    done
+fi
