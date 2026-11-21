@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Desktop widgets (eww/desktop): a clock, what's playing, the weather - on the
-# desktop behind windows. From config/widgets.json:
-#   {"clock": true, "media": false, "weather": false, "corner": "top left"}
+# Desktop widgets (eww/desktop): clock, now playing, weather, calendar,
+# system - cards on the desktop, under every window. From config/widgets.json:
+#   {"order": [...], "on": {"clock": true, ...}, "style": "cards"|"clear", "corner": "top left"}
 # Run at login (bspwmrc) and by Control Center after a change.
 
 BSPDIR="$HOME/.config/bspwm"
@@ -10,19 +10,15 @@ CFG="$BSPDIR/config/widgets.json"
 [ -s "$CFG" ] || exit 0
 "$BSPDIR/bin/EwwDaemon" >/dev/null 2>&1
 
-show=$(jq -c '{clock: (.clock // true), media: (.media // false), weather: (.weather // false)}' "$CFG")
+show=$(jq -c '{order: (.order // ["clock","media","weather","calendar","system"]),
+               on: (.on // {clock: true}), style: (.style // "cards")}' "$CFG")
 corner=$(jq -r '.corner // "top left"' "$CFG")
 "${EWW[@]}" close desktop >/dev/null 2>&1
-if [ "$(jq -r '[.clock, .media, .weather] | any' <<< "$show")" != true ]; then
-    "${EWW[@]}" update "dw_show=$show" >/dev/null 2>&1
-    exit 0
-fi
 "${EWW[@]}" update "dw_show=$show" >/dev/null 2>&1
+[ "$(jq -r '.on | to_entries | any(.value)' <<< "$show")" = true ] || exit 0
 case "$corner" in
-    "top right")    pos="40x70" ;;
-    "bottom left")  pos="40x60" ;;
-    "bottom right") pos="40x60" ;;
-    *)              pos="40x70"; corner="top left" ;;
+    "top right"|"top left") pos="40x60" ;;
+    *) pos="40x50" ;;
 esac
 "${EWW[@]}" open desktop --screen 0 --anchor "$corner" --pos "$pos" >/dev/null 2>&1
 exit 0

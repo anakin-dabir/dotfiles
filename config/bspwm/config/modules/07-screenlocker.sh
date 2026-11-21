@@ -1,9 +1,5 @@
 #!/bin/sh
-
-sed -i "$HOME"/.config/bspwm/bin/ScreenLocker \
-    -e "s/bg=.*/bg=${sl_bg}/" \
-    -e "s/fg=.*/fg=${sl_fg}/" \
-    -e "s/ring=.*/ring=${sl_ring}/" \
-    -e "s/wrong=.*/wrong=${sl_wrong}/" \
-    -e "s/date=.*/date=${sl_date}/" \
-    -e "s/verify=.*/verify=${sl_verify}/"
+# The lock screen (bin/ScreenLocker) reads the theme's colours and font
+# itself when it locks; nothing to write here. (This used to edit lines in
+# ScreenLocker with sed, which broke the new one.)
+:

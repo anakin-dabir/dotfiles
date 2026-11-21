@@ -1,37 +1,102 @@
-;; Desktop widgets (bin/DesktopWidgets, Control Center > Appearance):
-;; a clock, what's playing and the weather, on the desktop behind windows.
+;; Desktop widgets (bin/DesktopWidgets, Control Center > Appearance > Desktop widgets):
+;; cards of one size, in your order: clock, now playing, weather, calendar, system.
+;; On the desktop under every window.
 
-(defvar dw_show '{"clock":true,"media":false,"weather":false}')
-(defpoll dw_media :interval "2s" :run-while {dw_show.media}
-  :initial '{"has":false,"playing":false,"title":"","artist":"","art":"","player":""}'
+(defvar dw_show '{"order":["clock","media","weather","calendar","system"],"on":{"clock":true},"style":"cards"}')
+(defpoll dw_media :interval "2s" :run-while {dw_show.on.media ?: false}
+  :initial '{"has":false,"playing":false,"title":"","artist":"","art":"","player":"","pct":0,"pos":"","len":""}'
   "~/.config/bspwm/bin/BarPanelData media")
-(defpoll dw_weather :interval "600s" :run-while {dw_show.weather}
-  :initial '{"ok":false,"place":"","temp":"","desc":"","icon":"","hi":"","lo":""}'
+(defpoll dw_weather :interval "600s" :run-while {dw_show.on.weather ?: false}
+  :initial '{"ok":false,"place":"","temp":"","desc":"","icon":"","hi":"","lo":"","hours":[]}'
   "~/.config/bspwm/bin/BarPanelData weather")
+(defpoll dw_calendar :interval "900s" :run-while {dw_show.on.calendar ?: false}
+  :initial '{"title":"","weekdays":[],"weeks":[]}'
+  "~/.config/bspwm/bin/BarPanelData calendar")
+
+;; ----- the widgets -----
+
+(defwidget dw-clock []
+  (box :class "dw-card dw-clock-card" :orientation "v" :space-evenly false
+    (label :class "dw-time" :halign "start" :text {formattime(EWW_TIME, "%H:%M")})
+    (label :class "dw-date" :halign "start" :text {formattime(EWW_TIME, "%A, %-d %B")})))
+
+(defwidget dw-media []
+  (box :class "dw-card" :visible {dw_media.has} :orientation "v" :space-evenly false :spacing 12
+    (box :space-evenly false :spacing 14
+      (box :class "dw-art" :visible {dw_media.art != ""} :style "background-image: url('${dw_media.art}');")
+      (box :class "dw-art dw-art-empty" :visible {dw_media.art == ""}
+        (label :class "dw-glyph" :hexpand true :text "󰝚"))
+      (box :orientation "v" :space-evenly false :valign "center" :spacing 2 :hexpand true
+        (label :class "dw-title" :halign "start" :xalign 0 :limit-width 22 :text {dw_media.title})
+        (label :class "dw-sub" :halign "start" :xalign 0 :limit-width 26
+               :text {dw_media.artist != "" ? dw_media.artist : dw_media.player})))
+    (progress :class "dw-progress" :visible {dw_media.len != ""} :value {dw_media.pct} :orientation "h")
+    (box :class "dw-controls" :halign "center" :space-evenly false :spacing 28
+      (eventbox :cursor "pointer" (button :onclick "~/.config/bspwm/bin/BarPanelAction media prev &" "󰒮"))
+      (eventbox :cursor "pointer" (button :class "dw-play" :onclick "~/.config/bspwm/bin/BarPanelAction media play &"
+                                          {dw_media.playing ? "󰏤" : "󰐊"}))
+      (eventbox :cursor "pointer" (button :onclick "~/.config/bspwm/bin/BarPanelAction media next &" "󰒭")))))
+
+(defwidget dw-weather []
+  (box :class "dw-card" :visible {dw_weather.ok} :orientation "v" :space-evenly false :spacing 10
+    (box :space-evenly false :spacing 12
+      (label :class "dw-weather-icon" :valign "center" :text {dw_weather.icon})
+      (box :orientation "v" :space-evenly false :valign "center" :hexpand true
+        (label :class "dw-big" :halign "start" :text {dw_weather.temp})
+        (label :class "dw-sub" :halign "start" :xalign 0 :limit-width 26 :text {dw_weather.place}))
+      (box :orientation "v" :space-evenly false :valign "center"
+        (label :class "dw-title" :halign "end" :text {dw_weather.desc})
+        (label :class "dw-sub" :halign "end" :text "${dw_weather.hi} / ${dw_weather.lo}")))
+    (box :space-evenly true
+      (for h in {dw_weather.hours}
+        (box :orientation "v" :space-evenly false :spacing 2
+          (label :class "dw-tiny" :text {h.t})
+          (label :class "dw-glyph-small" :text {h.icon})
+          (label :class "dw-tiny dw-strong" :text {h.temp}))))))
+
+(defwidget dw-calendar []
+  (box :class "dw-card" :orientation "v" :space-evenly false :spacing 4
+    (label :class "dw-title" :halign "start" :text {dw_calendar.title})
+    (box :class "dw-cal-row" :space-evenly true
+      (for w in {dw_calendar.weekdays}
+        (label :class "dw-tiny" :text {substring(w, 0, 2)})))
+    (for week in {dw_calendar.weeks}
+      (box :class "dw-cal-row" :space-evenly true
+        (for d in week
+          (box :halign "center"
+            (label :class "dw-day ${d.in ? '' : 'dw-day-out'} ${d.today ? 'dw-day-today' : ''}" :text {d.d})))))))
+
+(defwidget dw-bar [label icon value]
+  (box :class "dw-stat" :space-evenly false :spacing 10
+    (label :class "dw-glyph-small" :text icon)
+    (box :orientation "v" :space-evenly false :hexpand true :spacing 4
+      (box
+        (label :class "dw-tiny" :halign "start" :text label)
+        (label :class "dw-tiny dw-strong" :halign "end" :text "${round(value, 0)}%"))
+      (progress :class "dw-progress" :value value :orientation "h"))))
+
+(defwidget dw-system []
+  (box :class "dw-card" :orientation "v" :space-evenly false :spacing 10
+    (dw-bar :label "Processor" :icon "󰍛" :value {EWW_CPU.avg})
+    (dw-bar :label "Memory" :icon "󰘚" :value {EWW_RAM.used_mem_perc})
+    (box :visible {(EWW_BATTERY?.BAT0?.capacity ?: -1) >= 0}
+      (dw-bar :label {(EWW_BATTERY?.BAT0?.status ?: "") == "Charging" ? "Battery · charging" : "Battery"}
+              :icon "󰁹" :value {EWW_BATTERY?.BAT0?.capacity ?: 0}))))
+
+;; ----- in your order -----
 
 (defwidget dw []
-  (box :class "dw" :orientation "v" :space-evenly false :spacing 16
-    (box :visible {dw_show.clock} :class "dw-clock" :orientation "v" :space-evenly false
-      (label :class "dw-time" :halign "start" :text {formattime(EWW_TIME, "%H:%M")})
-      (label :class "dw-date" :halign "start" :text {formattime(EWW_TIME, "%A, %-d %B")}))
-    (box :visible {dw_show.media && dw_media.has} :class "dw-card" :space-evenly false :spacing 14
-      (box :class "dw-art" :visible {dw_media.art != ""} :style "background-image: url('${dw_media.art}');")
-      (box :class "dw-art dw-art-empty" :visible {dw_media.art == ""} (label :class "dw-icon" :hexpand true :text "󰝚"))
-      (box :orientation "v" :space-evenly false :valign "center" :spacing 2 :width 190
-        (label :class "dw-title" :halign "start" :xalign 0 :limit-width 24 :text {dw_media.title})
-        (label :class "dw-sub" :halign "start" :xalign 0 :limit-width 28 :text {dw_media.artist != "" ? dw_media.artist : dw_media.player})
-        (box :space-evenly false :spacing 14 :halign "start" :class "dw-controls"
-          (eventbox :cursor "pointer" (button :onclick "~/.config/bspwm/bin/BarPanelAction media prev &" "󰒮"))
-          (eventbox :cursor "pointer" (button :onclick "~/.config/bspwm/bin/BarPanelAction media play &" {dw_media.playing ? "󰏤" : "󰐊"}))
-          (eventbox :cursor "pointer" (button :onclick "~/.config/bspwm/bin/BarPanelAction media next &" "󰒭")))))
-    (box :visible {dw_show.weather && dw_weather.ok} :class "dw-card" :space-evenly false :spacing 14
-      (label :class "dw-weather-icon" :valign "center" :text {dw_weather.icon})
-      (box :orientation "v" :space-evenly false :valign "center" :spacing 2
-        (label :class "dw-title" :halign "start" :text "${dw_weather.temp} · ${dw_weather.place}")
-        (label :class "dw-sub" :halign "start" :text "${dw_weather.desc} · ${dw_weather.hi} / ${dw_weather.lo}")))))
+  (box :class "dw dw-${dw_show.style}" :orientation "v" :space-evenly false :spacing 12
+    (for k in {dw_show.order}
+      (box :visible {dw_show.on[k] ?: false} :orientation "v" :space-evenly false
+        (box :visible {k == "clock"} (dw-clock))
+        (box :visible {k == "media"} (dw-media))
+        (box :visible {k == "weather"} (dw-weather))
+        (box :visible {k == "calendar"} (dw-calendar))
+        (box :visible {k == "system"} (dw-system))))))
 
 (defwindow desktop
-  :geometry (geometry :x "40px" :y "60px" :anchor "top left")
+  :geometry (geometry :x "40px" :y "60px" :width "320px" :anchor "top left")
   ;; a desktop-type window: the window manager keeps it under every window
   :windowtype "desktop"
   :stacking "bg"

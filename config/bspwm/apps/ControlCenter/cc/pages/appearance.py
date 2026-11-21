@@ -7,12 +7,20 @@ import re
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import rice
-from ..common import BSPDIR, HOME, Page, current_rice, group, have, run_quiet, thumbnail, tool
+from ..common import widgets_changed, BSPDIR, HOME, Page, current_rice, group, have, run_quiet, thumbnail, tool
 from ..preview import current_wallpaper
 
 IMAGES = (".png", ".jpg", ".jpeg", ".webp")
 DAYNIGHT = os.path.join(BSPDIR, "config", "daynight.json")
 WIDGETS = os.path.join(BSPDIR, "config", "widgets.json")
+DW_NAMES = {
+    "clock": ("Clock", "Time and date", "preferences-system-time-symbolic"),
+    "media": ("Now playing", "Cover, song and controls (when something plays)", "audio-x-generic-symbolic"),
+    "weather": ("Weather", "Now and the next hours", "weather-few-clouds-symbolic"),
+    "calendar": ("Calendar", "This month", "x-office-calendar-symbolic"),
+    "system": ("System", "Processor, memory and battery", "utilities-system-monitor-symbolic"),
+}
+DW_STYLES = [("cards", "Cards"), ("clear", "See-through (no card)")]
 CORNERS = [("top left", "Top left"), ("top right", "Top right"), ("bottom left", "Bottom left"),
            ("bottom right", "Bottom right")]
 
@@ -110,19 +118,15 @@ class AppearancePage(Page):
         self._dn_load()
 
         # Desktop widgets (bin/DesktopWidgets, config/widgets.json)
-        dw = group(self, "Desktop widgets", "On the desktop, behind your windows.")
-        self.dw_rows = {}
-        for key, title, icon in (("clock", "Clock and date", "preferences-system-time-symbolic"),
-                                 ("media", "What's playing", "audio-x-generic-symbolic"),
-                                 ("weather", "Weather", "weather-few-clouds-symbolic")):
-            r = Adw.SwitchRow(title=title)
-            r.add_prefix(Gtk.Image.new_from_icon_name(icon))
-            r.connect("notify::active", lambda row, _p, k=key: self._dw_set(**{k: row.get_active()}))
-            dw.add(r)
-            self.dw_rows[key] = r
+        self.dw = group(self, "Desktop widgets", "Cards on the desktop, under your windows. Switch them on and "
+                                                 "put them in the order you like.")
+        self.dw_rows = []
+        self.dw_style = Adw.ComboRow(title="Look", model=Gtk.StringList.new([t for _v, t in DW_STYLES]))
+        self.dw_style.connect("notify::selected", lambda r, _p: self._dw_set(style=DW_STYLES[r.get_selected()][0]))
         self.dw_corner = Adw.ComboRow(title="Where", model=Gtk.StringList.new([t for _v, t in CORNERS]))
         self.dw_corner.connect("notify::selected", lambda r, _p: self._dw_set(corner=CORNERS[r.get_selected()][0]))
-        dw.add(self.dw_corner)
+        self.dw.add(self.dw_style)
+        self.dw.add(self.dw_corner)
         self._dw_load()
 
         # How the wallpaper is chosen (the theme's ENGINE)
@@ -273,33 +277,80 @@ class AppearancePage(Page):
                 c = json.load(f)
         except (OSError, ValueError):
             c = {}
-        return {"clock": bool(c.get("clock", False)), "media": bool(c.get("media", False)),
-                "weather": bool(c.get("weather", False)), "corner": c.get("corner", "top left")}
+        order = [k for k in c.get("order", []) if k in DW_NAMES]
+        order += [k for k in DW_NAMES if k not in order]
+        return {"order": order, "on": dict(c.get("on", {"clock": True})),
+                "style": c.get("style", "cards"), "corner": c.get("corner", "top left")}
 
     def _dw_load(self):
         c = self._dw()
+        for r in self.dw_rows:
+            self.dw.remove(r)
+        self.dw_rows.clear()
+        self.dw.remove(self.dw_style)
+        self.dw.remove(self.dw_corner)
+        n = len(c["order"])
+        for i, key in enumerate(c["order"]):
+            title, sub, icon = DW_NAMES[key]
+            r = Adw.ActionRow(title=title, subtitle=sub)
+            r.add_prefix(Gtk.Image.new_from_icon_name(icon))
+            for step, ic, tip, ok in ((-1, "go-up-symbolic", "Move up", i > 0), (1, "go-down-symbolic", "Move down", i < n - 1)):
+                b = Gtk.Button(icon_name=ic, valign=Gtk.Align.CENTER, tooltip_text=tip, sensitive=ok)
+                b.add_css_class("flat")
+                b.connect("clicked", lambda _b, k=key, st=step: self._dw_move(k, st))
+                r.add_suffix(b)
+            sw = Gtk.Switch(active=bool(c["on"].get(key)), valign=Gtk.Align.CENTER)
+            sw.connect("notify::active", lambda s_, _p, k=key: self._dw_on(k, s_.get_active()))
+            r.add_suffix(sw)
+            r.set_activatable_widget(sw)
+            self.dw.add(r)
+            self.dw_rows.append(r)
+        self.dw.add(self.dw_style)
+        self.dw.add(self.dw_corner)
 
         def put():
-            for k, r in self.dw_rows.items():
-                r.set_active(c[k])
+            self.dw_style.set_selected(next((i for i, (v, _t) in enumerate(DW_STYLES) if v == c["style"]), 0))
             self.dw_corner.set_selected(next((i for i, (v, _t) in enumerate(CORNERS) if v == c["corner"]), 0))
         self.quietly(put)
-        self.dw_corner.set_sensitive(any(c[k] for k in self.dw_rows))
+        on = any(c["on"].get(k) for k in DW_NAMES)
+        self.dw_style.set_sensitive(on)
+        self.dw_corner.set_sensitive(on)
+        widgets_changed()
 
-    def _dw_set(self, **changes):
-        if self._updating:
-            return
-        c = self._dw()
-        c.update(changes)
+    def _dw_save(self, c):
         try:
             with open(WIDGETS, "w") as f:
                 json.dump(c, f, indent=2)
                 f.write("\n")
         except OSError as e:
             self.toast(f"Couldn't save: {e.strerror}")
-            return
-        self._dw_load()
+            return False
         run_quiet([tool("DesktopWidgets")])
+        return True
+
+    def _dw_set(self, **changes):
+        if self._updating:
+            return
+        c = self._dw()
+        c.update(changes)
+        if self._dw_save(c):
+            self._dw_load()
+
+    def _dw_on(self, key, on):
+        c = self._dw()
+        c["on"][key] = on
+        if self._dw_save(c):
+            GLib.idle_add(lambda: (self._dw_load(), False)[1])
+
+    def _dw_move(self, key, step):
+        c = self._dw()
+        o = c["order"]
+        i = o.index(key)
+        j = i + step
+        if 0 <= j < len(o):
+            o[i], o[j] = o[j], o[i]
+            if self._dw_save(c):
+                self._dw_load()
 
     # ----- day and night -----
 

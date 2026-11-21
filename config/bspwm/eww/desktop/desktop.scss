@@ -1,64 +1,127 @@
-// Desktop widgets: the theme's font and accent, a soft shadow so they read on any wallpaper.
+// Desktop widgets: one card style for all, in the theme's font, colours and accent.
+// "cards": solid enough to read on any wallpaper; "clear": no card, a soft text shadow.
 
 .dw {
   font-family: $nc-font;
 }
 .dw label {
   font-family: $nc-font;
-  color: #ffffff;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
-}
-.dw-clock .dw-time {
-  font-size: 84px;
-  font-weight: bold;
-  letter-spacing: -2px;
-}
-.dw-clock .dw-date {
-  font-size: 20px;
-  margin-top: -6px;
-  color: rgba(255, 255, 255, 0.85);
+  color: $fg;
 }
 .dw-card {
-  padding: 14px 16px;
-  border-radius: $nc-radius + 4px;
-  background-color: rgba($bg, 0.62);
-  border: 1px solid rgba($fg, 0.08);
+  min-width: 288px;
+  padding: 16px 18px;
+  border-radius: $nc-radius + 6px;
+  background-color: rgba($bg, 0.86);
+  border: 1px solid rgba($fg, 0.10);
 }
-.dw-card label {
-  text-shadow: none;
+.dw-clear .dw-card {
+  background-color: transparent;
+  border-color: transparent;
+  padding: 4px 2px;
 }
+.dw-clear label {
+  color: #ffffff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+// clock
+.dw .dw-time {
+  font-size: 64px;
+  font-weight: bold;
+  letter-spacing: -1px;
+}
+.dw .dw-date {
+  font-size: 15px;
+  color: $nc-accent;
+  font-weight: bold;
+}
+.dw-clear .dw-date {
+  color: #ffffff;
+}
+
+// text
+.dw .dw-title {
+  font-size: 14px;
+  font-weight: bold;
+}
+.dw .dw-big {
+  font-size: 30px;
+  font-weight: bold;
+}
+.dw .dw-sub {
+  font-size: 12px;
+  color: rgba($fg, 0.65);
+}
+.dw-clear .dw-sub {
+  color: rgba(255, 255, 255, 0.8);
+}
+.dw .dw-tiny {
+  font-size: 11px;
+  color: rgba($fg, 0.65);
+}
+.dw .dw-strong {
+  color: $fg;
+  font-weight: bold;
+}
+.dw-clear .dw-tiny, .dw-clear .dw-strong {
+  color: #ffffff;
+}
+
+// icons
+.dw .dw-glyph, .dw .dw-glyph-small, .dw .dw-weather-icon, .dw-controls button {
+  font-family: "Material Design Icons Desktop";
+  color: $nc-accent;
+}
+.dw .dw-glyph { font-size: 26px; }
+.dw .dw-glyph-small { font-size: 16px; }
+.dw .dw-weather-icon { font-size: 42px; }
+
+// media
 .dw-art {
-  min-width: 64px;
-  min-height: 64px;
+  min-width: 58px;
+  min-height: 58px;
   border-radius: 10px;
   background-size: cover;
   background-position: center;
 }
 .dw-art-empty {
-  background-color: rgba($nc-accent, 0.25);
-}
-.dw .dw-icon, .dw .dw-weather-icon {
-  font-family: "Material Design Icons Desktop";
-  color: $nc-accent;
-}
-.dw .dw-icon { font-size: 26px; }
-.dw .dw-weather-icon { font-size: 40px; }
-.dw .dw-title {
-  font-size: 15px;
-  font-weight: bold;
-}
-.dw .dw-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-}
-.dw-controls {
-  margin-top: 6px;
+  background-color: rgba($nc-accent, 0.18);
 }
 .dw-controls button {
-  font-family: "Material Design Icons Desktop";
-  font-size: 18px;
-  color: #ffffff;
+  font-size: 20px;
+  color: $fg;
+}
+.dw-controls .dw-play {
+  font-size: 26px;
+  color: $nc-accent;
 }
 .dw-controls button:hover {
   color: $nc-accent;
+}
+.dw-progress trough {
+  min-height: 4px;
+  border-radius: 99px;
+  background-color: rgba($fg, 0.15);
+}
+.dw-progress progress {
+  min-height: 4px;
+  border-radius: 99px;
+  background-color: $nc-accent;
+}
+
+// calendar
+.dw .dw-day {
+  font-size: 12px;
+  min-width: 26px;
+  min-height: 22px;
+}
+.dw .dw-day-out {
+  color: rgba($fg, 0.3);
+}
+.dw .dw-day-today {
+  color: $nc-on-accent;
+  background-color: $nc-accent;
+  border-radius: 99px;
+  font-weight: bold;
 }

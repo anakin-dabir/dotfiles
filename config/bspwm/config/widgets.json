@@ -1,6 +1,18 @@
 {
-  "clock": true,
-  "media": true,
-  "weather": false,
+  "order": [
+    "clock",
+    "media",
+    "weather",
+    "calendar",
+    "system"
+  ],
+  "on": {
+    "clock": true,
+    "media": false,
+    "weather": false,
+    "calendar": false,
+    "system": false
+  },
+  "style": "cards",
   "corner": "top left"
 }
