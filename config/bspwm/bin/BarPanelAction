@@ -31,16 +31,21 @@ push() { local p; for p in "$@"; do "$BIN/BarPanelData" "$p" --push; done; }
 # The click-outside layer (bp-closer) covers the screen under the bar. While
 # the Wi-Fi password box is open, it's split into pieces around the dropdown
 # and the box, so clicks (and the pointer) on the box reach it.
-closer_split() { # box window
+closer_split() { # [box window] - around the dropdown (and the box)
     local m cpos csize cx cy cw ch
     read -r m cpos csize < "$RUN/closer" 2>/dev/null || return
     cx=${cpos%x*}; cy=${cpos#*x}; cw=${csize%x*}; ch=${csize#*x}
-    eval "$(xdotool getwindowgeometry --shell "$1" | sed 's/^/B_/')"
     local dd; dd=$(xdotool search --onlyvisible --name '^Eww - bp-network$' 2>/dev/null | head -1)
+    [ -n "$dd" ] || return
     eval "$(xdotool getwindowgeometry --shell "$dd" | sed 's/^/D_/')"
+    if [ -n "$1" ]; then
+        eval "$(xdotool getwindowgeometry --shell "$1" | sed 's/^/B_/')"
+    else
+        B_X=$D_X; B_Y=$D_Y; B_WIDTH=$D_WIDTH; B_HEIGHT=$D_HEIGHT
+    fi
     local left=$(( D_X < B_X ? D_X : B_X )) right=$(( D_X + D_WIDTH > B_X + B_WIDTH ? D_X + D_WIDTH : B_X + B_WIDTH ))
     local top=$(( D_Y < B_Y ? D_Y : B_Y )) bottom=$(( D_Y + D_HEIGHT > B_Y + B_HEIGHT ? D_Y + D_HEIGHT : B_Y + B_HEIGHT ))
-    "${EWW[@]}" close bp-closer >/dev/null 2>&1
+    "${EWW[@]}" close bp-closer bp-closer-l bp-closer-r bp-closer-t bp-closer-b >/dev/null 2>&1
     [ $(( left - cx )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-l --screen "$m" --pos "${cx}x${cy}" --size "$(( left - cx ))x${ch}" >/dev/null 2>&1
     [ $(( cx + cw - right )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-r --screen "$m" --pos "${right}x${cy}" --size "$(( cx + cw - right ))x${ch}" >/dev/null 2>&1
     [ $(( top - cy )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-t --screen "$m" --pos "${left}x${cy}" --size "$(( right - left ))x$(( top - cy ))" >/dev/null 2>&1
@@ -48,11 +53,9 @@ closer_split() { # box window
     return 0
 }
 closer_restore() {
-    local m cpos csize
-    "${EWW[@]}" close bp-closer-l bp-closer-r bp-closer-t bp-closer-b >/dev/null 2>&1
-    read -r m cpos csize < "$RUN/closer" 2>/dev/null || return
-    [ "$("${EWW[@]}" get bp_open)" = network ] &&
-        "${EWW[@]}" open bp-closer --screen "$m" --pos "$cpos" --size "$csize" >/dev/null 2>&1
+    # (back around the dropdown alone: a full layer opened now would sit on
+    # top of the dropdown and catch every click)
+    closer_split
 }
 
 # Change one field of a dropdown's data at once (sliders: the number next to

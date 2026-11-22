@@ -915,7 +915,7 @@ eww --no-daemonize -c \"$HOME/.config/bspwm/eww\" update bp_ask_err= bp_pass_ok=
              :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &")
       (eventbox :cursor "pointer" :tooltip {bp_pass_show ? "Hide the password" : "Show the password"}
         (button :class "bp-pass-eye" :onclick "eww --no-daemonize -c $HOME/.config/bspwm/eww update bp_pass_show=${!bp_pass_show} &"
-          {bp_pass_show ? "󰈉" : "󰈈"})))
+          {bp_pass_show ? "󰛑" : "󰛐"})))
     (box :space-evenly true :spacing 8
       (eventbox :cursor "pointer" :hexpand true
         (button :class "bp-button" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-ask-cancel &"
