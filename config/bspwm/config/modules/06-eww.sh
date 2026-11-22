@@ -24,10 +24,28 @@ else
 fi
 [ "$_nc_lum" -gt 165 ] && _nc_on_accent="#111111" || _nc_on_accent="#ffffff"
 
+# Text that reads on the background: a faint theme text colour (e.g. dark
+# blue on black) is lightened, or darkened on light themes, until it reads
+_eww_fg=$(python3 - "$fg" "$bg" <<'PY' 2>/dev/null
+import sys, colorsys
+def rgb(h): h = h.lstrip("#")[-6:]; return [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+def lum(c): return sum(w * (x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for w, x in zip((0.2126, 0.7152, 0.0722), c))
+def ratio(a, b): la, lb = sorted((lum(a), lum(b)), reverse=True); return (la + 0.05) / (lb + 0.05)
+fg, bg = rgb(sys.argv[1]), rgb(sys.argv[2])
+target = (1, 1, 1) if lum(bg) < 0.4 else (0, 0, 0)
+t = 0.0
+while ratio(fg, bg) < 7 and t < 1:
+    t += 0.05
+    fg = [x + (y - x) * 0.05 / (1.05 - t) for x, y in zip(fg, target)]
+print("#" + "".join(f"{round(min(max(x, 0), 1) * 255):02X}" for x in fg))
+PY
+)
+[ -n "$_eww_fg" ] || _eww_fg=$fg
+
 _write "$HOME/.config/bspwm/eww/colors.scss" << EOF
 \$bg: ${bg};
 \$bg-alt: ${accent_color};
-\$fg: ${fg};
+\$fg: ${_eww_fg};
 \$black: ${blackb};
 \$red: ${red};
 \$green: ${green};

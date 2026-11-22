@@ -28,14 +28,15 @@
 }
 .osd label {
   font-family: $nc-font;
-  color: #ffffff;
+  color: $fg;
 }
 .osd .osd-icon {
   font-family: "Material Design Icons Desktop";
   font-size: 22px;
+  color: $nc-on-accent;          // (it sits on the accent fill)
 }
 .osd-off .osd-icon {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba($fg, 0.5);
 }
 .osd-plain .osd-icon {
   color: $nc-accent;
