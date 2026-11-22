@@ -737,7 +737,7 @@ $bp-icons: "Material Design Icons Desktop";
   padding: 14px 16px;
 }
 .bp-pass-field {
-  padding: 2px 12px;
+  padding: 3px 4px 3px 12px;
   border-radius: $nc-card-radius;
   background-color: rgba($fg, 0.08);
   border: 1px solid rgba($nc-accent, 0.6);
@@ -749,8 +749,10 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-pass-eye {
   font-family: $bp-icons;
   font-size: 18px;
-  min-width: 30px;
-  min-height: 30px;
+  padding: 0 5px 0 0;     /* (the glyph sits right of its box) */
+  margin: 0;
+  min-width: 27px;
+  min-height: 32px;
   border-radius: 999px;
   border: none;
   box-shadow: none;

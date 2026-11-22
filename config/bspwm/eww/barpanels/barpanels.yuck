@@ -913,8 +913,8 @@ __BP_PASS__
 n=$(head -n 1 \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" | wc -m)
 eww --no-daemonize -c \"$HOME/.config/bspwm/eww\" update bp_ask_err= bp_pass_ok=$([ \"$n\" -gt 8 ] && echo true || echo false)"
              :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &")
-      (eventbox :cursor "pointer" :tooltip {bp_pass_show ? "Hide the password" : "Show the password"}
-        (button :class "bp-pass-eye" :onclick "eww --no-daemonize -c $HOME/.config/bspwm/eww update bp_pass_show=${!bp_pass_show} &"
+      (eventbox :cursor "pointer" :valign "center" :tooltip {bp_pass_show ? "Hide the password" : "Show the password"}
+        (button :class "bp-pass-eye" :valign "center" :halign "center" :onclick "eww --no-daemonize -c $HOME/.config/bspwm/eww update bp_pass_show=${!bp_pass_show} &"
           {bp_pass_show ? "󰛑" : "󰛐"})))
     (box :space-evenly true :spacing 8
       (eventbox :cursor "pointer" :hexpand true
