@@ -77,13 +77,13 @@ class Window(Adw.ApplicationWindow):
         self.set_size_request(720, 480)
         self.timer = 0
 
-        self.pages = [P(self) for P in PAGES]
-        self.by_name = {p.name: p for p in self.pages}
+        # Pages are built when first needed (the one you open first, the rest
+        # just after the window is on screen): opening is quicker
+        self.classes = {P.name: P for P in PAGES}
+        self.built = {}
 
         # Content: header + stack of pages, with toasts on top
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
-        for p in self.pages:
-            self.stack.add_named(p, p.name)
         self.toasts = Adw.ToastOverlay(child=self.stack)
         content_view = Adw.ToolbarView()
         self.heading = Adw.WindowTitle()
@@ -129,11 +129,11 @@ class Window(Adw.ApplicationWindow):
         self.family_of = {}           # page name -> (family title, [pages])
         self.switchers = {}           # family id -> Adw.ToggleGroup (the tabs)
         done = set()
-        for p in self.pages:
+        for p in PAGES:
             if p.name in done:
                 continue
             fam = next((f for f in FAMILIES if p.name in f[3]), None)
-            members = [self.by_name[n] for n in fam[3] if n in self.by_name] if fam else [p]
+            members = [self.classes[n] for n in fam[3] if n in self.classes] if fam else [p]
             done.update(m.name for m in members)
             title, icon = (fam[1], fam[2]) if fam and len(members) > 1 else (p.title, p.icon)
             box = Gtk.Box(spacing=12, margin_top=2, margin_bottom=2)
@@ -146,7 +146,7 @@ class Window(Adw.ApplicationWindow):
             text.append(hit)
             box.append(text)
             row = Gtk.ListBoxRow(child=box)
-            row.page, row.pages, row.title = members[0], members, title
+            row.name, row.names, row.title = members[0].name, [m.name for m in members], title
             row.hit_label, row.match = hit, None
             if len(members) > 1:
                 tabs = Adw.ToggleGroup()
@@ -196,9 +196,35 @@ class Window(Adw.ApplicationWindow):
         self.connect("notify::visible-dialog", lambda *_: widgets_changed())
         self.connect("notify::visible-dialog", self._dialog_shown)
         self.connect("close-request", self._closing)
-        dd = self.by_name.get("dropdowns")
-        if dd is not None:
-            GLib.timeout_add_seconds(3, lambda: (dd.prepare(), False)[1])
+        if "dropdowns" in self.classes:
+            GLib.timeout_add_seconds(3, lambda: (self.get_page("dropdowns").prepare(), False)[1])
+        GLib.timeout_add(150, self._build_rest)
+
+    # ----- pages, built when needed -----
+
+    def get_page(self, name):
+        page = self.built.get(name)
+        if page is None:
+            page = self.classes[name](self)
+            self.built[name] = page
+            self.stack.add_named(page, name)
+        return page
+
+    def _build_rest(self):
+        """The other pages, one at a time while nothing else is going on."""
+        rest = [n for n in self.classes if n not in self.built]
+        if rest:
+            self.get_page(rest[0])
+            GLib.idle_add(self._build_rest)
+        return False
+
+    @property
+    def pages(self):
+        return [self.get_page(n) for n in self.classes]
+
+    @property
+    def by_name(self):
+        return {n: self.get_page(n) for n in self.classes}
 
 
     def _show_sticky(self):
@@ -279,10 +305,10 @@ class Window(Adw.ApplicationWindow):
             if isinstance(row, Gtk.ListBoxRow):
                 row.match, row.shown = None, not words
                 if words:
-                    for p in row.pages:
+                    for p in (self.get_page(n) for n in row.names):
                         if all(w in _plain(row.title + " " + p.title + " " + KEYWORDS.get(p.name, "")) for w in words):
                             row.shown = True
-                            if row.match is None and len(row.pages) > 1:
+                            if row.match is None and len(row.names) > 1:
                                 row.match = (p.title, None, p)
                         found = next(((n, w) for n, w in self._settings_of(p) if all(x in _plain(n) for x in words)), None)
                         if found:
@@ -310,7 +336,7 @@ class Window(Adw.ApplicationWindow):
         if row.match is None:
             return
         name, widget, page = row.match
-        if page is not row.page or self.page is not page:
+        if page.name != row.name or self.page is not page:
             self.show_page(page.name)
         if widget is None:
             return
@@ -355,26 +381,26 @@ class Window(Adw.ApplicationWindow):
     # ----- navigation -----
 
     def show_page(self, name):
-        page = self.by_name.get(name) or self.pages[0]
-        row = self._row_of(page)
-        row.page = page
+        if name not in self.classes:
+            name = next(iter(self.classes))
+        row = self._row_of(name)
+        row.name = name
         if self.list.get_selected_row() is row:
             self._show(row)
         else:
             self.list.select_row(row)   # -> _selected -> _show
 
-    def _row_of(self, page):
+    def _row_of(self, name):
         row = self.list.get_first_child()
         while row is not None:
-            if isinstance(row, Gtk.ListBoxRow) and page in row.pages:
+            if isinstance(row, Gtk.ListBoxRow) and name in row.names:
                 return row
             row = row.get_next_sibling()
         return self.list.get_row_at_index(0)
 
     def _tab(self, row, name):
-        page = self.by_name.get(name)
-        if page is not None and page is not row.page:
-            row.page = page
+        if name in self.classes and name != row.name:
+            row.name = name
             self._show(row)
 
     def _selected(self, _list, row):
@@ -382,7 +408,7 @@ class Window(Adw.ApplicationWindow):
             self._show(row)
 
     def _show(self, row):
-        page = row.page
+        page = self.get_page(row.name)
         if self.page is not None and self.page is not page:
             self.page.leave()
         # Load the page's state before it's on screen: switches then don't
