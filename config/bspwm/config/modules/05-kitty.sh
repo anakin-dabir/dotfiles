@@ -1,6 +1,14 @@
 #!/bin/sh
 
-sed -i "s|^background_opacity .*|background_opacity ${P_TERM_OPACITY}|" "$HOME/.config/kitty/kitty.conf"
+# Opacity (added if kitty.conf doesn't have the line yet); dynamic_background_opacity
+# lets windows that are already open change too
+_kconf="$HOME/.config/kitty/kitty.conf"
+if grep -q '^background_opacity ' "$_kconf"; then
+    sed -i "s|^background_opacity .*|background_opacity ${P_TERM_OPACITY}|" "$_kconf"
+else
+    printf '\nbackground_opacity %s\n' "${P_TERM_OPACITY}" >> "$_kconf"
+fi
+grep -q '^dynamic_background_opacity ' "$_kconf" || printf 'dynamic_background_opacity yes\n' >> "$_kconf"
 
 # The theme's accent (#AARRGGBB -> #RRGGBB): cursor, selection, links, active border
 _term_accent=$(printf '%s' "${FOCUSED_BC:-$blue}" | sed 's/^#..\([0-9A-Fa-f]\{6\}\)$/#\1/')

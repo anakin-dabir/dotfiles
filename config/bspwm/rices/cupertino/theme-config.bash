@@ -63,12 +63,12 @@ term_font_name="JetBrainsMono Nerd Font"
 
 # Picom — macOS vibrancy: strong blur, soft shadow, rounded windows
 P_FADE="true"
-P_SHADOWS="true"
+P_SHADOWS="false"
 SHADOW_C="#000000"
 P_CORNER_R="10"
 P_BLUR="true"
 P_ANIMATIONS="@"
-P_TERM_OPACITY="1.0"
+P_TERM_OPACITY="0.95"
 
 # Dunst — notification-centre style
 dunst_offset='(14, 40)'
