@@ -49,6 +49,5 @@ if [ -n "$selected" ]; then
         # Re-grab keys after layout change — without this, sxhkd's keysym
         # bindings break until a manual reload.
         pkill -USR1 sxhkd
-        OSD layout "${selected#* }"
     fi
 fi

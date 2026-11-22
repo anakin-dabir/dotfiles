@@ -16,6 +16,7 @@
 # Licensed under GPL-3.0 license
 # =============================================================
 
+DIR="$HOME/.config/bspwm/config/assets"
 BRIGHTNESS_STEPS=5
 MIN_BRIGHTNESS=2
 
@@ -27,9 +28,14 @@ get_brightness() {
     brightnessctl i | extract_pct
 }
 
-send_notification() {      # (the on-screen pop-up, bin/OSD)
-    OSD brightness "$1"
+send_notification() {
+    brightness="$1"
+    icon="$DIR/brightness.svg"
+
+    # The graphical bar comes from the int:value hint, dunst draws it itself.
+    dunstify "Brightness $brightness%" -i "$icon" -r 5555 -h int:value:"$brightness"
 }
+
 adjust_brightness() {
     current="$(get_brightness)"
 

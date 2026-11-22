@@ -3,5 +3,4 @@
 (include "welcome/welcome.yuck")
 (include "notifications/notifications.yuck")
 (include "barpanels/barpanels.yuck")
-(include "osd/osd.yuck")
 (include "desktop/desktop.yuck")
