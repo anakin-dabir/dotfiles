@@ -746,13 +746,14 @@ $bp-icons: "Material Design Icons Desktop";
   border-color: $red;
   background-color: rgba($red, 0.08);
 }
-.bp-panel .bp-pass-icon {
+.bp-panel .bp-pass-eye {
   font-family: $bp-icons;
-  font-size: 16px;
+  font-size: 17px;
+  padding: 4px 2px;
   color: rgba($fg, 0.6);
 }
-.bp-pass-bad .bp-pass-icon {
-  color: $red;
+.bp-panel .bp-pass-eye:hover {
+  color: $fg;
 }
 .bp-pass {
   padding: 8px 0;

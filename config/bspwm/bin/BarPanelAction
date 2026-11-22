@@ -28,6 +28,33 @@ EWW=(timeout 3 eww --no-daemonize -c "$HOME/.config/bspwm/eww")
 upd()  { "${EWW[@]}" update "$@" >/dev/null 2>&1; }
 push() { local p; for p in "$@"; do "$BIN/BarPanelData" "$p" --push; done; }
 
+# The click-outside layer (bp-closer) covers the screen under the bar. While
+# the Wi-Fi password box is open, it's split into pieces around the dropdown
+# and the box, so clicks (and the pointer) on the box reach it.
+closer_split() { # box window
+    local m cpos csize cx cy cw ch
+    read -r m cpos csize < "$RUN/closer" 2>/dev/null || return
+    cx=${cpos%x*}; cy=${cpos#*x}; cw=${csize%x*}; ch=${csize#*x}
+    eval "$(xdotool getwindowgeometry --shell "$1" | sed 's/^/B_/')"
+    local dd; dd=$(xdotool search --onlyvisible --name '^Eww - bp-network$' 2>/dev/null | head -1)
+    eval "$(xdotool getwindowgeometry --shell "$dd" | sed 's/^/D_/')"
+    local left=$(( D_X < B_X ? D_X : B_X )) right=$(( D_X + D_WIDTH > B_X + B_WIDTH ? D_X + D_WIDTH : B_X + B_WIDTH ))
+    local top=$(( D_Y < B_Y ? D_Y : B_Y )) bottom=$(( D_Y + D_HEIGHT > B_Y + B_HEIGHT ? D_Y + D_HEIGHT : B_Y + B_HEIGHT ))
+    "${EWW[@]}" close bp-closer >/dev/null 2>&1
+    [ $(( left - cx )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-l --screen "$m" --pos "${cx}x${cy}" --size "$(( left - cx ))x${ch}" >/dev/null 2>&1
+    [ $(( cx + cw - right )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-r --screen "$m" --pos "${right}x${cy}" --size "$(( cx + cw - right ))x${ch}" >/dev/null 2>&1
+    [ $(( top - cy )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-t --screen "$m" --pos "${left}x${cy}" --size "$(( right - left ))x$(( top - cy ))" >/dev/null 2>&1
+    [ $(( cy + ch - bottom )) -gt 0 ] && "${EWW[@]}" open bp-closer --id bp-closer-b --screen "$m" --pos "${left}x${bottom}" --size "$(( right - left ))x$(( cy + ch - bottom ))" >/dev/null 2>&1
+    return 0
+}
+closer_restore() {
+    local m cpos csize
+    "${EWW[@]}" close bp-closer-l bp-closer-r bp-closer-t bp-closer-b >/dev/null 2>&1
+    read -r m cpos csize < "$RUN/closer" 2>/dev/null || return
+    [ "$("${EWW[@]}" get bp_open)" = network ] &&
+        "${EWW[@]}" open bp-closer --screen "$m" --pos "$cpos" --size "$csize" >/dev/null 2>&1
+}
+
 # Change one field of a dropdown's data at once (sliders: the number next to
 # the slider follows while you drag, without re-reading the whole system)
 patch() { # var jq-filter
@@ -208,6 +235,7 @@ case "$1" in
         if [ $rc -eq 0 ]; then
             date +%s%N > "$RUN/pass-closed"           # (the dropdown stays open)
             "${EWW[@]}" close bp-wifi-pass >/dev/null 2>&1
+            closer_restore
             upd bp_ask="" bp_ask_ssid="" bp_pass_ok=false
         else
             # (a wrong password leaves a half-made connection behind: remove it)
@@ -222,6 +250,7 @@ case "$1" in
     wifi-ask-cancel)
         rm -f "$RUN/wifi-pass"; date +%s%N > "$RUN/pass-closed"
         "${EWW[@]}" close bp-wifi-pass >/dev/null 2>&1
+        closer_restore
         upd bp_ask="" bp_ask_ssid="" bp_ask_err="" bp_pass_ok=false ;;
 
     wifi-connect) # $2 = position in the dropdown's list (names can contain quotes)
@@ -235,7 +264,7 @@ case "$1" in
         elif [ "$(jq -r .secure <<< "$info")" = true ]; then
             # Ask for the password in the dropdown (wifi-pass connects)
             rm -f "$RUN/wifi-pass"
-            upd bp_ask="$2" bp_ask_ssid="$ssid" bp_ask_err="" bp_pass_ok=false
+            upd bp_ask="$2" bp_ask_ssid="$ssid" bp_ask_err="" bp_pass_ok=false bp_pass_show=false
             # right under the dropdown, attached to it (the dropdown always stays on
             # top, so the box can't cover it); beside it when there's no room below.
             # (eww places it: it moves it back if anything else does)
@@ -256,7 +285,10 @@ case "$1" in
                 pw=$(xdotool search --onlyvisible --name '^Eww - bp-wifi-pass$' 2>/dev/null | head -1)
                 [ -n "$pw" ] && break; sleep 0.03
             done
-            [ -n "$pw" ] && xdotool windowfocus "$pw" 2>/dev/null
+            if [ -n "$pw" ]; then
+                xdotool windowfocus "$pw" 2>/dev/null
+                closer_split "$pw"
+            fi
             exit 0
         else
             upd bp_connecting="$ssid"

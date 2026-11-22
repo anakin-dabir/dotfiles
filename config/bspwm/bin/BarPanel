@@ -156,6 +156,7 @@ open() { # $1 = name
     local shown; shown=$(jq -c . "$BSPDIR/config/dropdowns.json" 2>/dev/null)
     show() {
         # (the click-outside layer opens while the dropdown's state is set)
+        echo "$mon $cpos $csize" > "$STATE/closer"     # (the Wi-Fi password box splits it)
         "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &
         local closer=$!
         "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" bp_ask="" bp_ask_err="" \

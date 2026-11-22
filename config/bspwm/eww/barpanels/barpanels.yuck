@@ -13,6 +13,7 @@
 (defvar bp_ask_err "")        ;; ...and why the last try failed
 (defvar bp_ask_ssid "")       ;; ...and its name
 (defvar bp_pass_ok false)     ;; ...long enough to try (8+ characters)
+(defvar bp_pass_show false)   ;; ...shown as text (the eye) or as dots
 (defvar bp_confirm "")
 (defvar bp_calendar '{"title":"","offset":0,"weekdays":[],"weeks":[]}')   ;; the month shown (BarPanelData calendar)       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
 ;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
@@ -901,18 +902,20 @@
         (label :class "bp-item-sub ${bp_ask_err != '' ? 'bp-ask-err' : ''}" :halign "start" :xalign 0 :limit-width 34
                :text {bp_connecting == bp_ask_ssid && bp_ask_ssid != "" ? "Joining…"
                       : bp_ask_err != "" ? bp_ask_err : "Type the Wi-Fi password"})))
-    ;; the field: a key icon and the password (dots); red when the last try failed.
+    ;; the field: the password (dots, or text with the eye); red when the last try failed.
     ;; Typing: the text goes to a private file (quoted here-document: quotes are
     ;; safe), Join becomes clickable at 8 characters, a red error clears.
     (box :class "bp-pass-field ${bp_ask_err != '' ? 'bp-pass-bad' : ''}" :space-evenly false :spacing 8
-      (label :class "bp-pass-icon" :text "󰌆")
-      (input :class "bp-pass" :password true :hexpand true
+      (input :class "bp-pass" :password {!bp_pass_show} :hexpand true
              :onchange "umask 077; cat > \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" <<'__BP_PASS__'
 {}
 __BP_PASS__
 n=$(head -n 1 \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" | wc -m)
 eww --no-daemonize -c \"$HOME/.config/bspwm/eww\" update bp_ask_err= bp_pass_ok=$([ \"$n\" -gt 8 ] && echo true || echo false)"
-             :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &"))
+             :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &")
+      (eventbox :cursor "pointer" :tooltip {bp_pass_show ? "Hide the password" : "Show the password"}
+        (button :class "bp-pass-eye" :onclick "eww --no-daemonize -c $HOME/.config/bspwm/eww update bp_pass_show=${!bp_pass_show} &"
+          {bp_pass_show ? "󰈉" : "󰈈"})))
     (box :space-evenly true :spacing 8
       (eventbox :cursor "pointer" :hexpand true
         (button :class "bp-button" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-ask-cancel &"
