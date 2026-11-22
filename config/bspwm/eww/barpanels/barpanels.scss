@@ -736,14 +736,30 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel.bp-ask {
   padding: 14px 16px;
 }
-.bp-pass {
-  padding: 9px 12px;
+.bp-pass-field {
+  padding: 2px 12px;
   border-radius: $nc-card-radius;
   background-color: rgba($fg, 0.08);
   border: 1px solid rgba($nc-accent, 0.6);
+}
+.bp-pass-bad {
+  border-color: $red;
+  background-color: rgba($red, 0.08);
+}
+.bp-panel .bp-pass-icon {
+  font-family: $bp-icons;
+  font-size: 16px;
+  color: rgba($fg, 0.6);
+}
+.bp-pass-bad .bp-pass-icon {
+  color: $red;
+}
+.bp-pass {
+  padding: 8px 0;
   color: $fg;
   font-family: $nc-font;
 }
+
 .bp-panel .bp-ask-err {
   color: $red;
   font-size: 11px;
@@ -754,4 +770,12 @@ $bp-icons: "Material Design Icons Desktop";
 .bp-panel .bp-button-accent .bp-btn-text {
   color: $nc-on-accent;
   font-weight: bold;
+}
+
+// Join while it can't be used yet (password too short, or joining)
+.bp-panel .bp-button-accent.bp-button-off {
+  background-color: rgba($nc-accent, 0.32);
+}
+.bp-panel .bp-button-accent.bp-button-off .bp-btn-text {
+  color: rgba($nc-on-accent, 0.55);
 }

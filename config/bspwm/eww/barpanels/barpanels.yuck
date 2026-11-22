@@ -12,6 +12,7 @@
 (defvar bp_ask "")            ;; Wi-Fi list: the network (position) asking for its password
 (defvar bp_ask_err "")        ;; ...and why the last try failed
 (defvar bp_ask_ssid "")       ;; ...and its name
+(defvar bp_pass_ok false)     ;; ...long enough to try (8+ characters)
 (defvar bp_confirm "")
 (defvar bp_calendar '{"title":"","offset":0,"weekdays":[],"weeks":[]}')   ;; the month shown (BarPanelData calendar)       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
 ;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
@@ -894,24 +895,33 @@
 (defwidget bp-wifi-pass-box []
   (box :class "bp-panel bp-ask" :orientation "v" :space-evenly false :spacing 10
     (box :space-evenly false :spacing 10
-      (label :class "bp-item-icon" :text "󰌾")
+      (label :class "bp-item-icon" :text "󰖩")
       (box :orientation "v" :space-evenly false :hexpand true
         (label :class "bp-item-name" :halign "start" :xalign 0 :limit-width 26 :text {bp_ask_ssid})
-        (label :class "bp-item-sub" :halign "start" :xalign 0
-               :text {bp_connecting == bp_ask_ssid && bp_ask_ssid != "" ? "Connecting…" : "Type the Wi-Fi password"})))
-    (input :class "bp-pass" :password true :hexpand true
-           :onchange "umask 077; cat > \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" <<'__BP_PASS__'
+        (label :class "bp-item-sub ${bp_ask_err != '' ? 'bp-ask-err' : ''}" :halign "start" :xalign 0 :limit-width 34
+               :text {bp_connecting == bp_ask_ssid && bp_ask_ssid != "" ? "Joining…"
+                      : bp_ask_err != "" ? bp_ask_err : "Type the Wi-Fi password"})))
+    ;; the field: a key icon and the password (dots); red when the last try failed.
+    ;; Typing: the text goes to a private file (quoted here-document: quotes are
+    ;; safe), Join becomes clickable at 8 characters, a red error clears.
+    (box :class "bp-pass-field ${bp_ask_err != '' ? 'bp-pass-bad' : ''}" :space-evenly false :spacing 8
+      (label :class "bp-pass-icon" :text "󰌆")
+      (input :class "bp-pass" :password true :hexpand true
+             :onchange "umask 077; cat > \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" <<'__BP_PASS__'
 {}
-__BP_PASS__"
-           :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &")
-    (label :class "bp-ask-err" :halign "start" :xalign 0 :wrap true :visible {bp_ask_err != ""} :text bp_ask_err)
+__BP_PASS__
+n=$(head -n 1 \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" | wc -m)
+eww --no-daemonize -c \"$HOME/.config/bspwm/eww\" update bp_ask_err= bp_pass_ok=$([ \"$n\" -gt 8 ] && echo true || echo false)"
+             :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &"))
     (box :space-evenly true :spacing 8
       (eventbox :cursor "pointer" :hexpand true
         (button :class "bp-button" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-ask-cancel &"
           (label :class "bp-btn-text" :text "Cancel")))
-      (eventbox :cursor "pointer" :hexpand true
-        (button :class "bp-button bp-button-accent" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-pass &"
-          (label :class "bp-btn-text" :text "Join"))))))
+      (eventbox :cursor {bp_pass_ok && bp_connecting == "" ? "pointer" : "default"} :hexpand true
+        (button :class "bp-button bp-button-accent ${bp_pass_ok && bp_connecting == '' ? '' : 'bp-button-off'}"
+                :active {bp_pass_ok && bp_connecting == ""}
+                :onclick "~/.config/bspwm/bin/BarPanelAction wifi-pass &"
+          (label :class "bp-btn-text" :text {bp_connecting == bp_ask_ssid && bp_ask_ssid != "" ? "Joining…" : "Join"}))))))
 
 (defwindow bp-wifi-pass
   :geometry (geometry :width "340px")
