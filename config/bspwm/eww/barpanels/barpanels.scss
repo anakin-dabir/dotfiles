@@ -731,3 +731,27 @@ $bp-icons: "Material Design Icons Desktop";
   background-color: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+
+// ----- Wi-Fi password, in the list -----
+.bp-panel.bp-ask {
+  padding: 14px 16px;
+}
+.bp-pass {
+  padding: 9px 12px;
+  border-radius: $nc-card-radius;
+  background-color: rgba($fg, 0.08);
+  border: 1px solid rgba($nc-accent, 0.6);
+  color: $fg;
+  font-family: $nc-font;
+}
+.bp-panel .bp-ask-err {
+  color: $red;
+  font-size: 11px;
+}
+.bp-button-accent {
+  background-color: $nc-accent;
+}
+.bp-panel .bp-button-accent .bp-btn-text {
+  color: $nc-on-accent;
+  font-weight: bold;
+}

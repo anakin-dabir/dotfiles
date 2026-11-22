@@ -9,6 +9,9 @@
 (defvar bp_view "main")      ;; network dropdown: main | wifi | bt
 (defvar bp_scanning false)   ;; looking for Wi-Fi networks
 (defvar bp_connecting "")
+(defvar bp_ask "")            ;; Wi-Fi list: the network (position) asking for its password
+(defvar bp_ask_err "")        ;; ...and why the last try failed
+(defvar bp_ask_ssid "")       ;; ...and its name
 (defvar bp_confirm "")
 (defvar bp_calendar '{"title":"","offset":0,"weekdays":[],"weeks":[]}')   ;; the month shown (BarPanelData calendar)       ;; a button waiting for its second click ("Sure?")    ;; Wi-Fi name or Bluetooth address being connected
 ;; The Wi-Fi and Bluetooth lists refresh while they're on screen (no new
@@ -463,8 +466,9 @@
               :height {arraylength(bp_wifi.networks) > 7 ? 330 : arraylength(bp_wifi.networks) < 4 ? 188 : arraylength(bp_wifi.networks) * 46 + 4}
         (box :orientation "v" :space-evenly false :spacing 2
           (for n in {bp_wifi.networks}
+           (box :orientation "v" :space-evenly false
             (eventbox :cursor "pointer"
-              (button :class "bp-item ${n.active ? 'bp-item-on' : ''}"
+              (button :class "bp-item ${n.active || bp_ask == '${n.i}' ? 'bp-item-on' : ''}"
                       :onclick "~/.config/bspwm/bin/BarPanelAction wifi-connect ${n.i} &"
                 (box :space-evenly false :spacing 12
                   (label :class "bp-item-icon"
@@ -475,7 +479,7 @@
                            :visible {n.active || n.known || n.connecting || bp_connecting == n.ssid}
                            :text {n.connecting || bp_connecting == n.ssid ? "Connecting…" : n.active ? "Connected" : "Saved"}))
                   (label :class "bp-item-lock" :visible {n.secure} :text "󰌾")
-                  (label :class "bp-check" :visible {n.active} :text "󰄬")))))))))
+                  (label :class "bp-check" :visible {n.active} :text "󰄬"))))))))))
     (box :space-evenly true :spacing 8
       (bp-button :icon "󰐕" :text "Other Network…" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/OpenApps --netmanager &")
       (bp-button :icon "󰒓" :text "Settings" :onclick "~/.config/bspwm/bin/BarPanelAction run ~/.config/bspwm/bin/ControlCenter network &"))))
@@ -882,6 +886,40 @@
     (bp-head :icon "󰖲" :title "Windows"
              :sub "Desktop ${bp_windows.desktop} · ${bp_windows.count} open" :value "")
     (bp-o-windows)))
+
+;; ----- Wi-Fi password: a small window over the bottom of the network dropdown -----
+;; (bspwm manages it so it gets the keyboard; bin/ExternalRules puts it in place.)
+;; The typed text goes to a private file through a quoted here-document: quotes in it are safe.
+
+(defwidget bp-wifi-pass-box []
+  (box :class "bp-panel bp-ask" :orientation "v" :space-evenly false :spacing 10
+    (box :space-evenly false :spacing 10
+      (label :class "bp-item-icon" :text "󰌾")
+      (box :orientation "v" :space-evenly false :hexpand true
+        (label :class "bp-item-name" :halign "start" :xalign 0 :limit-width 26 :text {bp_ask_ssid})
+        (label :class "bp-item-sub" :halign "start" :xalign 0
+               :text {bp_connecting == bp_ask_ssid && bp_ask_ssid != "" ? "Connecting…" : "Type the Wi-Fi password"})))
+    (input :class "bp-pass" :password true :hexpand true
+           :onchange "umask 077; cat > \"$XDG_RUNTIME_DIR/barpanel/wifi-pass\" <<'__BP_PASS__'
+{}
+__BP_PASS__"
+           :onaccept "~/.config/bspwm/bin/BarPanelAction wifi-pass &")
+    (label :class "bp-ask-err" :halign "start" :xalign 0 :wrap true :visible {bp_ask_err != ""} :text bp_ask_err)
+    (box :space-evenly true :spacing 8
+      (eventbox :cursor "pointer" :hexpand true
+        (button :class "bp-button" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-ask-cancel &"
+          (label :class "bp-btn-text" :text "Cancel")))
+      (eventbox :cursor "pointer" :hexpand true
+        (button :class "bp-button bp-button-accent" :onclick "~/.config/bspwm/bin/BarPanelAction wifi-pass &"
+          (label :class "bp-btn-text" :text "Join"))))))
+
+(defwindow bp-wifi-pass
+  :geometry (geometry :width "340px")
+  :windowtype "dialog"
+  :wm-ignore false
+  :focusable true
+  :resizable false
+  (bp-wifi-pass-box))
 
 ;; ================= windows =================
 

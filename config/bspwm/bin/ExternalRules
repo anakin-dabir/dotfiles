@@ -22,6 +22,13 @@ result() {
     [ "$state" ] || echo "$1"
 }
 
+# eww windows that bspwm manages (the Wi-Fi password box): float, no border;
+# BarPanelAction puts them in place (their title isn't set yet here)
+if [ "$class" = Eww ]; then
+    echo "state=floating focus=on border=off layer=above"
+    exit 0
+fi
+
 case "$class" in
     FloaTerm)
 		result "state=floating center=on rectangle=696x399+0+0"

@@ -30,7 +30,15 @@ current() { cat "$STATE/open" 2>/dev/null; }
 
 start_watcher() {
     stop_watcher
-    ( bspc subscribe desktop_focus node_focus | head -n 1 >/dev/null
+    ( bspc subscribe desktop_focus node_focus | while read -r ev _ _ node; do
+          # (not when the Wi-Fi password box takes the focus, or gives it back)
+          if [ "$ev" = node_focus ]; then
+              [ "$(xdotool getwindowname "$node" 2>/dev/null)" = "Eww - bp-wifi-pass" ] && continue
+              last=$(cat "$STATE/pass-closed" 2>/dev/null)
+              [ -n "$last" ] && [ $(( $(date +%s%N) - last )) -lt 1500000000 ] && continue
+          fi
+          break
+      done
       rm -f "$STATE/watcher.pid"   # so --close doesn't stop this very process
       "$0" --close ) >/dev/null 2>&1 7>&- &
     echo $! > "$STATE/watcher.pid"
@@ -120,6 +128,7 @@ fill() { # $1 = name, $2 = max height
 
 close() {
     local was; was=$(current)
+    rm -f "$STATE/wifi-pass"        # (a Wi-Fi password typed but not used)
     stop_watcher
     rm -f "$STATE/open"
     local wins; wins=$("${EWW[@]}" active-windows 2>/dev/null | cut -d: -f1 | grep -E '^(notifcenter|bp-)')
@@ -149,7 +158,7 @@ open() { # $1 = name
         # (the click-outside layer opens while the dropdown's state is set)
         "${EWW[@]}" open bp-closer --screen "$mon" --pos "$cpos" --size "$csize" >/dev/null 2>&1 &
         local closer=$!
-        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" \
+        "${EWW[@]}" update bp_open="$name" bp_view=main bp_scanning=false bp_connecting="" bp_ask="" bp_ask_err="" \
             ${shown:+"bp_show=$shown"} >/dev/null 2>&1 &&
         "${EWW[@]}" open "$win" --screen "$mon" --pos "$pos" --anchor "$anchor" >/dev/null 2>&1
         local ok=$?

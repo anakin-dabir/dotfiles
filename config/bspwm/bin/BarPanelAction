@@ -192,6 +192,36 @@ case "$1" in
         "$BIN/BarPanelData" wifi --rescan --push
         upd bp_scanning=false ;;
 
+    wifi-pass)      # the password was typed in the password box
+        ssid=$("${EWW[@]}" get bp_ask_ssid)
+        [ -n "$ssid" ] || exit 1
+        pass=$(head -n 1 "$RUN/wifi-pass" 2>/dev/null)
+        if [ ${#pass} -lt 8 ]; then
+            upd bp_ask_err="Wi-Fi passwords have at least 8 characters"; exit 0
+        fi
+        upd bp_ask_err="" bp_connecting="$ssid"
+        out=$(nmcli dev wifi connect "$ssid" password "$pass" 2>&1); rc=$?
+        rm -f "$RUN/wifi-pass"; pass=""
+        upd bp_connecting=""
+        if [ $rc -eq 0 ]; then
+            date +%s%N > "$RUN/pass-closed"           # (the dropdown stays open)
+            "${EWW[@]}" close bp-wifi-pass >/dev/null 2>&1
+            upd bp_ask="" bp_ask_ssid=""
+        else
+            # (a wrong password leaves a half-made connection behind: remove it)
+            nmcli -t -f NAME con show | grep -qxF "$ssid" && ! nmcli -t -f NAME con show --active | grep -qxF "$ssid" &&
+                nmcli con delete id "$ssid" >/dev/null 2>&1
+            msg=$(tail -n 1 <<< "$out" | sed 's/^Error: //')
+            case "$msg" in *[Ss]ecrets*|*password*|*802-11-wireless-security*) msg="Wrong password. Try again." ;; esac
+            upd bp_ask_err="$msg"
+        fi
+        push wifi network ;;
+
+    wifi-ask-cancel)
+        rm -f "$RUN/wifi-pass"; date +%s%N > "$RUN/pass-closed"
+        "${EWW[@]}" close bp-wifi-pass >/dev/null 2>&1
+        upd bp_ask="" bp_ask_ssid="" bp_ask_err="" ;;
+
     wifi-connect) # $2 = position in the dropdown's list (names can contain quotes)
         info=$("${EWW[@]}" get bp_wifi | jq -c --argjson i "$2" '.networks[$i]')
         ssid=$(jq -r .ssid <<< "$info")
@@ -201,12 +231,31 @@ case "$1" in
             upd bp_connecting="$ssid"
             out=$(nmcli con up id "$ssid" 2>&1)
         elif [ "$(jq -r .secure <<< "$info")" = true ]; then
-            pass=$(rofi -dmenu -password -p "Password" -mesg "Wi-Fi network \"$ssid\"" \
-                   -theme "$HOME/.config/bspwm/config/rofi-themes/NetManagerDM.rasi" \
-                   -theme-str 'listview { enabled: false; }' < /dev/null 2>/dev/null) || exit 0
-            [ -z "$pass" ] && exit 0
-            upd bp_connecting="$ssid"
-            out=$(nmcli dev wifi connect "$ssid" password "$pass" 2>&1)
+            # Ask for the password in the dropdown (wifi-pass connects)
+            rm -f "$RUN/wifi-pass"
+            upd bp_ask="$2" bp_ask_ssid="$ssid" bp_ask_err=""
+            # right under the dropdown, attached to it (the dropdown always stays on
+            # top, so the box can't cover it); beside it when there's no room below.
+            # (eww places it: it moves it back if anything else does)
+            dd=$(xdotool search --onlyvisible --name '^Eww - bp-network$' 2>/dev/null | head -1)
+            pos=""
+            if [ -n "$dd" ]; then
+                eval "$(xdotool getwindowgeometry --shell "$dd" | sed 's/^/D_/')"
+                read -r SW SH < <(xdotool getdisplaygeometry)
+                px=$D_X; py=$(( D_Y + D_HEIGHT + 6 ))
+                if [ $(( py + 160 )) -gt "$SH" ]; then
+                    py=$(( D_Y + D_HEIGHT - 153 ))
+                    px=$(( D_X - 340 - 8 )); [ "$px" -lt 0 ] && px=$(( D_X + D_WIDTH + 8 ))
+                fi
+                pos="--pos ${px}x${py}"
+            fi
+            "${EWW[@]}" open bp-wifi-pass $pos --anchor "top left" >/dev/null 2>&1
+            for _ in $(seq 30); do
+                pw=$(xdotool search --onlyvisible --name '^Eww - bp-wifi-pass$' 2>/dev/null | head -1)
+                [ -n "$pw" ] && break; sleep 0.03
+            done
+            [ -n "$pw" ] && xdotool windowfocus "$pw" 2>/dev/null
+            exit 0
         else
             upd bp_connecting="$ssid"
             out=$(nmcli dev wifi connect "$ssid" 2>&1)
