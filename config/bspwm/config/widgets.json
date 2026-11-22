@@ -7,7 +7,7 @@
     "system"
   ],
   "on": {
-    "clock": true,
+    "clock": false,
     "media": false,
     "weather": false,
     "calendar": false,

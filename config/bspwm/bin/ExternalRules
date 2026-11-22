@@ -32,9 +32,6 @@ case "$class" in
 	Scratch)
 		result "state=floating focus=on sticky=on"
 		;;
-	RiceEditor)
-		result "state=floating focus=on center=on"
-		;;
 	ControlCenter)
 		# Only the main window gets its size (not any dialog window it opens)
 		if xprop -id "$wid" _NET_WM_WINDOW_TYPE 2>/dev/null | grep -q _NET_WM_WINDOW_TYPE_DIALOG; then

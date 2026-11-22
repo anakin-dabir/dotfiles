@@ -7,13 +7,6 @@
 # Licensed under GPL-3.0 license
 # =============================================================
 
-# Icon directory
-vol_dir="$HOME/.config/bspwm/config/assets"
-
-notify() {
-    dunstify -u low -h string:x-dunst-stack-tag:cvolum "$@"
-}
-
 # Get volume status (prints "muted" or a bare number, no %)
 get_volume() {
     status=$(pamixer --get-volume-human)
@@ -21,14 +14,6 @@ get_volume() {
     case "$status" in
         muted) echo muted ;;
         *) echo "${status%\%}" ;;
-    esac
-}
-
-# Determine icon based on a volume value (muted|0|N)
-get_icon() {
-    case "$1" in
-        muted|0) icon="$vol_dir/mute.png" ;;
-        *) icon="$vol_dir/vol.png" ;;
     esac
 }
 

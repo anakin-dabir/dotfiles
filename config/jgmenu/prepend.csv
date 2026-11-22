@@ -44,7 +44,7 @@ User Card,OpenApps --usercard,system-users
 Music Player,OpenApps --player,musique
 
 ^tag(wm)
-Rice Editor,RiceEditor,preferences-desktop-theme
+Customize the theme,ControlCenter customize,preferences-desktop-theme
 Keybinds,OpenApps --KeyHelp,preferences-desktop-keyboard-shortcuts
 Restart WM,bspc wm -r,system-reboot
 Soft Reload,SoftReload,system-reboot
