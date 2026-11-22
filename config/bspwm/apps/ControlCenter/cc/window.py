@@ -353,7 +353,10 @@ class Window(Adw.ApplicationWindow):
                     tries[0] -= 1                 # not laid out yet
                     return True
                 if ok:
-                    adj.set_value(min(max(0, pt.y - 12), adj.get_upper() - adj.get_page_size()))
+                    # (the point is measured in the viewport, which moves as it
+                    # scrolls: add how far it's scrolled already)
+                    y = pt.y + adj.get_value()
+                    adj.set_value(min(max(0, y - 12), adj.get_upper() - adj.get_page_size()))
                     if tries[0] >= 0:            # once more when pictures above it have loaded
                         tries[0] = -1
                         GLib.timeout_add(400, lambda: (focus(), False)[1])
